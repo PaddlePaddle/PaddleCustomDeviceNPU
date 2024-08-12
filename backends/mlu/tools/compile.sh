@@ -40,6 +40,7 @@ Configuring cmake in build ...
     -DWITH_MKL=${WITH_MKL}
     -DWITH_ARM=${WITH_ARM}
     -DON_INFER=${ON_INFER:-OFF}
+    -DPYTHON_VERSION=${PYTHON_VERSION:-""}
 ========================================
 EOF
 
@@ -51,6 +52,7 @@ cmake .. \
     -DWITH_MKL=${WITH_MKL:-ON} \
     -DWITH_ARM=${WITH_ARM:-OFF} \
     -DON_INFER=${ON_INFER:-OFF} \
+    -DPYTHON_VERSION=${PYTHON_VERSION:-""} \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON;cmake_error=$?
 
 if [ "$cmake_error" != 0 ];then
