@@ -46,6 +46,7 @@ Configuring cmake in build ...
     -DWITH_ATB=${WITH_ATB:-OFF}
     -DON_INFER=${ON_INFER:-OFF}
     -DWITH_COVERAGE=${WITH_COVERAGE:-OFF}
+    -DPYTHON_VERSION=${PYTHON_VERSION:-""}
 ========================================
 EOF
 
@@ -58,6 +59,7 @@ cmake .. \
     -DWITH_ATB=${WITH_ATB:-OFF} \
     -DON_INFER=${ON_INFER:-OFF} \
     -DWITH_COVERAGE=${WITH_COVERAGE:-OFF} \
+    -DPYTHON_VERSION=${PYTHON_VERSION:-""} \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON;cmake_error=$?
 
 if [ "$cmake_error" != 0 ];then

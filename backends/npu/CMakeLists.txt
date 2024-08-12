@@ -158,7 +158,7 @@ add_custom_command(
           ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/npu/passes
   COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/passes/*
           ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/npu/passes
-  COMMAND python3 ${CMAKE_CURRENT_BINARY_DIR}/setup.py bdist_wheel
+  COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py bdist_wheel
   DEPENDS ${CUSTOM_NPU_NAME}
   COMMENT "Packing whl packages------>>>")
 
