@@ -67,10 +67,10 @@ inline phi::DDim GetUnsqueezeShape(const std::vector<int64_t> unsqz_dims,
 }
 
 template <typename T, typename Context>
-void UnsqueezeInferKernel(const Context& dev_ctx,
-                          const phi::DenseTensor& x,
-                          const phi::IntArray& axes,
-                          phi::DenseTensor* out) {
+void UnsqueezeKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::IntArray& axes,
+                     phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("unsqueeze_infer");
   VLOG(6) << "[HOST_KERNEL] Impl on host for unsqueeze_infer";
   auto x_dims = x.dims();
@@ -86,26 +86,24 @@ void UnsqueezeInferKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void UnsqueezeKernel(const Context& dev_ctx,
-                     const phi::DenseTensor& x,
-                     const phi::IntArray& axes,
-                     phi::DenseTensor* out,
-                     phi::DenseTensor* xshape) {
+void UnsqueezeWithXShapeKernel(const Context& dev_ctx,
+                               const phi::DenseTensor& x,
+                               const phi::IntArray& axes,
+                               phi::DenseTensor* out,
+                               phi::DenseTensor* xshape) {
   PADDLE_GCU_KERNEL_TRACE("unsqueeze");
   VLOG(6) << "[HOST_KERNEL] Impl on host for unsqueeze";
-  custom_kernel::UnsqueezeInferKernel<T, Context>(dev_ctx, x, axes, out);
+  custom_kernel::UnsqueezeKernel<T, Context>(dev_ctx, x, axes, out);
 }
 
 template <typename T, typename Context>
 void UnsqueezeGradKernel(const Context& dev_ctx,
-                         const phi::DenseTensor& x_shape,
+                         const phi::DenseTensor& x,
                          const phi::DenseTensor& dout,
                          phi::DenseTensor* dx) {
   PADDLE_GCU_KERNEL_TRACE("unsqueeze_grad");
   VLOG(6) << "[HOST_KERNEL] Impl on host for unsqueeze_grad";
-  auto xshape_dims = x_shape.dims();
-  auto x_dims = phi::slice_ddim(xshape_dims, 1, xshape_dims.size());
-
+  auto x_dims = dx->dims();
   dev_ctx.template Alloc<T>(dx);
   custom_kernel::TensorCopy(dev_ctx, dout, false, dx);
   dx->Resize(x_dims);
@@ -113,10 +111,10 @@ void UnsqueezeGradKernel(const Context& dev_ctx,
 
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(unsqueeze_infer,
+PD_REGISTER_PLUGIN_KERNEL(unsqueeze,
                           gcu,
                           ALL_LAYOUT,
-                          custom_kernel::UnsqueezeInferKernel,
+                          custom_kernel::UnsqueezeKernel,
                           float,
                           double,
                           phi::dtype::bfloat16,
@@ -129,10 +127,10 @@ PD_REGISTER_PLUGIN_KERNEL(unsqueeze_infer,
                           phi::dtype::complex<float>,
                           phi::dtype::complex<double>) {}
 
-PD_REGISTER_PLUGIN_KERNEL(unsqueeze,
+PD_REGISTER_PLUGIN_KERNEL(unsqueeze_with_xshape,
                           gcu,
                           ALL_LAYOUT,
-                          custom_kernel::UnsqueezeKernel,
+                          custom_kernel::UnsqueezeWithXShapeKernel,
                           float,
                           double,
                           phi::dtype::bfloat16,

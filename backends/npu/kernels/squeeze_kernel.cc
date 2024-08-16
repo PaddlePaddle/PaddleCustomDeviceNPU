@@ -18,10 +18,10 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void SqueezeInferKernel(const Context& dev_ctx,
-                        const phi::DenseTensor& x,
-                        const phi::IntArray& axes_int_array,
-                        phi::DenseTensor* out) {
+void SqueezeKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::IntArray& axes_int_array,
+                   phi::DenseTensor* out) {
   auto stream = dev_ctx.stream();
 
   auto out_dims = out->dims();
@@ -33,36 +33,33 @@ void SqueezeInferKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void SqueezeKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::IntArray& axes_int_array,
-                   phi::DenseTensor* out,
-                   phi::DenseTensor* xshape) {
-  custom_kernel::SqueezeInferKernel<T, Context>(
-      dev_ctx, x, axes_int_array, out);
+void SqueezeWithXShapeKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::IntArray& axes_int_array,
+                             phi::DenseTensor* out,
+                             phi::DenseTensor* xshape) {
+  custom_kernel::SqueezeKernel<T, Context>(dev_ctx, x, axes_int_array, out);
 }
 
 template <typename T, typename Context>
 void SqueezeGradKernel(const Context& dev_ctx,
-                       const phi::DenseTensor& xshape,
+                       const phi::DenseTensor& x,
                        const phi::DenseTensor& dout,
                        const phi::IntArray& axes_int_array,
                        phi::DenseTensor* dx) {
   auto stream = dev_ctx.stream();
 
-  auto xshape_dims = xshape.dims();
-  auto x_dims = phi::slice_ddim(xshape_dims, 1, xshape_dims.size());
-
+  auto x_dims = dx->dims();
   TensorCopy(dev_ctx, dout, false, dx);
   dx->Resize(x_dims);
 }
 
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(squeeze_infer,
+PD_REGISTER_PLUGIN_KERNEL(squeeze,
                           npu,
                           ALL_LAYOUT,
-                          custom_kernel::SqueezeInferKernel,
+                          custom_kernel::SqueezeKernel,
                           bool,
                           int,
                           uint8_t,
@@ -73,10 +70,10 @@ PD_REGISTER_PLUGIN_KERNEL(squeeze_infer,
                           phi::dtype::bfloat16,
                           double) {}
 
-PD_REGISTER_PLUGIN_KERNEL(squeeze,
+PD_REGISTER_PLUGIN_KERNEL(squeeze_with_xshape,
                           npu,
                           ALL_LAYOUT,
-                          custom_kernel::SqueezeKernel,
+                          custom_kernel::SqueezeWithXShapeKernel,
                           bool,
                           int,
                           uint8_t,

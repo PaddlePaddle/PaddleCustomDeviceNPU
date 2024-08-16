@@ -64,10 +64,10 @@ std::vector<int64_t> GetOutputShape(const std::vector<int> squeeze_dims,
 }
 
 template <typename T>
-void SqueezeInferKernel(const phi::Context& dev_ctx,
-                        const phi::DenseTensor& x,
-                        const phi::IntArray& axes_int_array,
-                        phi::DenseTensor* out) {
+void SqueezeKernel(const phi::Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::IntArray& axes_int_array,
+                   phi::DenseTensor* out) {
   auto stream = dev_ctx.stream();
   std::vector<int32_t> axes(axes_int_array.GetData().begin(),
                             axes_int_array.GetData().end());
@@ -83,18 +83,21 @@ void SqueezeInferKernel(const phi::Context& dev_ctx,
 }
 
 template <typename T>
-void SqueezeKernel(const phi::Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::IntArray& axes_int_array,
-                   phi::DenseTensor* out,
-                   phi::DenseTensor* xshape) {
-  custom_kernel::SqueezeInferKernel<T>(dev_ctx, x, axes_int_array, out);
+void SqueezeWithXShapeKernel(const phi::Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::IntArray& axes_int_array,
+                             phi::DenseTensor* out,
+                             phi::DenseTensor* xshape) {
+  custom_kernel::SqueezeKernel<T>(dev_ctx, x, axes_int_array, out);
 }
 
 }  // namespace custom_kernel
 
 PD_BUILD_PHI_KERNEL(
-    squeeze_infer, mps, ALL_LAYOUT, custom_kernel::SqueezeInferKernel, float) {}
-
-PD_BUILD_PHI_KERNEL(
     squeeze, mps, ALL_LAYOUT, custom_kernel::SqueezeKernel, float) {}
+
+PD_BUILD_PHI_KERNEL(squeeze_with_xshape,
+                    mps,
+                    ALL_LAYOUT,
+                    custom_kernel::SqueezeWithXShapeKernel,
+                    float) {}

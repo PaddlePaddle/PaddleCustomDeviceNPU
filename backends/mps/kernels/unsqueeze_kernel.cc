@@ -52,10 +52,10 @@ inline std::vector<int64_t> GetUnsqueezeShape(
 }
 
 template <typename T>
-void UnsqueezeInferKernel(const phi::Context& dev_ctx,
-                          const phi::DenseTensor& x,
-                          const phi::IntArray& axes,
-                          phi::DenseTensor* out) {
+void UnsqueezeKernel(const phi::Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::IntArray& axes,
+                     phi::DenseTensor* out) {
   auto x_dims = x.dims();
   auto out_dims = out->dims();
 
@@ -76,21 +76,20 @@ void UnsqueezeInferKernel(const phi::Context& dev_ctx,
 }
 
 template <typename T>
-void UnsqueezeKernel(const phi::Context& dev_ctx,
-                     const phi::DenseTensor& x,
-                     const phi::IntArray& axes,
-                     phi::DenseTensor* out,
-                     phi::DenseTensor* xshape) {
-  custom_kernel::UnsqueezeInferKernel<T>(dev_ctx, x, axes, out);
+void UnsqueezeWithXShapeKernel(const phi::Context& dev_ctx,
+                               const phi::DenseTensor& x,
+                               const phi::IntArray& axes,
+                               phi::DenseTensor* out,
+                               phi::DenseTensor* xshape) {
+  custom_kernel::UnsqueezeKernel<T>(dev_ctx, x, axes, out);
 }
 
 template <typename T>
 void UnsqueezeGradKernel(const phi::Context& dev_ctx,
-                         const phi::DenseTensor& x_shape,
+                         const phi::DenseTensor& x,
                          const phi::DenseTensor& dout,
                          phi::DenseTensor* dx) {
-  auto xshape_dims = x_shape.dims();
-  auto x_dims = phi::slice_ddim(xshape_dims, 1, xshape_dims.size());
+  auto x_dims = dx->dims();
 
   dev_ctx.template Alloc<T>(dx);
   auto dout_data = dout.data<T>();
@@ -101,14 +100,14 @@ void UnsqueezeGradKernel(const phi::Context& dev_ctx,
 
 }  // namespace custom_kernel
 
-PD_BUILD_PHI_KERNEL(unsqueeze_infer,
-                    mps,
-                    ALL_LAYOUT,
-                    custom_kernel::UnsqueezeInferKernel,
-                    float) {}
-
 PD_BUILD_PHI_KERNEL(
     unsqueeze, mps, ALL_LAYOUT, custom_kernel::UnsqueezeKernel, float) {}
+
+PD_BUILD_PHI_KERNEL(unsqueeze_with_xshape,
+                    mps,
+                    ALL_LAYOUT,
+                    custom_kernel::UnsqueezeWithXShapeKernel,
+                    float) {}
 
 PD_BUILD_PHI_KERNEL(unsqueeze_grad,
                     mps,
