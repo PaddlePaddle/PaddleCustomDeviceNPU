@@ -259,6 +259,49 @@ function main() {
     if [[ "$EXIT_CODE" != "0" ]];then
         show_ut_retry_result
     fi
+
+    # PaddleX test
+    unset MLU_VISIBLE_DEVICES
+    echo "Start Download"
+    git clone --depth 1000 https://gitee.com/PaddlePaddle/PaddleX.git
+    cd PaddleX
+    pip install -e .
+    paddlex --install PaddleClas
+    paddlex --install PaddleSeg
+
+    wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/cls_flowers_examples.tar -P ./dataset
+    tar -xf ./dataset/cls_flowers_examples.tar -C ./dataset/
+    wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/seg_optic_examples.tar -P ./dataset
+    tar -xf ./dataset/seg_optic_examples.tar -C ./dataset/
+    echo "End Download"
+
+    echo "Start PaddleX ResNet50"
+    python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
+    -o Global.mode=train \
+    -o Global.dataset_dir=./dataset/cls_flowers_examples \
+    -o Global.output=resnet50_output \
+    -o Global.device="mlu:0,1,2,3"
+
+    python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
+    -o Global.mode=predict \
+    -o Predict.model_dir="./resnet50_output/best_model" \
+    -o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_image_classification_001.jpg" \
+    -o Global.device="mlu:0"
+    echo "End PaddleX ResNet50"
+
+    echo "Start DeepLabv3"
+    python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
+    -o Global.mode=train \
+    -o Global.dataset_dir=./dataset/seg_optic_examples \
+    -o Global.output=deeplabv3p_output \
+    -o Global.device="mlu:0,1,2,3"
+
+    python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
+    -o Global.mode=predict \
+    -o Predict.model_dir="./deeplabv3p_output/best_model/model/" \
+    -o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
+    -o Global.device="mlu:0"
+    echo "End DeepLabv3"
 }
 
 main $@
