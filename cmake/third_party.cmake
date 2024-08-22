@@ -41,28 +41,34 @@ macro(check_update_submodule MODULE_NAME)
 endmacro()
 
 # ########################## include third_party ###############################
-
-check_update_submodule(gflags)
+if(NOT paddle_submodule)
+  check_update_submodule(gflags)
+  check_update_submodule(glog)
+endif()
 include(external/gflags) # gflags
-
-check_update_submodule(glog)
 include(external/glog) # glog
 
 list(APPEND third_party_deps extern_gflags extern_glog)
 if(NOT ON_INFER)
-  check_update_submodule(pybind)
+  if(NOT paddle_submodule)
+    check_update_submodule(pybind)
+  endif()
   include(external/pybind11) # pybind
   list(APPEND third_party_deps extern_pybind)
 endif()
 
 if(WITH_TESTING)
-  check_update_submodule(gtest)
+  if(NOT paddle_submodule)
+    check_update_submodule(gtest)
+  endif()
   include(external/gtest) # gtest
   list(APPEND third_party_deps extern_gtest)
 endif()
 
 if(WITH_MKL AND NOT WITH_ARM)
-  check_update_submodule(onednn)
+  if(NOT paddle_submodule)
+    check_update_submodule(onednn)
+  endif()
   include(external/onednn) # onednn
   list(APPEND third_party_deps extern_onednn)
 endif()
