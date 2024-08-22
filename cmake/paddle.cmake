@@ -69,17 +69,24 @@ if(NO_PADDLE_SUBMODULE)
 endif()
 
 # submodule Paddle first
-get_filename_component(REPO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../"
-                       ABSOLUTE)
-message(STATUS "Run 'git submodule update --init Paddle' in ${REPO_SOURCE_DIR}")
-execute_process(
-  COMMAND git submodule update --init Paddle
-  WORKING_DIRECTORY ${REPO_SOURCE_DIR}
-  RESULT_VARIABLE result_var)
-if(NOT result_var EQUAL 0)
+if(paddle_submodule)
   message(
-    FATAL_ERROR "Failed to get submodule Paddle', please check your network !")
-endif()
+    "Paddle submodule already exists, skip git submodule update --init Paddle")
+else()
+  get_filename_component(REPO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../"
+                         ABSOLUTE)
+  message(
+    STATUS "Run 'git submodule update --init Paddle' in ${REPO_SOURCE_DIR}")
+  execute_process(
+    COMMAND git submodule update --init Paddle
+    WORKING_DIRECTORY ${REPO_SOURCE_DIR}
+    RESULT_VARIABLE result_var)
+  if(NOT result_var EQUAL 0)
+    message(
+      FATAL_ERROR "Failed to get submodule Paddle', please check your network !"
+    )
+  endif()
 
-get_filename_component(PADDLE_SOURCE_DIR "${REPO_SOURCE_DIR}/Paddle" ABSOLUTE)
-message(STATUS "PADDLE_SOURCE_DIR=${PADDLE_SOURCE_DIR}")
+  get_filename_component(PADDLE_SOURCE_DIR "${REPO_SOURCE_DIR}/Paddle" ABSOLUTE)
+  message(STATUS "PADDLE_SOURCE_DIR=${PADDLE_SOURCE_DIR}")
+endif()
