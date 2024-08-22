@@ -69,6 +69,7 @@ if(NO_PADDLE_SUBMODULE)
 endif()
 
 # submodule Paddle first
+set(paddle_submodule $ENV{paddle_submodule})
 if(paddle_submodule)
   message(
     "Paddle submodule already exists, skip git submodule update --init Paddle")
