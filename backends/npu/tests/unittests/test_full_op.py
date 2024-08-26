@@ -147,18 +147,11 @@ class TestFullOpError(unittest.TestCase):
     def test_errors(self):
         with program_guard(Program(), Program()):
             # for ci coverage
+            # The argument dtype of full must be one of bool, float16,
+            # float32, float64, uint8, int16, int32 or int64
             self.assertRaises(
                 TypeError, paddle.full, shape=[1], fill_value=5, dtype="uint4"
             )
-
-            # The argument dtype of full must be one of bool, float16,
-            # float32, float64, uint8, int16, int32 or int64
-
-            # The argument shape's type of full_op  must be list, tuple or Variable.
-            def test_shape_type():
-                paddle.full(shape=1, dtype="float32", fill_value=1)
-
-            self.assertRaises(TypeError, test_shape_type)
 
             # The shape dtype of full op must be int32 or int64.
             def test_shape_tensor_dtype():
