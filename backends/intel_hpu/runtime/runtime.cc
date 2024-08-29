@@ -33,6 +33,7 @@
 
 #include "hccl.h"
 #include "hccl_types.h"
+#include "paddle/phi/common/type_traits.h"
 
 FLAGS_DEFINE_bool(intel_hpu_runtime_debug, false, "runtime debug log");
 
@@ -216,7 +217,7 @@ class RuntimeManager {
             << "create builtin stream h2d" << stream_h2d;
       }
 
-      addCache(device,src, size);
+      addCache(device, src, size);
       // status = synHostMap(device->id, size, src);
       // LOG_IF(ERROR, status != synSuccess)
       //     << "[RUNTIME] synHostMap() failed = " << status;
@@ -244,7 +245,7 @@ class RuntimeManager {
             << "[RUNTIME] synStreamCreateGeneric() failed = " << status;
       }
 
-      addCache(device,dst, size);
+      addCache(device, dst, size);
       // status = synHostMap(device->id, size, dst);
       // LOG_IF(ERROR, status != synSuccess)
       //     << "[RUNTIME] synHostMap() failed = " << status;
@@ -303,7 +304,7 @@ class RuntimeManager {
       LOG_IF(ERROR, status != synSuccess)
           << "[RUNTIME] synMemCopyAsync() failed = " << status;
     } else if (flag == 1) {
-      addCache(device,dst, size);
+      addCache(device, dst, size);
       status = synMemCopyAsync(reinterpret_cast<synStreamHandle>(stream),
                                reinterpret_cast<uint64_t>(src),
                                size,
@@ -374,7 +375,7 @@ class RuntimeManager {
     synStatus status = synFail;
     if (it == hostMappedAddress.end()) {
       // not found, map and cache
-       status = synHostMap(device->id, size, ptr);
+      status = synHostMap(device->id, size, ptr);
       LOG_IF(ERROR, status != synSuccess)
           << "[RUNTIME] synHostMap() failed = " << status;
       hostMappedAddress[ptr] = size;
@@ -424,8 +425,8 @@ static RuntimeManager runtimeManager;
 C_Status Init() {
   DEBUG_LOG
   synStatus status = synInitialize();
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synInitialize() failed: [" << status << "]";
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synInitialize() failed = %d", status);
 
   DEBUG_LOG
   return C_SUCCESS;
@@ -463,8 +464,7 @@ C_Status Finalize() {
   DEBUG_LOG
 
   synStatus status = synDestroy();
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synDestroy() failed: [" << status << "]";
+  PD_CHECK(status == synSuccess, "[RUNTIME] synDestroy() failed = %d", status);
   DEBUG_LOG
   return C_SUCCESS;
 }
@@ -554,8 +554,8 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
   uint64_t p;
   synStatus status =
       synDeviceMalloc(runtimeManager.GetDeviceID(), size, 0, 0, &p);
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] hbmAlloc() failed = " << status;
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synDeviceMalloc() failed = %d", status);
   *ptr = reinterpret_cast<void *>(p);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
       << "device id = " << runtimeManager.GetDeviceID()
@@ -573,8 +573,9 @@ C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
 
   synStatus status = synDeviceFree(
       runtimeManager.GetDeviceID(), *reinterpret_cast<uint64_t *>(ptr), 0);
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] hbmFree() failed = " << status;
+
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synDeviceFree() failed = %d", status);
 
   DEBUG_LOG
   return C_SUCCESS;
@@ -583,8 +584,9 @@ C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
 C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
   DEBUG_LOG
   synStatus status = synHostMalloc(runtimeManager.GetDeviceID(), size, 0, ptr);
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synHostMalloc() failed = " << status;
+
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synHostMalloc() failed = %d", status);
 
   DEBUG_LOG
   return C_FAILED;
@@ -593,8 +595,8 @@ C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
 C_Status Deallocate_host(const C_Device device, void *ptr, size_t size) {
   DEBUG_LOG
   synStatus status = synHostFree(runtimeManager.GetDeviceID(), ptr, 0);
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synHostFree() failed = " << status;
+  PD_CHECK(status == synSuccess, "[RUNTIME] synHostFree() failed = %d", status);
+
   DEBUG_LOG
   return C_SUCCESS;
 }
@@ -631,8 +633,9 @@ C_Status RecordEvent(const C_Device device, C_Stream stream, C_Event event) {
   synStatus status =
       synEventRecord(reinterpret_cast<synEventHandle>(event),
                      reinterpret_cast<const synStreamHandle>(stream));
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synEventRecord() failed = " << status;
+
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synEventRecord() failed = %d", status);
 
   DEBUG_LOG
   return C_SUCCESS;
@@ -653,8 +656,9 @@ C_Status SyncDevice(const C_Device device) {
       << runtimeManager.GetModuleID() << ", current = " << device->id;
 
   synStatus status = synDeviceSynchronize(runtimeManager.GetDevice());
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synDeviceSynchronize() failed = " << status;
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] synDeviceSynchronize() failed = %d",
+           status);
 
   DEBUG_LOG
   return C_SUCCESS;
@@ -672,8 +676,10 @@ C_Status SyncStream(const C_Device device, C_Stream stream) {
 
   synStatus status =
       synStreamSynchronize(reinterpret_cast<const synStreamHandle>(stream));
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synStreamSynchronize() failed: [" << status << "]";
+
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] synStreamSynchronize() failed = %d",
+           status);
 
   DEBUG_LOG
   return C_SUCCESS;
@@ -688,8 +694,10 @@ C_Status SyncEvent(const C_Device device, C_Event event) {
 
   synStatus status =
       synEventSynchronize(reinterpret_cast<const synEventHandle>(event));
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synEventSynchronize() failed: [" << status << "]";
+
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] synEventSynchronize() failed = %d",
+           status);
 
   DEBUG_LOG
   return C_SUCCESS;
@@ -708,8 +716,10 @@ C_Status StreamWaitEvent(const C_Device device,
       synStreamWaitEvent(reinterpret_cast<const synStreamHandle>(stream),
                          reinterpret_cast<synEventHandle>(event),
                          0);
-  LOG_IF(ERROR, status != synSuccess)
-      << "[RUNTIME] synStreamWaitEvent() failed: [" << status << "]";
+
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] synStreamWaitEvent() failed = %d",
+           status);
 
   DEBUG_LOG
   return C_SUCCESS;
