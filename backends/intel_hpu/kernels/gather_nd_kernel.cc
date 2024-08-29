@@ -56,7 +56,7 @@ class GatherND : public HpuOperator {
                                      "gather",
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

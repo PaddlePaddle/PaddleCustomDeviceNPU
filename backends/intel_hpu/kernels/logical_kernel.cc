@@ -58,7 +58,7 @@ class Logical : public HpuOperator {
                                      params.op.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

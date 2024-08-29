@@ -64,7 +64,8 @@ class Cast : public HpuOperator {
                                      "CAST",
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 
@@ -84,7 +85,8 @@ void CastKernel(const Context& dev_ctx,
     phi::DenseTensor x_double_host;
     phi::DenseTensorMeta x_double_meta(phi::DataType::FLOAT64, x.dims());
     x_double_host.set_meta(x_double_meta);
-    double* p_x_double_host = dev_ctx.template HostAlloc<double>(&x_double_host);
+    double* p_x_double_host =
+        dev_ctx.template HostAlloc<double>(&x_double_host);
     TensorCopy(dev_ctx, x, true, &x_double_host, phi::CPUPlace());
 
     // cast float64 to float32

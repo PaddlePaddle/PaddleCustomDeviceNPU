@@ -64,7 +64,7 @@ class SwiGlu : public HpuOperator {
                                      silu_name.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
 
     status = synNodeCreate(graphHandle_,
                            mul_inputs,
@@ -77,7 +77,7 @@ class SwiGlu : public HpuOperator {
                            mul_name.c_str(),
                            nullptr,
                            nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 
  protected:

@@ -55,7 +55,9 @@ class BinaryOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate binary fwd failed!");
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate binary fwd () failed = %d",
+             status);
   }
   std::string pName_;
 };

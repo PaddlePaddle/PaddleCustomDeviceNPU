@@ -117,10 +117,10 @@ class OpCacheOperator {
     } else if (std::is_same<T, int64_t>::value) {
       datatype_ = syn_type_int64;
       guid_ = guid_prefix + "_i64";
-    }else {
+    } else {
       synStatus status = synUnsupported;
-      LOG(INFO) << typeid(T).name();
-      CHKSTATUS("synDataType not supported");
+      PD_CHECK(
+          false, "[RUNTIME] synDataType not supported = %s", typeid(T).name());
     }
 
     key_creator_.AddAsKey(guid_);

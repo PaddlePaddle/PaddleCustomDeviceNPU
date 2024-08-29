@@ -78,7 +78,7 @@ class Reduce : public HpuOperator {
                                      reduce_name.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
     std::string reshape_name = guid_ + "_reshape";
     std::string reshape_guid = "reshape";
     status = synNodeCreate(graphHandle_,
@@ -92,7 +92,7 @@ class Reduce : public HpuOperator {
                            reshape_name.c_str(),
                            nullptr,
                            nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

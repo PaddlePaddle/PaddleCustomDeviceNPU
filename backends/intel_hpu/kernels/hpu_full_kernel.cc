@@ -51,7 +51,8 @@ class Full : public HpuOperator {
                                      "constant",
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate full failed!");
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 
@@ -105,7 +106,6 @@ void FullKernel(const Context& dev_ctx,
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
-
 template <typename T, typename Context>
 void FullLikeKernel(const Context& dev_ctx,
                     const phi::DenseTensor& x,
@@ -141,4 +141,3 @@ PD_REGISTER_PLUGIN_KERNEL(full_like,
                           int32_t,
                           int64_t,
                           bool) {}
-

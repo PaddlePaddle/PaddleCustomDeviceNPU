@@ -57,7 +57,7 @@ class Unary : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate add_fwd failed!");
+PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };

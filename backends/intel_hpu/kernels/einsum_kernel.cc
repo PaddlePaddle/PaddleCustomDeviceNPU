@@ -60,7 +60,7 @@ class Einsum : public HpuOperator {
                                      "Einsum",
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

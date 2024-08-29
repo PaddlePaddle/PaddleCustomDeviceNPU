@@ -55,7 +55,7 @@ class Expand : public HpuOperator {
                                      "Expand",
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate expand failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

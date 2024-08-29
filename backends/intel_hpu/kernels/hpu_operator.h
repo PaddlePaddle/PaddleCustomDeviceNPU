@@ -11,10 +11,6 @@
 #include "synapse_common_types.h"
 #include "utils/hpu_helper.h"
 
-#define CHKSTATUS(ERR)           \
-  assert(status == synSuccess && \
-         (std::string(ERR) + std::to_string(status)).c_str())
-
 typedef std::pair<synSectionHandle, bool> sectionWithFirstIndication;
 static std::unordered_map<std::string, sectionWithFirstIndication> sectionMap;
 
@@ -26,7 +22,8 @@ class HpuOperator {
  public:
   HpuOperator(const std::string guid) : guid_(guid) {
     synStatus status = synGraphCreate(&graphHandle_, synDeviceGaudi2);
-    CHKSTATUS("synGraphCreate failed!");
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synGraphCreate() failed = %d", status);
   }
 
   void Compile() {
@@ -35,10 +32,13 @@ class HpuOperator {
         graphHandle_,
         (guid_ + "_" + std::to_string(recipe_count) + ".recipe").c_str(),
         0);
+
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synGraphCompile() failed = %d",
+             status);
+
     LOG(INFO) << " synGraphCompile =" << guid_ << ", count = " << recipe_count;
     recipe_count += 1;
-
-    CHKSTATUS("synGraphCompile failed!");
   }
 
   void prepareTensorInfo(synRecipeHandle recipe,
@@ -64,13 +64,16 @@ class HpuOperator {
 
     uint64_t request_workspace_size = 0;
     status = synWorkspaceGetSize(&request_workspace_size, recipeHandle_);
-    CHKSTATUS("synWorkspaceGetSize failed!");
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synWorkspaceGetSize() failed = %d",
+             status);
 
     if (request_workspace_size > cached_workspaceSize) {
       if (cached_workspaceSize != 0) {
         status = synDeviceFree(0, cached_workspaceAddress, 0);
-        LOG_IF(ERROR, status != synSuccess)
-            << "[RUNTIME] synDeviceFree() failed = " << status;
+        PD_CHECK(status == synSuccess,
+                 "[RUNTIME] synDeviceFree() failed = %d",
+                 status);
       }
 
       cached_workspaceSize = request_workspace_size;
@@ -78,10 +81,9 @@ class HpuOperator {
       LOG(INFO) << "malloc device workspace " << cached_workspaceSize;
       status = synDeviceMalloc(
           0, cached_workspaceSize, 0, 0, &cached_workspaceAddress);
-      LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synDeviceMalloc() failed = " << status;
-
-      CHKSTATUS("synDeviceMalloc failed!");
+      PD_CHECK(status == synSuccess,
+               "[RUNTIME] synDeviceMalloc() failed = %d",
+               status);
     }
 
     LOG(INFO) << "workspace size = " << cached_workspaceSize;
@@ -147,15 +149,18 @@ class HpuOperator {
     synSectionHandle sectionHandle = nullptr;
     if (is_presist) {
       status = synSectionCreate(&sectionHandle, 0, graphHandle_);
-      LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synSectionCreate() failed = " << status;
+
+      PD_CHECK(status == synSuccess,
+               "[RUNTIME] synSectionCreate() failed = %d",
+               status);
       sectons_.push_back(sectionHandle);
     }
 
     synTensor tensor = nullptr;
     status = synTensorCreate(&tensor, &desc, sectionHandle, 0);
-    LOG_IF(ERROR, status != synSuccess)
-        << "[RUNTIME] synTensorCreate() failed = " << status;
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synTensorCreate() failed = %d",
+             status);
     tensors_.insert({name, tensor});
     return tensor;
   }
@@ -215,10 +220,9 @@ class RecipeRunner {
       LOG(INFO) << "malloc device workspace " << cached_workspaceSize;
       status = synDeviceMalloc(
           0, cached_workspaceSize, 0, 0, &cached_workspaceAddress);
-      LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synDeviceMalloc() failed = " << status;
-
-      CHKSTATUS("synDeviceMalloc failed!");
+      PD_CHECK(status == synSuccess,
+               "[RUNTIME] synDeviceMalloc() failed = %d",
+               status);
     }
 
     LOG(INFO) << "workspace size = " << cached_workspaceSize;

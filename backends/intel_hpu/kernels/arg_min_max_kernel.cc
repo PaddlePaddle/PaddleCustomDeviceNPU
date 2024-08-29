@@ -13,10 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 #include "funcs.h"
 #include "hpu_operator.h"
-#include "utils/utills.h"
 #include "perf_lib_layer_params.h"
 #include "synapse_api.h"
 #include "synapse_common_types.h"
+#include "utils/utills.h"
 
 namespace custom_kernel {
 
@@ -28,7 +28,7 @@ struct ArgMinMaxParams {
 class ArgMaxMinOperator : public HpuOperator {
  public:
   ArgMaxMinOperator(std::string guid_prefix, std::string node_name)
-    : HpuOperator(guid_prefix), pName_(node_name) {}
+      : HpuOperator(guid_prefix), pName_(node_name) {}
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
                synDataType datatype,
@@ -40,7 +40,7 @@ class ArgMaxMinOperator : public HpuOperator {
         createTensor(ins[0].size(), datatype, ins[0], true, "input")};
     synDataType out_datatype = syn_type_int32;
     if (params.type == phi::DataType::INT64) {
-        out_datatype = syn_type_int64;
+      out_datatype = syn_type_int64;
     }
     synTensor outputs[outs.size()] = {
         createTensor(outs[0].size(), out_datatype, outs[0], true, "output")};
@@ -56,7 +56,8 @@ class ArgMaxMinOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };
@@ -86,20 +87,19 @@ void doArgMaxMinTensor(const Context& dev_ctx,
     node_name = "ArgMin_op";
   }
 
-
   OpCacheOperator op_info;
   ArgMinMaxParams params;
   params.params.reductionDimension = axis;
   params.type = out_datatype;
   op_info.prepareOpInfo<T, ArgMinMaxParams>(guid_prefix, {x_dims}, &params);
-  
+
   // const int siz_ar = op_info.key_creator_.GetKey().size();
   // for (int i = 0; i < siz_ar; ++i)
   //   printf("%d ", op_info.key_creator_.GetKey()[i]);
   // std::cout << std::endl;
-  
+
   auto recipe = op_info.GetRecipe();
-  if(recipe == nullptr){
+  if (recipe == nullptr) {
     // compile
     ArgMaxMinOperator op(op_info.guid_, node_name);
     op.AddNode({x_dims}, {out_dims}, op_info.datatype_, params);
@@ -107,14 +107,14 @@ void doArgMaxMinTensor(const Context& dev_ctx,
     op_info.setOp(op);
     recipe = op_info.GetRecipe();
   }
-  
+
   // runtime
   std::map<std::string, uint64_t> tensors;
   auto out_addr = out->data();
   tensors["input"] = reinterpret_cast<uint64_t>(x.data<T>());
   tensors["output"] = reinterpret_cast<uint64_t>(out_addr);
-  
-  RecipeRunner runner(recipe); 
+
+  RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
@@ -144,8 +144,8 @@ void ArgMaxMin(const Context& dev_ctx,
     dev_ctx.template Alloc<int32_t>(out);
   } else {
     dev_ctx.template Alloc<int64_t>(out);
-    //PADDLE_THROW(phi::errors::InvalidArgument(
-    //    "Intel HPU only support the output's dtype is int32."));
+    // PADDLE_THROW(phi::errors::InvalidArgument(
+    //     "Intel HPU only support the output's dtype is int32."));
   }
 
   auto x_dims = x.dims().size();
@@ -180,12 +180,11 @@ void ArgMaxMin(const Context& dev_ctx,
     out->Resize(phi::make_ddim(out_keepdims_shape));
   }
   custom_kernel::doArgMaxMinTensor<T, Context>(
-    dev_ctx, transformed_x, axis_, arg_max, dtype, out);
+      dev_ctx, transformed_x, axis_, arg_max, dtype, out);
   if (!keepdims) {
     out->Resize(phi::make_ddim(out_shape));
   }
 }
-
 
 template <typename T, typename Context>
 void ArgMinKernel(const Context& dev_ctx,
@@ -197,7 +196,6 @@ void ArgMinKernel(const Context& dev_ctx,
                   phi::DenseTensor* out) {
   custom_kernel::ArgMaxMin<T, Context>(
       dev_ctx, x, axis, keepdims, flatten, dtype, false, out);
-  
 }
 
 template <typename T, typename Context>
@@ -210,7 +208,6 @@ void ArgMaxKernel(const Context& dev_ctx,
                   phi::DenseTensor* out) {
   custom_kernel::ArgMaxMin<T, Context>(
       dev_ctx, x, axis, keepdims, flatten, dtype, true, out);
-  
 }
 
 }  // namespace custom_kernel

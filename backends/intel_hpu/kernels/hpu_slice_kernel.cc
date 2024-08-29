@@ -50,7 +50,7 @@ class SliceOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    CHKSTATUS("synNodeCreate reshape failed!");
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };
