@@ -175,7 +175,7 @@ void CastKernel(const Context& dev_ctx,
     TensorCopy(dev_ctx, x_float_host, true, &x_float_device);
 
     custom_kernel::CastKernelF32<float, Context>(
-        dev_ctx, x_float_device, phi::DataType::FLOAT32, out);
+        dev_ctx, x_float_device, dtype, out);
     return;
   }
 
@@ -208,7 +208,7 @@ void CastKernel(const Context& dev_ctx,
   }
 
   custom_kernel::CastKernelF32<T, Context>(
-      dev_ctx, x, phi::DataType::FLOAT32, out);
+      dev_ctx, x, dtype, out);
 }
 
 }  // namespace custom_kernel
