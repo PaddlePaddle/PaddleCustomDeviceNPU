@@ -55,8 +55,7 @@ class Contiguous : public HpuOperator {
                                      "Contiguous",
                                      nullptr,
                                      nullptr);
-    LOG_IF(ERROR, status != synSuccess)
-        << "[RUNTIME] synNodeCreate() failed = " << status;
+    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 
