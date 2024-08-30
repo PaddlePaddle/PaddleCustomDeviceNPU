@@ -968,8 +968,8 @@ void InitPlugin(CustomRuntimeParams *params) {
   params->version.major = 1;
   params->version.minor = 16;
   params->version.patch = 0;
-  params->device_type = "intel_hpu";
-  params->sub_device_type = "gaudi2";
+  params->device_type = (char*)"intel_hpu";
+  params->sub_device_type = (char*)"intel_hpu";
 
   memset(reinterpret_cast<void *>(params->interface),
          0,

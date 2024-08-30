@@ -109,21 +109,18 @@ class HpuOperator {
 
   virtual ~HpuOperator() {
     synStatus status = synGraphDestroy(graphHandle_);
-    PD_CHECK(status == synSuccess,
-             "[RUNTIME] synGraphDestroy() failed = %d",
-             status);
+    LOG_IF(ERROR, status != synSuccess)
+        << "[RUNTIME] synGraphDestroy() failed = " << status;
 
     for (auto it = tensors_.begin(); it != tensors_.end(); ++it) {
       status = synTensorDestroy(it->second);
-      PD_CHECK(status == synSuccess,
-               "[RUNTIME] synTensorDestroy() failed = %d",
-               status);
+      LOG_IF(ERROR, status != synSuccess)
+          << "[RUNTIME] synTensorDestroy() failed = " << status;
     }
     for (size_t i = 0; i < sectons_.size(); i++) {
       status = synSectionDestroy(sectons_[i]);
-      PD_CHECK(status == synSuccess,
-               "[RUNTIME] synTensorDestroy() failed = %d",
-               status);
+      LOG_IF(ERROR, status != synSuccess)
+          << "[RUNTIME] synSectionDestroy() failed = " << status;
     }
   }
 

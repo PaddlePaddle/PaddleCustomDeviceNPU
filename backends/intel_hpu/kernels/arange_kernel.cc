@@ -85,8 +85,6 @@ void ArangeTensorKernel(const Context& dev_ctx,
                         const phi::DenseTensor& end_t,
                         const phi::DenseTensor& step_t,
                         phi::DenseTensor* out) {
-  auto stream = dev_ctx.stream();
-
   phi::DenseTensor n;
   n.Resize(start_t.dims());
   T* n_data = dev_ctx.template HostAlloc<T>(&n);

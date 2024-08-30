@@ -36,7 +36,7 @@ class Reduce : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
     if (params.reduce_all) {
-      inputs[0].dims = std::vector<int64_t>({inputs[0].num_elements});
+      inputs[0].dims = std::vector<int64_t>({static_cast<int64_t>(inputs[0].num_elements)});
       outputs[0].dims = std::vector<int64_t>({1});
     }
     std::vector<synTensor> syn_inputs;

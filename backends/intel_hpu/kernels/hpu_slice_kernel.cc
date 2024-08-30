@@ -135,14 +135,14 @@ void SliceRawKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
   
   synSliceParamsV2 params;
-  for (size_t i = 0; i < in_dims.size(); i++)
+  for (int i = 0; i < in_dims.size(); i++)
   {
     params.axes[i] = i;
     params.steps[i] = 1;
     params.starts[i] = 0;
     params.ends[i] = in_dims[in_dims.size() - 1 - i];
   }
-  for (size_t i = 0; i < axes.size(); i++)
+  for (int i = 0; i < static_cast<int>(axes.size()); i++)
   {
     params.starts[in_dims.size() - 1 - axes[i]] = starts[i];
     params.ends[in_dims.size() - 1 - axes[i]] = ends[i];

@@ -41,7 +41,7 @@ inline synDataType PDDataTypeToSynDataType(phi::DataType type) {
   } else if (type == phi::DataType::INT64) {
     return syn_type_int64;
   } else {
-    phi::errors::InvalidArgument("Unsupported cast dtype %s", type);
+    PD_CHECK(false, "Unsupported cast dtype %d", type);
   }
 }
 
@@ -69,8 +69,7 @@ inline std::string SynDataTypeToStr(synDataType s) {
       case syn_type_uint64:
         return "u64";
       default:
-        phi::errors::InvalidArgument("Unsupported cast dtype %d", s);
-        break;
+        PD_CHECK(false, "Unsupported dtype %d", s);
     }
   }
 }

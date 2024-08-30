@@ -129,7 +129,9 @@ PD_REGISTER_PLUGIN_KERNEL(full,
                           int16_t,
                           int32_t,
                           int64_t,
-                          bool) {}
+                          bool,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(full_like,
                           intel_hpu,
@@ -140,4 +142,6 @@ PD_REGISTER_PLUGIN_KERNEL(full_like,
                           int16_t,
                           int32_t,
                           int64_t,
-                          bool) {}
+                          bool,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {}

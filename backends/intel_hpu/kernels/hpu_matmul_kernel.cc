@@ -44,8 +44,8 @@ class BatchGEMM : public HpuOperator {
                                      "BATCH_GEMM",
                                      nullptr,
                                      nullptr);
-    LOG_IF(ERROR, status != synSuccess)
-        << "[RUNTIME] synNodeCreate() failed = " << status;
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 
  protected:
@@ -76,8 +76,8 @@ class GEMM : public HpuOperator {
                                      "GEMM",
                                      nullptr,
                                      nullptr);
-    LOG_IF(ERROR, status != synSuccess)
-        << "[RUNTIME] synNodeCreate() failed = " << status;
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 
  protected:

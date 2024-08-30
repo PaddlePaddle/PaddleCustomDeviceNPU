@@ -118,7 +118,6 @@ class OpCacheOperator {
       datatype_ = syn_type_int64;
       guid_ = guid_prefix + "_i64";
     } else {
-      synStatus status = synUnsupported;
       PD_CHECK(
           false, "[RUNTIME] synDataType not supported = %s", typeid(T).name());
     }

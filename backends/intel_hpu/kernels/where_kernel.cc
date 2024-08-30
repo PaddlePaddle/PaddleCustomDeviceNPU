@@ -54,8 +54,8 @@ class Where : public HpuOperator {
                                      "Where",
                                      nullptr,
                                      nullptr);
-    LOG_IF(ERROR, status != synSuccess)
-        << "[RUNTIME] synNodeCreate() failed = " << status;
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

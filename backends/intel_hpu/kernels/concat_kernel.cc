@@ -34,8 +34,11 @@ class Concat : public HpuOperator {
 
     std::vector<synTensor> syn_outputs;
     for (size_t i = 0; i < outputs.size(); i++) {
-      syn_outputs.push_back(createTensor(
-          outputs[i].dims.size(), dtype_, outputs[i].dims, true, outputs[i].name));
+      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
+                                         dtype_,
+                                         outputs[i].dims,
+                                         true,
+                                         outputs[i].name));
     }
 
     synStatus status = synNodeCreate(graphHandle_,
@@ -49,8 +52,9 @@ class Concat : public HpuOperator {
                                      "CONCAT",
                                      nullptr,
                                      nullptr);
-    LOG_IF(ERROR, status != synSuccess)
-        << "[RUNTIME] synNodeCreate() failed = " << status;
+
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 
  protected:

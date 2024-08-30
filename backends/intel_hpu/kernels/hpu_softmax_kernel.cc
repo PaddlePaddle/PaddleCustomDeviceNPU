@@ -68,7 +68,7 @@ void SoftmaxKernel(const Context& dev_ctx,
   }
   std::vector<int64_t> inputs_dim = phi::vectorize<int64_t>(x.dims());
   std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
-  ns_Softmax::Params params{inputs_dim.size() - 1 - calc_axis};
+  ns_Softmax::Params params{static_cast<int>(inputs_dim.size()) - 1 - calc_axis};
   
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, ns_Softmax::Params>("softmax_fwd", {inputs_dim}, &params);
