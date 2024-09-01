@@ -208,6 +208,8 @@ class ConvertTensors {
   }
 
   void Add(const phi::DenseTensor& x, bool is_input = true) {
+    phi::DenseTensorMeta meta = x.meta();
+    // auto addr = x.data() - meta.offset;
     auto addr = x.data();
 
     phi::vectorize<int64_t>(x.dims());

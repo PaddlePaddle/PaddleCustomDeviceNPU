@@ -20,6 +20,7 @@ namespace custom_kernel {
 struct ContiguousParams {
   std::vector<int32_t> input_strides;
   synStridedOpParams params;
+  std::vector<int64_t> input_dims;
 };
 
 class Contiguous : public HpuOperator {
@@ -29,13 +30,20 @@ class Contiguous : public HpuOperator {
   void AddNode(ConvertTensors& ct, ContiguousParams& params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
-
     std::vector<synTensor> syn_inputs;
-    syn_inputs.push_back(createTensor(inputs[0].dims.size(),
-                                      inputs[0].type,
-                                      inputs[0].dims,
-                                      true,
-                                      inputs[0].name));
+    if (params.params.baseOffset != 0) {
+      syn_inputs.push_back(createTensor(inputs[0].dims.size(),
+                                        inputs[0].type,
+                                        params.input_dims,
+                                        true,
+                                        inputs[0].name));
+    } else {
+      syn_inputs.push_back(createTensor(inputs[0].dims.size(),
+                                        inputs[0].type,
+                                        inputs[0].dims,
+                                        true,
+                                        inputs[0].name));
+    }
 
     std::vector<synTensor> syn_outputs;
     syn_outputs.push_back(createTensor(outputs[0].dims.size(),
@@ -55,7 +63,8 @@ class Contiguous : public HpuOperator {
                                      "Contiguous",
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 
@@ -65,28 +74,21 @@ void ContiguousKernel(const Context& dev_ctx,
                       phi::DenseTensor* out) {
   phi::DenseTensorMeta meta = input.meta();
   ContiguousParams params;
-  params.params.baseOffset = 0;
+  params.params.baseOffset = meta.offset / sizeof(T);
+  LOG(INFO) << "== " << params.params.baseOffset;
 
   params.input_strides = phi::vectorize<int32_t>(meta.strides);
   auto rank = params.input_strides.size();
   for (size_t i = 0; i < params.input_strides.size(); i++) {
     params.params.strides[rank - 1 - i] = params.input_strides[i];
   }
-  // calculate output dim
-  // auto numel = input.numel();
-  // int dim1 = 0;
-  // int non_one = 1;
-  // for (size_t i = 0; i < rank; i++) {
-  //   if (params.input_strides[i] == 1) {
-  //     meta.dims[i] = 1;
-  //     dim1 = i;
-  //   } else {
-  //     meta.dims[i] = numel / params.input_strides[i];
-  //     non_one = non_one * meta.dims[i];
-  //   }
-  // }
-
-  // meta.dims[dim1] = numel / non_one;
+  // calculate inputs dim
+  params.input_dims = phi::vectorize<int64_t>(meta.dims);
+  int64_t count = 1;
+  for (int i = rank - 2; i >= 0; i--) {
+    params.input_dims[i + 1] = meta.strides[i] / count;
+    count = count * params.input_dims[i + 1];
+  }
 
   meta.strides = meta.calc_strides(meta.dims);
   meta.offset = 0;
@@ -98,7 +100,6 @@ void ContiguousKernel(const Context& dev_ctx,
   ct.Add(out, false);
 
   std::vector<DIMS> inputs_dims = ct.GetDims();
-
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, ContiguousParams>(
       "ContiguousKernel", inputs_dims, &params);
