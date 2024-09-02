@@ -32,7 +32,7 @@ cmake ..
 make -j8
 
 # using pip to install the output
-pip install dist/paddle_habana_hpu*.whl
+pip install dist/paddle_intel_hpu*.whl
 ```
 
 ## Verification
