@@ -39,7 +39,10 @@ class Full : public HpuOperator {
                                          true,
                                          outputs[i].name));
     }
-    guid_ = guid_ + SynDataTypeToStr(outputs[0].type);
+    if(outputs[0].type == syn_type_int64)
+      guid_ = guid_ + "i32";
+    else
+      guid_ = guid_ + SynDataTypeToStr(outputs[0].type);
     synStatus status = synNodeCreate(graphHandle_,
                                      nullptr,
                                      syn_outputs.data(),
