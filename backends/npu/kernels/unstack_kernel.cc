@@ -39,10 +39,10 @@ void UnStackKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void UnStackGradKernel(const Context& dev_ctx,
-                       const std::vector<const phi::DenseTensor*>& x,
-                       int axis,
-                       phi::DenseTensor* outs) {
+void AclopUnStackGradKernel(const Context& dev_ctx,
+                            const std::vector<const phi::DenseTensor*>& x,
+                            int axis,
+                            phi::DenseTensor* outs) {
   dev_ctx.template Alloc<T>(outs);
   auto stream = dev_ctx.stream();
 
@@ -56,6 +56,20 @@ void UnStackGradKernel(const Context& dev_ctx,
   const auto& runner =
       NpuOpRunner("Pack", {x_list}, {*outs}, {{"axis", axis}, {"N", num}});
   runner.Run(stream);
+}
+
+template <typename T, typename Context>
+void UnStackGradKernel(const Context& dev_ctx,
+                       const std::vector<const phi::DenseTensor*>& x,
+                       int axis,
+                       phi::DenseTensor* outs) {
+  DO_COMPATIBILITY(aclnnStack,
+                   (custom_kernel::AclopUnStackGradKernel<T, Context>(
+                       dev_ctx, x, axis, outs)));
+
+  dev_ctx.template Alloc<T>(outs);
+  if (axis < 0) axis += (x[0]->dims().size() + 1);
+  EXEC_NPU_CMD(aclnnStack, dev_ctx, x, axis, *outs);
 }
 }  // namespace custom_kernel
 
