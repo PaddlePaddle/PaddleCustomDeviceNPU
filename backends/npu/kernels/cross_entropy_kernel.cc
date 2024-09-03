@@ -18,6 +18,19 @@ limitations under the License. */
 namespace custom_kernel {
 
 template <typename T, typename Context>
+void GreaterEqualKernel(const Context& dev_ctx,
+                        const phi::DenseTensor& x,
+                        const phi::DenseTensor& y,
+                        phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void AllKernel(const Context& dev_ctx,
+               const phi::DenseTensor& x,
+               const std::vector<int64_t>& dims,
+               bool keep_dim,
+               phi::DenseTensor* out);
+
+template <typename T, typename Context>
 void EqualKernel(const Context& dev_ctx,
                  const phi::DenseTensor& x,
                  const phi::DenseTensor& y,
@@ -166,8 +179,32 @@ void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
     // cause of input is softmax, copy to output softmax, directly
     phi::Copy<Context>(dev_ctx, logits, dev_ctx.GetPlace(), false, softmax);
   }
+
+  phi::DenseTensorMeta labels_zero_meta = {phi::DataType::INT32, labels.dims()};
+  phi::DenseTensor labels_zero_tensor;
+  labels_zero_tensor.set_meta(labels_zero_meta);
+  dev_ctx.template Alloc<T>(&labels_zero_tensor);
+  EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, labels_zero_tensor);
+  labels_zero_tensor.Resize(labels.dims());
+
+  phi::DenseTensorMeta labels_bool_meta = {phi::DataType::BOOL, labels.dims()};
+  phi::DenseTensor labels_bool;
+  labels_bool.set_meta(labels_bool_meta);
+  custom_kernel::GreaterEqualKernel<T, Context>(
+      dev_ctx, labels, labels_zero_tensor, &labels_bool);
+
+  phi::DenseTensor labels_result;
+  labels_result.Resize(phi::make_ddim({}));
+  std::vector<int64_t> emptyVector;
+  custom_kernel::AllKernel<bool, Context>(
+      dev_ctx, labels_bool, emptyVector, false, &labels_result);
+
+  std::vector<bool> labels_condition_vec;
+  TensorToVector(dev_ctx, *&labels_result, dev_ctx, &labels_condition_vec);
+  bool condition = labels_condition_vec[0];
+
   // Use NPU IR
-  if (!soft_label && labels.dims()[use_axis] == 1 && use_softmax) {
+  if (!soft_label && labels.dims()[use_axis] == 1 && condition && use_softmax) {
     PADDLE_ENFORCE_EQ(soft_label,
                       false,
                       phi::errors::Unimplemented(
@@ -238,12 +275,14 @@ void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
     phi::DenseTensorMeta zero_meta = {phi::DataType::INT32, loss_1d.dims()};
     phi::DenseTensor zero_tensor;
     zero_tensor.set_meta(zero_meta);
-    FillNpuTensorWithConstant<int>(&zero_tensor, dev_ctx, zero_);
+    dev_ctx.template Alloc<T>(&zero_tensor);
+    EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, zero_tensor);
     zero_tensor.Resize(loss_1d.dims());
+
     custom_kernel::WhereKernel<T, Context>(
         dev_ctx, mid_out, zero_tensor, loss_1d, &loss_1d);
     loss_1d.Resize(dims);
-  } else if (use_softmax) {
+  } else if (labels.dims()[use_axis] != 1 && use_softmax) {
     phi::DenseTensor loss_1d(*loss), transformed_logits, transformed_lables;
     auto dims = labels.dims();
     dims[use_axis] = 1;
