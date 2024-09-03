@@ -26,6 +26,7 @@ void FusedBlockAttnLayerOpPrefillStage(
     const phi::CustomContext &dev_ctx,
     const paddle::Tensor &norm_weight,
     const paddle::Tensor &qkv_weight,
+    const paddle::optional<paddle::Tensor> &qkv_bias,
     const paddle::optional<paddle::Tensor> &qkv_deq_scale,
     const paddle::Tensor &out_linear_weight,
     const paddle::optional<paddle::Tensor> &out_linear_shift,
@@ -56,17 +57,14 @@ void FusedBlockAttnLayerOpPrefillStage(
     bool trans_qkv,
     bool trans_out_linear,
     bool trans_ffn1,
-    bool trans_ffn2) {
+    bool trans_ffn2,
+    bool use_neox_style,
+    bool use_alibi) {
   bool use_matmul_int8 = qkv_deq_scale.is_initialized();
   bool use_smooth_quant = out_linear_shift.is_initialized();
 
   int64_t batch_size =
       FusedBlhaGlobalVar::Instance().get_seqlens_encoder()->size;
-  void *cos_data =
-      FusedBlhaGlobalVar::Instance().get_rope_encoder()->rope_emb_cos->data();
-  void *sin_data =
-      FusedBlhaGlobalVar::Instance().get_rope_encoder()->rope_emb_sin->data();
-  void *mask_data = FusedBlhaGlobalVar::Instance().get_mask();
   void *slots_data = FusedBlhaGlobalVar::Instance().get_slots_encoder();
   void *seqlens_dev =
       FusedBlhaGlobalVar::Instance().get_seqlens_encoder()->dev_ptr;
@@ -85,11 +83,13 @@ void FusedBlockAttnLayerOpPrefillStage(
   } else {
     atb_layers::FusedBlhaLayerParam param;
     param.epsilon = epsilon;
-    param.rope_neox = false;
+    param.rope_neox = use_neox_style;
+    param.use_alibi = use_alibi;
     param.trans_qkv_weight = trans_qkv;
     param.trans_out_weight = trans_out_linear;
     param.trans_ffn1_weight = trans_ffn1;
     param.trans_ffn2_weight = trans_ffn2;
+    param.has_qkv_bias = qkv_bias.is_initialized();
     param.scale = 1.0f;
     param.head_num = head_num;
     param.kv_head_num = kv_head_num;
@@ -118,6 +118,9 @@ void FusedBlockAttnLayerOpPrefillStage(
   }
   runner.bind_input(norm_weight);
   runner.bind_input(qkv_weight);
+  if (qkv_bias.is_initialized()) {
+    runner.bind_input(qkv_bias.get());
+  }
   if (qkv_deq_scale.is_initialized()) {
     runner.bind_input(qkv_deq_scale.get());
     runner.bind_input(FusedBlhaGlobalVar::Instance().get_qkv_deq_offset(),
@@ -154,10 +157,26 @@ void FusedBlockAttnLayerOpPrefillStage(
                       phi::DataType::INT32,
                       {ffn2_deq_scale->numel()});
   }
-  runner.bind_input(cos_data, phi::DataType::FLOAT16, {ntokens, head_dim});
-  runner.bind_input(sin_data, phi::DataType::FLOAT16, {ntokens, head_dim});
-  runner.bind_input(
-      mask_data, phi::DataType::FLOAT16, {max_seq_len, max_seq_len});
+  if (!use_alibi) {
+    void *cos_data =
+        FusedBlhaGlobalVar::Instance().get_rope_encoder()->rope_emb_cos->data();
+    void *sin_data =
+        FusedBlhaGlobalVar::Instance().get_rope_encoder()->rope_emb_sin->data();
+    runner.bind_input(cos_data, phi::DataType::FLOAT16, {ntokens, head_dim});
+    runner.bind_input(sin_data, phi::DataType::FLOAT16, {ntokens, head_dim});
+  }
+  if (!use_alibi) {
+    void *mask_data = FusedBlhaGlobalVar::Instance().get_casual_mask();
+    runner.bind_input(
+        mask_data, phi::DataType::FLOAT16, {max_seq_len, max_seq_len});
+  } else {
+    void *mask_data = FusedBlhaGlobalVar::Instance().get_alibi_src_mask();
+    // 1, head_num, max_seq_len, max_seq_len
+    runner.bind_input(mask_data,
+                      phi::DataType::FLOAT16,
+                      {batch_size, head_num, max_seq_len, max_seq_len});
+  }
+
   runner.bind_input(cache_k);
   runner.bind_input(cache_v);
   runner.bind_input(slots_data, phi::DataType::INT32, {ntokens});
@@ -180,6 +199,7 @@ void FusedBLockAttnLayerOpDecodingStage(
     const phi::CustomContext &dev_ctx,
     const paddle::Tensor &norm_weight,
     const paddle::Tensor &qkv_weight,
+    const paddle::optional<paddle::Tensor> &qkv_bias,
     const paddle::optional<paddle::Tensor> &qkv_deq_scale,
     const paddle::Tensor &out_linear_weight,
     const paddle::optional<paddle::Tensor> &out_linear_shift,
@@ -211,16 +231,14 @@ void FusedBLockAttnLayerOpDecodingStage(
     bool trans_qkv,
     bool trans_out_linear,
     bool trans_ffn1,
-    bool trans_ffn2) {
+    bool trans_ffn2,
+    bool use_neox_style,
+    bool use_alibi) {
   bool use_matmul_int8 = qkv_deq_scale.is_initialized();
   bool use_smooth_quant = out_linear_shift.is_initialized();
 
   int64_t batch_size =
       FusedBlhaGlobalVar::Instance().get_seqlens_decoder()->size;
-  void *cos_data =
-      FusedBlhaGlobalVar::Instance().get_rope_decoder()->rope_emb_cos->data();
-  void *sin_data =
-      FusedBlhaGlobalVar::Instance().get_rope_decoder()->rope_emb_sin->data();
   void *slots_data = FusedBlhaGlobalVar::Instance().get_slots_decoder();
   void *seqlens_dev =
       FusedBlhaGlobalVar::Instance().get_seqlens_decoder()->dev_ptr;
@@ -241,11 +259,13 @@ void FusedBLockAttnLayerOpDecodingStage(
   } else {
     atb_layers::FusedBlhaLayerParam param;
     param.epsilon = epsilon;
-    param.rope_neox = false;
+    param.rope_neox = use_neox_style;
+    param.use_alibi = use_alibi;
     param.trans_qkv_weight = trans_qkv;
     param.trans_out_weight = trans_out_linear;
     param.trans_ffn1_weight = trans_ffn1;
     param.trans_ffn2_weight = trans_ffn2;
+    param.has_qkv_bias = qkv_bias.is_initialized();
     param.scale = 1.0f;
     param.head_num = head_num;
     param.kv_head_num = kv_head_num;
@@ -274,6 +294,9 @@ void FusedBLockAttnLayerOpDecodingStage(
   }
   runner.bind_input(norm_weight);
   runner.bind_input(qkv_weight);
+  if (qkv_bias.is_initialized()) {
+    runner.bind_input(qkv_bias.get());
+  }
   if (qkv_deq_scale.is_initialized()) {
     runner.bind_input(qkv_deq_scale.get());
     runner.bind_input(FusedBlhaGlobalVar::Instance().get_qkv_deq_offset(),
@@ -310,8 +333,21 @@ void FusedBLockAttnLayerOpDecodingStage(
                       phi::DataType::INT32,
                       {ffn2_deq_scale->numel()});
   }
-  runner.bind_input(cos_data, phi::DataType::FLOAT16, {ntokens, head_dim});
-  runner.bind_input(sin_data, phi::DataType::FLOAT16, {ntokens, head_dim});
+  if (!use_alibi) {
+    void *cos_data =
+        FusedBlhaGlobalVar::Instance().get_rope_decoder()->rope_emb_cos->data();
+    void *sin_data =
+        FusedBlhaGlobalVar::Instance().get_rope_decoder()->rope_emb_sin->data();
+    runner.bind_input(cos_data, phi::DataType::FLOAT16, {ntokens, head_dim});
+    runner.bind_input(sin_data, phi::DataType::FLOAT16, {ntokens, head_dim});
+  }
+  if (use_alibi) {
+    void *mask_data = FusedBlhaGlobalVar::Instance().get_alibi_tgt_mask();
+    // batch, head_num, 1, max_seq_len
+    runner.bind_input(mask_data,
+                      phi::DataType::FLOAT16,
+                      {batch_size, head_num, 1, max_seq_len});
+  }
   runner.bind_input(cache_k);
   runner.bind_input(cache_v);
   runner.bind_input(slots_data, phi::DataType::INT32, {ntokens});
@@ -336,6 +372,7 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
     const paddle::Tensor &hidden,
     const paddle::Tensor &norm_weight,
     const paddle::Tensor &qkv_weight,
+    const paddle::optional<paddle::Tensor> &qkv_bias,
     const paddle::optional<paddle::Tensor> &qkv_deq_scale,
     const paddle::Tensor &out_linear_weight,
     const paddle::optional<paddle::Tensor> &out_linear_shift,
@@ -356,6 +393,7 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
     const paddle::Tensor &seq_lens_this_time,
     const paddle::Tensor &block_tables,
     int32_t flag,
+    int32_t max_seq_len,
     int32_t block_size,
     float epsilon,
     float qkv_quant_scale,
@@ -365,15 +403,17 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
     bool trans_qkv,
     bool trans_out_linear,
     bool trans_ffn1,
-    bool trans_ffn2) {
+    bool trans_ffn2,
+    bool use_neox_style,
+    bool use_alibi) {
   bool use_matmul_int8 = qkv_deq_scale.is_initialized();
   bool use_smooth_quant = out_linear_shift.is_initialized();
 
   const auto &hidden_shape = hidden.shape();
   const auto &cache_k_shape = cache_k.shape();
   const auto &block_tables_shape = block_tables.shape();
+  // rope: 2, B, S, 1, D, alibi: B,H,S,S + B,H,1,S
   const auto &rope_emb_shape = rope_emb.shape();
-  uint64_t max_seq_len = rope_emb_shape[2];
   uint64_t token_num = hidden_shape[0];
   uint64_t emb_dim = hidden_shape[1];
   uint64_t kv_head_num = cache_k_shape[1];
@@ -385,31 +425,46 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
   auto place = hidden.place();
   const auto &dev_ctx = *static_cast<const phi::CustomContext *>(
       paddle::experimental::DeviceContextPool::Instance().Get(place));
-
+  if (rope_emb_shape.size() == 1) {
+    use_alibi = true;
+  }
   if (flag == kFusedBlckAttnLayerBegin) {
     FusedBlhaGlobalVar::Instance().update_block_tables(dev_ctx, block_tables);
     FusedBlhaGlobalVar::Instance().update_seqlens_encoder(dev_ctx,
                                                           seq_lens_encoder);
     FusedBlhaGlobalVar::Instance().update_seqlens_decoder(dev_ctx,
                                                           seq_lens_decoder);
-    FusedBlhaGlobalVar::Instance().update_mask(dev_ctx, max_seq_len);
+    if (!use_alibi) {
+      FusedBlhaGlobalVar::Instance().update_casual_mask(dev_ctx, max_seq_len);
+    } else {
+      if (phi::DataType::FLOAT16 != rope_emb.dtype()) {
+        PD_THROW("NOT supported data type. Only float16 are supported. ");
+      }
+      FusedBlhaGlobalVar::Instance().update_alibi_mask(
+          const_cast<phi::float16 *>(rope_emb.data<phi::float16>()),
+          const_cast<phi::float16 *>(rope_emb.data<phi::float16>() +
+                                     batch_size * head_num * max_seq_len *
+                                         max_seq_len));
+    }
 
     FusedBlhaGlobalVar::Instance().update_slots_encoder(
         dev_ctx, block_size, max_block_num_per_seq);
     FusedBlhaGlobalVar::Instance().update_slots_decoder(
         dev_ctx, block_size, max_block_num_per_seq);
 
-    if (phi::DataType::FLOAT16 != rope_emb.dtype()) {
-      auto rope_emb_fp16 = rope_emb.cast(phi::DataType::FLOAT16);
-      FusedBlhaGlobalVar::Instance().update_rope_encoder(
-          dev_ctx, rope_emb_fp16, max_seq_len, head_dim);
-      FusedBlhaGlobalVar::Instance().update_rope_decoder(
-          dev_ctx, rope_emb_fp16, max_seq_len, head_dim);
-    } else {
-      FusedBlhaGlobalVar::Instance().update_rope_encoder(
-          dev_ctx, rope_emb, max_seq_len, head_dim);
-      FusedBlhaGlobalVar::Instance().update_rope_decoder(
-          dev_ctx, rope_emb, max_seq_len, head_dim);
+    if (!use_alibi) {
+      if (phi::DataType::FLOAT16 != rope_emb.dtype()) {
+        auto rope_emb_fp16 = rope_emb.cast(phi::DataType::FLOAT16);
+        FusedBlhaGlobalVar::Instance().update_rope_encoder(
+            dev_ctx, rope_emb_fp16, max_seq_len, head_dim);
+        FusedBlhaGlobalVar::Instance().update_rope_decoder(
+            dev_ctx, rope_emb_fp16, max_seq_len, head_dim);
+      } else {
+        FusedBlhaGlobalVar::Instance().update_rope_encoder(
+            dev_ctx, rope_emb, max_seq_len, head_dim);
+        FusedBlhaGlobalVar::Instance().update_rope_decoder(
+            dev_ctx, rope_emb, max_seq_len, head_dim);
+      }
     }
 
     FusedBlhaGlobalVar::Instance().update_in_encoder(dev_ctx, hidden);
@@ -442,6 +497,7 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
     FusedBlockAttnLayerOpPrefillStage(dev_ctx,
                                       norm_weight,
                                       qkv_weight,
+                                      qkv_bias,
                                       qkv_deq_scale,
                                       out_linear_weight,
                                       out_linear_shift,
@@ -472,12 +528,15 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
                                       trans_qkv,
                                       trans_out_linear,
                                       trans_ffn1,
-                                      trans_ffn2);
+                                      trans_ffn2,
+                                      use_neox_style,
+                                      use_alibi);
   }
   if (ntokens_decoder > 0) {
     FusedBLockAttnLayerOpDecodingStage(dev_ctx,
                                        norm_weight,
                                        qkv_weight,
+                                       qkv_bias,
                                        qkv_deq_scale,
                                        out_linear_weight,
                                        out_linear_shift,
@@ -509,7 +568,9 @@ std::vector<paddle::Tensor> FusedBlockAttnLayerOp(
                                        trans_qkv,
                                        trans_out_linear,
                                        trans_ffn1,
-                                       trans_ffn2);
+                                       trans_ffn2,
+                                       use_neox_style,
+                                       use_alibi);
   }
 
   paddle::Tensor out(place);
@@ -531,6 +592,7 @@ std::vector<std::vector<int64_t>> FusedBlockAttnLayerOpInferShape(
     const std::vector<int64_t> &hidden_shape,
     const std::vector<int64_t> &norm_weight_shape,
     const std::vector<int64_t> &qkv_weight_shape,
+    const std::vector<int64_t> &qkv_bias_shape,
     const paddle::optional<std::vector<int64_t>> &qkv_deq_scale_shape,
     const std::vector<int64_t> &out_linear_weight_shape,
     const paddle::optional<std::vector<int64_t>> &out_linear_shift_shape,
@@ -551,6 +613,7 @@ std::vector<std::vector<int64_t>> FusedBlockAttnLayerOpInferShape(
     const std::vector<int64_t> &seq_lens_this_time_shape,
     const std::vector<int64_t> &block_tables_shape,
     int32_t flag,
+    int32_t max_seq_len,
     int32_t block_size,
     float epsilon,
     float qkv_quant_scale,
@@ -560,7 +623,9 @@ std::vector<std::vector<int64_t>> FusedBlockAttnLayerOpInferShape(
     bool trans_qkv,
     bool trans_out_linear,
     bool trans_ffn1,
-    bool trans_ffn2) {
+    bool trans_ffn2,
+    bool use_neox_style,
+    bool use_alibi) {
   return {{-1, hidden_shape[1]}};
 }
 
@@ -568,6 +633,7 @@ PD_BUILD_OP(fused_blha_layer_op)
     .Inputs({"hidden",
              "norm_weight",
              "qkv_weight",
+             "qkv_bias@OPTIONAL",
              "qkv_deq_scale@OPTIONAL",
              "out_linear_weight",
              "out_linear_shift@OPTIONAL",
@@ -589,6 +655,7 @@ PD_BUILD_OP(fused_blha_layer_op)
              "block_tables"})
     .Outputs({"hidden_out"})
     .Attrs({"flag: int",  // begin: 1, end: 2, other: 0
+            "max_seq_len: int",
             "block_size: int",
             "epsilon: float",
             "qkv_quant_scale: float",
@@ -598,7 +665,9 @@ PD_BUILD_OP(fused_blha_layer_op)
             "trans_qkv: bool",
             "trans_out_linear: bool",
             "trans_ffn1: bool",
-            "trans_ffn2: bool"})
+            "trans_ffn2: bool",
+            "use_neox_style: bool",
+            "use_alibi: bool"})
     .SetKernelFn(PD_KERNEL(FusedBlockAttnLayerOp))
     .SetInferShapeFn(PD_INFER_SHAPE(FusedBlockAttnLayerOpInferShape));
 

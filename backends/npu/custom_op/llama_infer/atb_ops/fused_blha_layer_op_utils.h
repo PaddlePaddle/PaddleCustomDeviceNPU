@@ -75,7 +75,10 @@ class FusedBlhaGlobalVar {
 
   void *get_slots_decoder() { return g_slots_decoder->data(); }
 
-  void *get_mask() { return g_mask->data(); }
+  void *get_casual_mask() { return g_mask->data(); }
+
+  void *get_alibi_src_mask() { return alibi_src_mask; }
+  void *get_alibi_tgt_mask() { return alibi_tgt_mask; }
 
   OutPack *get_out_encoder() { return &g_out_encoder; }
   OutPack *get_out_decoder() { return &g_out_decoder; }
@@ -131,7 +134,13 @@ class FusedBlhaGlobalVar {
                             int64_t max_block_num);
 
   // async d2d
-  void update_mask(const phi::CustomContext &dev_ctx, uint64_t max_seq_len);
+  void update_casual_mask(const phi::CustomContext &dev_ctx,
+                          uint64_t max_seq_len);
+
+  void update_alibi_mask(void *src_mask, void *tgt_mask) {
+    alibi_src_mask = src_mask;
+    alibi_tgt_mask = tgt_mask;
+  }
 
   // async d2d
   void update_in_encoder(const phi::CustomContext &dev_ctx,
@@ -177,6 +186,8 @@ class FusedBlhaGlobalVar {
   std::shared_ptr<phi::DenseTensor> g_ffn2_deq_offset{nullptr};
   std::unordered_map<int64_t, atb_layers::OperationRunner> g_encoder_runners;
   std::unordered_map<int64_t, atb_layers::OperationRunner> g_decoder_runners;
+  void *alibi_src_mask;
+  void *alibi_tgt_mask;
 };
 
 #endif

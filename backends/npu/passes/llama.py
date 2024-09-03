@@ -169,6 +169,10 @@ def llama_fuse_attention_layer():
             block_tables=block_tables,
         )
         fused_blha_op.SetAttr("flag", 0)
+        fused_blha_op.SetAttr("use_neox_style", False)
+        fused_blha_op.Attr("max_seq_len").MappedPattern(
+            op="block_multihead_attention", name="max_seq_len", index=0
+        )
         fused_blha_op.Attr("block_size").MappedPattern(
             op="block_multihead_attention", name="block_size", index=0
         )
@@ -199,6 +203,7 @@ def llama_fuse_attention_layer():
         fused_blha_op.Attr("trans_ffn2").MappedPattern(
             op="matmul_v2", name="trans_y", index=3
         )
+        fused_blha_op.SetAttr("use_alibi", False)
         return fused_blha_op.Output("hidden_out")
 
     return pattern, replace
@@ -301,6 +306,10 @@ def llama_fuse_attention_layer_begin():
             block_tables=block_tables,
         )
         fused_blha_op.SetAttr("flag", 1)
+        fused_blha_op.SetAttr("use_neox_style", False)
+        fused_blha_op.Attr("max_seq_len").MappedPattern(
+            op="block_multihead_attention", name="max_seq_len", index=0
+        )
         fused_blha_op.Attr("block_size").MappedPattern(
             op="block_multihead_attention", name="block_size", index=0
         )
@@ -331,6 +340,7 @@ def llama_fuse_attention_layer_begin():
         fused_blha_op.Attr("trans_ffn2").MappedPattern(
             op="matmul_v2", name="trans_y", index=3
         )
+        fused_blha_op.SetAttr("use_alibi", False)
         return fused_blha_op.Output("hidden_out")
 
     return pattern, replace
@@ -440,6 +450,10 @@ def llama_fuse_attention_layer_end():
             block_tables=block_tables,
         )
         fused_blha_op.SetAttr("flag", 2)
+        fused_blha_op.SetAttr("use_neox_style", False)
+        fused_blha_op.Attr("max_seq_len").MappedPattern(
+            op="block_multihead_attention", name="max_seq_len", index=0
+        )
         fused_blha_op.Attr("block_size").MappedPattern(
             op="block_multihead_attention", name="block_size", index=0
         )
@@ -470,6 +484,7 @@ def llama_fuse_attention_layer_end():
         fused_blha_op.Attr("trans_ffn2").MappedPattern(
             op="matmul_v2", name="trans_y", index=3
         )
+        fused_blha_op.SetAttr("use_alibi", False)
         return fused_blha_op.Output("hidden_out")
 
     return pattern, replace
@@ -541,6 +556,26 @@ def llama_fuse_get_padding_offset():
     def replace(input_ids, seq_lens_this_time):
         results = ir.PassDesc.OP.remove_padding(x=input_ids, seqlen=seq_lens_this_time)
         return results
+
+    return pattern, replace
+
+
+@ir.RegisterPass
+def replace_top_p_sampling_by_top_k_v2():
+    def pattern(probs, top_p):
+        results = ir.PassDesc.OP.top_p_sampling(
+            x=probs,
+            ps=top_p,
+        )
+        return results.Output("ids")
+
+    def replace(probs, top_p):
+        top_k_v2_op = ir.PassDesc.OP.top_k_v2
+        top_k_v2_op.SetAttr("axis", -1)
+        top_k_v2_op.SetAttr("k", 1)
+        top_k_v2_op.SetAttr("largest", True)
+        top_k_v2_op(X=probs)
+        return top_k_v2_op.Output("Indices")
 
     return pattern, replace
 
@@ -691,6 +726,10 @@ def llama_fuse_attention_smooth_quant_layer_begin():
         fused_blha_op._desc.set_input("ffn2_smooth@OPTIONAL", [ffn2_smooth.name])
         fused_blha_op._desc.set_input("ffn2_deq_scale@OPTIONAL", [ffn2_out_scale.name])
         fused_blha_op.SetAttr("flag", 1)
+        fused_blha_op.SetAttr("use_neox_style", False)
+        fused_blha_op.Attr("max_seq_len").MappedPattern(
+            op="block_multihead_attention", name="max_seq_len", index=0
+        )
         fused_blha_op.Attr("block_size").MappedPattern(
             op="block_multihead_attention", name="block_size", index=0
         )
@@ -721,6 +760,7 @@ def llama_fuse_attention_smooth_quant_layer_begin():
         fused_blha_op.Attr("trans_ffn2").MappedPattern(
             op="matmul_v2", name="trans_y", index=3
         )
+        fused_blha_op.SetAttr("use_alibi", False)
         return fused_blha_op.Output("hidden_out")
 
     return pattern, replace
@@ -877,6 +917,10 @@ def llama_fuse_attention_smooth_quant_layer_end():
         fused_blha_op._desc.set_input("ffn2_smooth@OPTIONAL", [ffn2_smooth.name])
         fused_blha_op._desc.set_input("ffn2_deq_scale@OPTIONAL", [ffn2_out_scale.name])
         fused_blha_op.SetAttr("flag", 2)
+        fused_blha_op.SetAttr("use_neox_style", False)
+        fused_blha_op.Attr("max_seq_len").MappedPattern(
+            op="block_multihead_attention", name="max_seq_len", index=0
+        )
         fused_blha_op.Attr("block_size").MappedPattern(
             op="block_multihead_attention", name="block_size", index=0
         )
@@ -907,6 +951,7 @@ def llama_fuse_attention_smooth_quant_layer_end():
         fused_blha_op.Attr("trans_ffn2").MappedPattern(
             op="matmul_v2", name="trans_y", index=3
         )
+        fused_blha_op.SetAttr("use_alibi", False)
         return fused_blha_op.Output("hidden_out")
 
     return pattern, replace
@@ -1052,6 +1097,10 @@ def llama_fuse_attention_smooth_quant_layer():
         fused_blha_op._desc.set_input("ffn2_smooth@OPTIONAL", [ffn2_smooth.name])
         fused_blha_op._desc.set_input("ffn2_deq_scale@OPTIONAL", [ffn2_out_scale.name])
         fused_blha_op.SetAttr("flag", 0)
+        fused_blha_op.SetAttr("use_neox_style", False)
+        fused_blha_op.Attr("max_seq_len").MappedPattern(
+            op="block_multihead_attention", name="max_seq_len", index=0
+        )
         fused_blha_op.Attr("block_size").MappedPattern(
             op="block_multihead_attention", name="block_size", index=0
         )
@@ -1082,6 +1131,7 @@ def llama_fuse_attention_smooth_quant_layer():
         fused_blha_op.Attr("trans_ffn2").MappedPattern(
             op="matmul_v2", name="trans_y", index=3
         )
+        fused_blha_op.SetAttr("use_alibi", False)
         return fused_blha_op.Output("hidden_out")
 
     return pattern, replace

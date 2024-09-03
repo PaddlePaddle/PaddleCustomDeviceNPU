@@ -22,9 +22,14 @@ void TopPSamplingKernel(const Context& dev_ctx,
                         const phi::DenseTensor& x,
                         const phi::DenseTensor& ps,
                         const paddle::optional<phi::DenseTensor>& threshold,
-                        int random_seed,
+                        const paddle::optional<phi::DenseTensor>& topp_seed,
+                        int seed,
+                        int k,
+                        const std::string& mode,
                         phi::DenseTensor* out,
-                        phi::DenseTensor* ids) {
+                        phi::DenseTensor* ids,
+                        phi::DenseTensor* topk_scores,
+                        phi::DenseTensor* topk_ids) {
   PADDLE_THROW(phi::errors::Unimplemented("Only supports model export"));
 }
 

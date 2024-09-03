@@ -31,6 +31,7 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
   uint64_t INPUT_NORM_WEIGHT = TENSOR_ID++;
 
   uint64_t INPUT_QKV_WEIGHT = TENSOR_ID++;
+  uint64_t INPUT_QKV_BIAS = param.has_qkv_bias ? TENSOR_ID++ : 0;
   uint64_t INPUT_QKV_DEQSCALE = param.use_matmul_int8 ? TENSOR_ID++ : 0;
   uint64_t INPUT_QKV_DEQOFFSET = param.use_matmul_int8 ? TENSOR_ID++ : 0;
 
@@ -56,9 +57,9 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
   uint64_t INPUT_FFN2_DEQSCALE = param.use_matmul_int8 ? TENSOR_ID++ : 0;
   uint64_t INPUT_FFN2_DEQOFFSET = param.use_matmul_int8 ? TENSOR_ID++ : 0;
 
-  uint64_t INPUT_COS = TENSOR_ID++;
-  uint64_t INPUT_SIN = TENSOR_ID++;
-  uint64_t INPUT_MASK = param.is_prefill ? TENSOR_ID++ : 0;
+  uint64_t INPUT_COS = param.use_alibi ? 0 : TENSOR_ID++;
+  uint64_t INPUT_SIN = param.use_alibi ? 0 : TENSOR_ID++;
+  uint64_t INPUT_MASK = param.is_prefill || param.use_alibi ? TENSOR_ID++ : 0;
 
   uint64_t INPUT_CACHE_K = TENSOR_ID++;
   uint64_t INPUT_CACHE_V = TENSOR_ID++;
@@ -83,8 +84,8 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
   uint64_t INTERMEDIATE_Q = TENSOR_ID++;
   uint64_t INTERMEDIATE_K = TENSOR_ID++;
   uint64_t INTERMEDIATE_V = TENSOR_ID++;
-  uint64_t INTERMEDIATE_EMB_Q = TENSOR_ID++;
-  uint64_t INTERMEDIATE_EMB_K = TENSOR_ID++;
+  uint64_t INTERMEDIATE_EMB_Q = param.use_alibi ? INTERMEDIATE_Q : TENSOR_ID++;
+  uint64_t INTERMEDIATE_EMB_K = param.use_alibi ? INTERMEDIATE_K : TENSOR_ID++;
   uint64_t INTERMEDIATE_ATTN_OUT = TENSOR_ID++;
   uint64_t INTERMEDIATE_LINEAR_OUT = TENSOR_ID++;
   uint64_t INTERMEDIATE_LINEAR_ADD_RES = TENSOR_ID++;
@@ -98,7 +99,11 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
   opGraph.inTensorNum = INPUT_BATCH_STATUS - INPUT_HIDDEN_STATES + 1;
   opGraph.outTensorNum = 1;
   opGraph.internalTensorNum = INTERMEDIATE_FFN2_OUT - INTERMEDIATE_NORM_OUT + 1;
-  opGraph.nodes.resize(12);
+  if (param.use_alibi) {
+    opGraph.nodes.resize(11);
+  } else {
+    opGraph.nodes.resize(12);
+  }
 
   // rms_norm
   {
@@ -116,14 +121,23 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
     atb::Node &opNode = opGraph.nodes.at(nodeIdx++);
     atb_layers::LinearParam opParam;
     opParam.trans_weight = param.trans_qkv_weight;
-    opParam.has_bias = false;
+    opParam.has_bias = param.has_qkv_bias;
     opParam.input_quant = param.use_matmul_int8;
     opParam.input_quant_scale = param.qkv_quant_scale;
     opParam.input_quant_offset = 0;
     opParam.input_smooth_quant = false;
     opParam.has_dequant_offset = param.use_matmul_int8;
     atb::CreateOperation(opParam, &opNode.operation);
-    if (param.use_matmul_int8) {
+    if (param.has_qkv_bias && param.use_matmul_int8) {
+      opNode.inTensorIds = {INTERMEDIATE_NORM_OUT,
+                            INPUT_QKV_WEIGHT,
+                            INPUT_QKV_BIAS,
+                            INPUT_QKV_DEQSCALE,
+                            INPUT_QKV_DEQOFFSET};
+    } else if (param.has_qkv_bias) {
+      opNode.inTensorIds = {
+          INTERMEDIATE_NORM_OUT, INPUT_QKV_WEIGHT, INPUT_QKV_BIAS};
+    } else if (param.use_matmul_int8) {
       opNode.inTensorIds = {INTERMEDIATE_NORM_OUT,
                             INPUT_QKV_WEIGHT,
                             INPUT_QKV_DEQSCALE,
@@ -147,7 +161,7 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
   }
 
   // rope
-  {
+  if (!param.use_alibi) {
     atb::Node &opNode = opGraph.nodes.at(nodeIdx++);
     atb::infer::RopeParam opParam;
     opParam.rotaryCoeff = param.rope_neox ? param.head_dim : 2;
@@ -209,7 +223,13 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
     opParam.qkScale = 1.0f / sqrt(param.head_dim);
     opParam.calcType = atb::infer::SelfAttentionParam::CalcType::PA_ENCODER;
     opParam.maskType = atb::infer::SelfAttentionParam::MASK_TYPE_NORM;
-    opParam.isTriuMask = 1;
+    if (param.use_alibi) {
+      opParam.isTriuMask = 0;
+      opParam.maskType =
+          atb::infer::SelfAttentionParam::MaskType::MASK_TYPE_ALIBI;
+    } else {
+      opParam.isTriuMask = 1;
+    }
     atb::CreateOperation(opParam, &opNode.operation);
     opNode.inTensorIds = {INTERMEDIATE_EMB_Q,
                           INTERMEDIATE_EMB_K,
@@ -224,17 +244,33 @@ void CreateFusedBlhaLayer(const FusedBlhaLayerParam &param,
     opParam.headNum = param.head_num;
     opParam.qkScale = 1.0f / sqrt(param.head_dim);
     opParam.kvHeadNum = param.kv_head_num;
-    opParam.maskType = atb::infer::PagedAttentionParam::UNDEFINED;
+    if (param.use_alibi) {
+      opParam.maskType =
+          atb::infer::PagedAttentionParam::MaskType::MASK_TYPE_ALIBI;
+    } else {
+      opParam.maskType = atb::infer::PagedAttentionParam::MaskType::UNDEFINED;
+    }
     opParam.batchRunStatusEnable = true;
 
     atb::CreateOperation(opParam, &opNode.operation);
 
-    opNode.inTensorIds = {INTERMEDIATE_EMB_Q,
-                          INPUT_CACHE_K,
-                          INPUT_CACHE_V,
-                          INPUT_BLOCK_TABLES,
-                          INPUT_SEQLEN,
-                          INPUT_BATCH_STATUS};
+    if (param.use_alibi) {
+      opNode.inTensorIds = {INTERMEDIATE_EMB_Q,
+                            INPUT_CACHE_K,
+                            INPUT_CACHE_V,
+                            INPUT_BLOCK_TABLES,
+                            INPUT_SEQLEN,
+                            INPUT_MASK,
+                            INPUT_BATCH_STATUS};
+    } else {
+      opNode.inTensorIds = {INTERMEDIATE_EMB_Q,
+                            INPUT_CACHE_K,
+                            INPUT_CACHE_V,
+                            INPUT_BLOCK_TABLES,
+                            INPUT_SEQLEN,
+                            INPUT_BATCH_STATUS};
+    }
+
     opNode.outTensorIds = {INTERMEDIATE_ATTN_OUT};
     opNode.inTensorReshapeFuncs.resize(opNode.inTensorIds.size());
     opNode.inTensorReshapeFuncs[0] = [=](const atb::Dims &oldShape,

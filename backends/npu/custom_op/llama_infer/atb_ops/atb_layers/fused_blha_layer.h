@@ -22,10 +22,12 @@ namespace atb_layers {
 struct FusedBlhaLayerParam {
   float epsilon;
   bool rope_neox{false};
+  bool use_alibi{false};
   bool trans_qkv_weight;
   bool trans_out_weight;
   bool trans_ffn1_weight;
   bool trans_ffn2_weight;
+  bool has_qkv_bias{false};
   atb::infer::ActivationType ffn_act;
   float scale;  // for swish
   int64_t head_num;

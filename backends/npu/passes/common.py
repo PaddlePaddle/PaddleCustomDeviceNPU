@@ -18,6 +18,7 @@ import os
 import paddle
 
 from . import llama  # noqa: F401
+from . import chatglm  # noqa: F401
 
 
 def setUp():
@@ -44,6 +45,7 @@ def addPasses(pass_builder, model_type, quant_type):
         register_pass(pass_builder, "llama_fuse_lm_head_with_slice")
         register_pass(pass_builder, "llama_fuse_lm_head")
         register_pass(pass_builder, "llama_fuse_get_padding_offset")
+        register_pass(pass_builder, "replace_top_p_sampling_by_top_k_v2")
     elif model_type == "llama":
         register_pass(pass_builder, "remove_residual_in_fused_bias_residual_layernorm")
         register_pass(pass_builder, "remove_residual_in_rms_norm")
@@ -54,5 +56,20 @@ def addPasses(pass_builder, model_type, quant_type):
         register_pass(pass_builder, "llama_fuse_lm_head_with_slice")
         register_pass(pass_builder, "llama_fuse_lm_head")
         register_pass(pass_builder, "llama_fuse_get_padding_offset")
+        register_pass(pass_builder, "replace_top_p_sampling_by_top_k_v2")
+    elif model_type.startswith("chatglm"):
+        register_pass(pass_builder, "remove_residual_in_fused_bias_residual_layernorm")
+        register_pass(pass_builder, "remove_residual_in_rms_norm")
+        register_pass(pass_builder, "remove_blha_get_max_len")
+        register_pass(pass_builder, "chatglm_fuse_attention_layer_begin")
+        register_pass(pass_builder, "chatglm_fuse_attention_layer_end")
+        register_pass(pass_builder, "chatglm_fuse_attention_layer")
+        register_pass(pass_builder, "llama_fuse_attention_layer_begin")
+        register_pass(pass_builder, "llama_fuse_attention_layer_end")
+        register_pass(pass_builder, "llama_fuse_attention_layer")
+        register_pass(pass_builder, "llama_fuse_lm_head_with_slice")
+        register_pass(pass_builder, "llama_fuse_lm_head")
+        register_pass(pass_builder, "llama_fuse_get_padding_offset")
+        register_pass(pass_builder, "replace_top_p_sampling_by_top_k_v2")
     else:
         print("NPU pass not support")

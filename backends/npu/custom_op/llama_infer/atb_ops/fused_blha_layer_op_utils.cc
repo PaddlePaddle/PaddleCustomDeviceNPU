@@ -442,8 +442,8 @@ void FusedBlhaGlobalVar::update_slots_decoder(const phi::CustomContext &dev_ctx,
                              reinterpret_cast<aclrtStream>(dev_ctx.stream())));
 }
 
-void FusedBlhaGlobalVar::update_mask(const phi::CustomContext &dev_ctx,
-                                     uint64_t max_seq_len) {
+void FusedBlhaGlobalVar::update_casual_mask(const phi::CustomContext &dev_ctx,
+                                            uint64_t max_seq_len) {
   if (!g_mask.get()) {
     g_mask = std::make_shared<phi::DenseTensor>();
   }
