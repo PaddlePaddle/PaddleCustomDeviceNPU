@@ -22,7 +22,7 @@ from paddle.base.framework import convert_np_dtype_to_dtype_
 
 paddle.enable_static()
 
-class TestNPUAbs(OpTest):
+class TestHPU(OpTest):
     def setUp(self):
         self.op_type = "fill_constant"
         self.set_npu()
@@ -51,5 +51,35 @@ class TestNPUAbs(OpTest):
     def test_check_output(self):
         self.check_output_with_place(self.place)
 
+
+class TestHPU_BOOL(OpTest):
+    def setUp(self):
+        self.op_type = "fill_constant"
+        self.set_npu()
+        self.init_dtype()
+
+        self.shape = [2, 3, 4, 5]
+        self.fill_value = True
+
+        self.inputs = {}
+        self.attrs = {
+            "shape": self.shape,
+            "value": self.fill_value,
+            "dtype": convert_np_dtype_to_dtype_(self.dtype),
+        }
+        self.outputs = {"Out": np.full(self.shape, self.fill_value, self.dtype)}
+        
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+        self.__class__.no_need_check_grad = True
+        self.place = paddle.CustomPlace("intel_hpu", 0)
+
+    def init_dtype(self):
+        self.dtype = np.bool
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+        
 if __name__ == "__main__":
     unittest.main()

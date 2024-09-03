@@ -84,9 +84,10 @@ void FullKernel(const Context& dev_ctx,
       dtype == phi::DataType::BFLOAT16) {
     params.params.constant.f = val.to<float>();
   } else if (dtype == phi::DataType::INT32 || dtype == phi::DataType::INT8 ||
-             dtype == phi::DataType::BOOL || dtype == phi::DataType::UINT8 ||
-             dtype == phi::DataType::INT64) {
+             dtype == phi::DataType::INT64 || dtype == phi::DataType::UINT8) {
     params.params.constant.i = val.to<int>();
+  } else if (dtype == phi::DataType::BOOL) {
+    params.params.constant.i = -val.to<int>();
   } else {
     phi::errors::InvalidArgument("Unsupported cast dtype %s", dtype);
   }
