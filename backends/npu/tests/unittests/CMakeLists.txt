@@ -24,6 +24,9 @@ endforeach()
 
 set_tests_properties(${TEST_OPS} PROPERTIES TIMEOUT 1000)
 
+set_tests_properties(test_tril_triu_op_npu PROPERTIES ENVIRONMENT
+                                                      FLAGS_enable_pir_api=0)
+
 set_tests_properties(test_check_nan_inf_op_npu
                      PROPERTIES ENVIRONMENT FLAGS_npu_check_nan_inf=1)
 set_tests_properties(test_adam_op_npu
