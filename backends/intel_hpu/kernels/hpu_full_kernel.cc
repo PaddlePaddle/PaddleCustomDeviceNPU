@@ -19,7 +19,6 @@
 namespace custom_kernel {
 
 struct FullParams {
-  phi::IntArray shape;
   phi::DataType dst_type;
   ns_ConstantKernel::Params params;
 };
@@ -78,7 +77,6 @@ void FullKernel(const Context& dev_ctx,
 
   OpCacheOperator op_info;
   FullParams params;
-  params.shape = shape;
   params.dst_type = dtype;
   if (dtype == phi::DataType::FLOAT32 || dtype == phi::DataType::FLOAT16 ||
       dtype == phi::DataType::BFLOAT16) {
@@ -91,8 +89,8 @@ void FullKernel(const Context& dev_ctx,
   } else {
     phi::errors::InvalidArgument("Unsupported cast dtype %s", dtype);
   }
-  std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, FullParams>("FullKernel", inputs_dims, &params);
+  std::vector<DIMS> outputs_dims = ct.GetDims(false);
+  op_info.prepareOpInfo<T, FullParams>("FullKernel", outputs_dims, &params);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
