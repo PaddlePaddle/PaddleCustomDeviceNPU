@@ -64,7 +64,7 @@ void ExpandKernel(const Context& dev_ctx,
                   const phi::DenseTensor& x,
                   const phi::IntArray& shape,
                   phi::DenseTensor* out) {
-  LOG(INFO) << "HPU ExpandKernel";
+  VLOG(6) << "HPU ExpandKernel";
 
   auto expand_shape = shape.GetData();
   std::vector<int> x_dims = phi::vectorize<int>(x.dims());

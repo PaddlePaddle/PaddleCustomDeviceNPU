@@ -78,7 +78,7 @@ class HpuOperator {
 
       cached_workspaceSize = request_workspace_size;
       // malloc the new one
-      LOG(INFO) << "malloc device workspace " << cached_workspaceSize;
+      VLOG(6) << "malloc device workspace " << cached_workspaceSize;
       status = synDeviceMalloc(
           0, cached_workspaceSize, 0, 0, &cached_workspaceAddress);
       PD_CHECK(status == synSuccess,
@@ -86,7 +86,7 @@ class HpuOperator {
                status);
     }
 
-    LOG(INFO) << "workspace size = " << cached_workspaceSize;
+    VLOG(6) << "workspace size = " << cached_workspaceSize;
 
     std::vector<synLaunchTensorInfo> concatTensors;
     for (auto& tensor : tensors) {
@@ -140,7 +140,7 @@ class HpuOperator {
 
     for (unsigned i = 0; i < dims; ++i) {
       desc.m_sizes[i] = tensor_size[dims - 1 - i];
-      LOG(INFO) << "name = " << name << ", " << tensor_size[dims - 1 - i];
+      VLOG(6) << "name = " << name << ", " << tensor_size[dims - 1 - i];
     }
 
     synSectionHandle sectionHandle = nullptr;
@@ -214,7 +214,7 @@ class RecipeRunner {
       }
 
       cached_workspaceSize = request_workspace_size;
-      LOG(INFO) << "malloc device workspace " << cached_workspaceSize;
+      VLOG(6) << "malloc device workspace " << cached_workspaceSize;
       status = synDeviceMalloc(
           0, cached_workspaceSize, 0, 0, &cached_workspaceAddress);
       PD_CHECK(status == synSuccess,
@@ -222,7 +222,7 @@ class RecipeRunner {
                status);
     }
 
-    LOG(INFO) << "workspace size = " << cached_workspaceSize;
+    VLOG(6) << "workspace size = " << cached_workspaceSize;
 
     std::vector<synLaunchTensorInfo> concatTensors;
     for (auto& tensor : tensors) {

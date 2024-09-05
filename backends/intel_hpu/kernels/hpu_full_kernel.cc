@@ -64,7 +64,7 @@ void FullKernel(const Context& dev_ctx,
                 const phi::Scalar& val,
                 phi::DataType dtype,
                 phi::DenseTensor* out) {
-  LOG(INFO) << "HPU FullKernel with val = " << val;
+  VLOG(6) << "HPU FullKernel with val = " << val;
   auto int_shape = shape.GetData();
   out->Resize(phi::make_ddim(int_shape));
   if (out->dims().size() == 0) {
@@ -114,7 +114,7 @@ void FullLikeKernel(const Context& dev_ctx,
                     const phi::Scalar& val,
                     phi::DataType dtype,
                     phi::DenseTensor* out) {
-  LOG(INFO) << "HPU FullLikeKernel with val = " << val;
+  VLOG(6) << "HPU FullLikeKernel with val = " << val;
   std::vector<int64_t> shape_vec = phi::vectorize(x.dims());
   phi::IntArray out_shape(shape_vec);
   custom_kernel::FullKernel<T, Context>(dev_ctx, out_shape, val, dtype, out);

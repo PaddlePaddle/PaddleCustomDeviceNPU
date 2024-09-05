@@ -229,7 +229,7 @@ class ConvertTensors {
         info.type = PDDataTypeToSynDataType(x.dtype());
         info.num_elements = x.numel();
         x_tensors_.insert({addr, info});
-        LOG(INFO) << "add tensor " << info.name << ", " << addr;
+        VLOG(6) << "add tensor " << info.name << ", " << addr;
       }
       x_host_tensor_.push_back(addr);
     } else {
@@ -248,7 +248,7 @@ class ConvertTensors {
         info.type = PDDataTypeToSynDataType(x.dtype());
         info.num_elements = x.numel();
         y_tensors_.insert({addr, info});
-        LOG(INFO) << "add tensor " << info.name << ", " << addr;
+        VLOG(6) << "add tensor " << info.name << ", " << addr;
       }
       y_host_tensor_.push_back(addr);
     }

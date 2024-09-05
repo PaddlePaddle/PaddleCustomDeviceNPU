@@ -70,7 +70,7 @@ class BinaryOperator : public HpuOperator {
                               int axis,                                      \
                               phi::DenseTensor* out) {                       \
     dev_ctx.template Alloc<T>(out);                                          \
-    LOG(INFO) << "CALL HPU " << #kernel_func << "RawKernel";                 \
+    VLOG(6) << "CALL HPU " << #kernel_func << "RawKernel";                   \
     std::vector<int64_t> x_dim = phi::vectorize<int64_t>(x.dims());          \
     std::vector<int64_t> y_dim = phi::vectorize<int64_t>(y.dims());          \
     if (y_dim.size() == 0) {                                                 \
