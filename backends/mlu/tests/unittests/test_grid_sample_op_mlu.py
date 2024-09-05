@@ -211,5 +211,77 @@ class Case2(LargeInputCase):
         self.mode = "bilinear"
 
 
+class TestGridSamperAPI(unittest.TestCase):
+    def setUp(self):
+        self.x_shape = (2, 3, 8, 8)
+        self.grid_shape = (2, 7, 9, 2)
+        self.theta_shape = (2, 2, 3)
+        self.align_corners = False
+        self.padding_mode = "zeros"
+        self.mode = "bilinear"
+
+        self.x = np.random.randint(0, 255, self.x_shape).astype("float32")
+        self.theta = np.zeros(self.theta_shape).astype("float32")
+
+        if len(self.grid_shape) == 4:
+            for i in range(self.theta_shape[0]):
+                for j in range(2):
+                    for k in range(3):
+                        self.theta[i, j, k] = np.random.rand(1)[0]
+            self.grid = AffineGrid(self.theta, self.grid_shape)
+        self.place = paddle.CustomPlace("mlu", 0)
+
+    def test_api_dygraph(self):
+        paddle.disable_static(self.place)
+
+        paddle.set_device("mlu")
+        # fwd and bwd with normal format
+        x = paddle.to_tensor(self.x)
+        grid = paddle.to_tensor(self.grid)
+        x.stop_gradient = False
+        grid.stop_gradient = False
+        out_expect = paddle.nn.functional.grid_sample(
+            x,
+            grid,
+            mode=self.mode,
+            padding_mode=self.padding_mode,
+            align_corners=self.align_corners,
+        )
+        loss = out_expect.sum()
+        loss.backward()
+        x_grad_expect = x.grad
+        grid_grad_expect = grid.grad
+
+        paddle.set_device("cpu")
+        # fwd and bwd with normal format
+        x_cpu = paddle.to_tensor(self.x)
+        grid_cpu = paddle.to_tensor(self.grid)
+        x_cpu.stop_gradient = False
+        grid_cpu.stop_gradient = False
+        out_expect_cpu = paddle.nn.functional.grid_sample(
+            x_cpu,
+            grid_cpu,
+            mode=self.mode,
+            padding_mode=self.padding_mode,
+            align_corners=self.align_corners,
+        )
+        loss_cpu = out_expect_cpu.sum()
+        loss_cpu.backward()
+        x_grad_expect_cpu = x_cpu.grad
+        grid_grad_expect_cpu = grid_cpu.grad
+
+        # compare results
+        np.testing.assert_allclose(
+            out_expect.numpy(), out_expect_cpu.numpy(), atol=1e-3
+        )
+        np.testing.assert_allclose(
+            x_grad_expect.numpy(), x_grad_expect_cpu.numpy(), atol=1e-3
+        )
+        np.testing.assert_allclose(
+            grid_grad_expect.numpy(), grid_grad_expect_cpu.numpy(), atol=1e-3
+        )
+        paddle.enable_static()
+
+
 if __name__ == "__main__":
     unittest.main()

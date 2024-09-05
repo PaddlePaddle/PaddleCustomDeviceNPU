@@ -5691,6 +5691,44 @@ NormalizeDesc::~NormalizeDesc() {
                                                    workspace_size));
 }
 
+/* static */ void MLUCnnl::GridSampleBackward(
+    const Context& ctx,
+    const cnnlGridSampleDescriptor_t grid_sample_desc,
+    const cnnlTensorDescriptor_t grad_output_desc,
+    const void* grad_output,
+    const cnnlTensorDescriptor_t input_desc,
+    const void* input,
+    const cnnlTensorDescriptor_t grid_desc,
+    const void* grid,
+    const cnnlTensorDescriptor_t grad_input_desc,
+    void* grad_input,
+    const cnnlTensorDescriptor_t grad_grid_desc,
+    void* grad_grid) {
+  cnnlHandle_t handle = GetHandleFromCTX(ctx);
+  size_t workspace_size;
+  PADDLE_ENFORCE_MLU_SUCCESS(cnnlGetGridSampleBackwardWorkspaceSize(
+      handle, grad_grid_desc, input_desc, grid_desc, &workspace_size));
+
+  Tensor workspace;
+  workspace.Resize({static_cast<int64_t>(workspace_size)});
+  void* workspace_ptr = ctx.Alloc(&workspace, DataType::INT8, workspace_size);
+
+  PADDLE_ENFORCE_MLU_SUCCESS(cnnlGridSampleBackward(handle,
+                                                    grid_sample_desc,
+                                                    grad_output_desc,
+                                                    grad_output,
+                                                    input_desc,
+                                                    input,
+                                                    grid_desc,
+                                                    grid,
+                                                    workspace_ptr,
+                                                    workspace_size,
+                                                    grad_input_desc,
+                                                    grad_input,
+                                                    grad_grid_desc,
+                                                    grad_grid));
+}
+
 /* static */ void MLUCnnl::SyncBatchNormStats(
     const Context& ctx,
     const cnnlTensorDescriptor_t x_desc,

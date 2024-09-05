@@ -2402,6 +2402,20 @@ class MLUCnnl {
                          const cnnlTensorDescriptor_t output_desc,
                          void* output);
 
+  static void GridSampleBackward(
+      const Context& ctx,
+      const cnnlGridSampleDescriptor_t grid_sample_desc,
+      const cnnlTensorDescriptor_t grad_output_desc,
+      const void* grad_output,
+      const cnnlTensorDescriptor_t input_desc,
+      const void* input,
+      const cnnlTensorDescriptor_t grid_desc,
+      const void* grid,
+      const cnnlTensorDescriptor_t grad_input_desc,
+      void* grad_input,
+      const cnnlTensorDescriptor_t grad_grid_desc,
+      void* grad_grid);
+
   static void SyncBatchNormStats(const Context& ctx,
                                  const cnnlTensorDescriptor_t x_desc,
                                  const void* x,
