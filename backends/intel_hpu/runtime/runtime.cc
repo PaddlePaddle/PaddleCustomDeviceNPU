@@ -205,7 +205,6 @@ class RuntimeManager {
                 const void *src,
                 size_t size,
                 size_t flag = 0 /*0 = h2d, 1 = d2h, 2=d2d*/) {
-    // TODO: cache mapped host addr
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
         << "copy: flag = " << flag << ", size = " << size << ", src = " << src
         << ", dst = " << dst;
@@ -293,7 +292,6 @@ class RuntimeManager {
                      const void *src,
                      size_t size,
                      size_t flag = 0 /*0 = h2d, 1 = d2h, 2=d2d*/) {
-    // TODO: cache mapped host addr
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
         << "AsyncCopy: flag = " << flag << ", size = " << size
         << ", stream = " << stream << ", src = " << src << ", dst = " << dst;
@@ -1005,10 +1003,8 @@ void InitPlugin(CustomRuntimeParams *params) {
   // params->interface->async_memory_copy_p2p = AsyncMemCpyP2P;
   params->interface->device_memory_allocate = Allocate_device;
   params->interface->host_memory_allocate = Allocate_host;
-  // params->interface->unified_memory_allocate = Allocate;
   params->interface->device_memory_deallocate = Deallocate_device;
   params->interface->host_memory_deallocate = Deallocate_host;
-  // params->interface->unified_memory_deallocate = Deallocate;
 
   params->interface->get_device_count = GetDevicesCount;
   params->interface->get_device_list = GetDevicesList;
