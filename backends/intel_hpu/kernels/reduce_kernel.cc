@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
 
 namespace custom_kernel {
@@ -36,7 +36,8 @@ class Reduce : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
     if (params.reduce_all) {
-      inputs[0].dims = std::vector<int64_t>({static_cast<int64_t>(inputs[0].num_elements)});
+      inputs[0].dims =
+          std::vector<int64_t>({static_cast<int64_t>(inputs[0].num_elements)});
       outputs[0].dims = std::vector<int64_t>({1});
     }
     std::vector<synTensor> syn_inputs;
@@ -78,7 +79,8 @@ class Reduce : public HpuOperator {
                                      reduce_name.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
     std::string reshape_name = guid_ + "_reshape";
     std::string reshape_guid = "reshape";
     status = synNodeCreate(graphHandle_,
@@ -92,7 +94,8 @@ class Reduce : public HpuOperator {
                            reshape_name.c_str(),
                            nullptr,
                            nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 

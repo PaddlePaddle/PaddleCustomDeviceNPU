@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 
 namespace custom_kernel {
 
 class RMS : public HpuOperator {
  public:
-  RMS(synDataType dtype) : HpuOperator("rms_norm_ex_fwd_"), dtype_(dtype) {}
+  explicit RMS(synDataType dtype)
+      : HpuOperator("rms_norm_ex_fwd_"), dtype_(dtype) {}
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
                const float epsilon) {
@@ -63,7 +64,8 @@ class RMS : public HpuOperator {
                                      "RMS",
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 
  protected:
@@ -110,7 +112,7 @@ void RmsNormKernel(const Context& dev_ctx,
   tensors["w"] = reinterpret_cast<uint64_t>(norm_weight.data<T>());
   tensors["out"] = reinterpret_cast<uint64_t>(out->data<T>());
 
-  op.Execute(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
+  // op.Execute(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
 }  // namespace custom_kernel

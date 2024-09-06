@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
 
 namespace custom_kernel {
 
 class SwiGlu : public HpuOperator {
  public:
-  SwiGlu(synDataType dtype) : HpuOperator("swiglu_fwd"), dtype_(dtype) {}
+  explicit SwiGlu(synDataType dtype)
+      : HpuOperator("swiglu_fwd"), dtype_(dtype) {}
   void AddNode(const std::vector<DIMS>& ins, const std::vector<DIMS>& outs) {
     synTensor silu_inputs[1] = {
         createTensor(ins[0].size(), dtype_, ins[0], true, "x")};
@@ -64,7 +65,8 @@ class SwiGlu : public HpuOperator {
                                      silu_name.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
 
     status = synNodeCreate(graphHandle_,
                            mul_inputs,
@@ -77,7 +79,8 @@ class SwiGlu : public HpuOperator {
                            mul_name.c_str(),
                            nullptr,
                            nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 
  protected:

@@ -12,20 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "utils/utills.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
 #include <climits>
+
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
+#include "utils/utills.h"
 
 namespace custom_kernel {
 
 class TrilTriuOperator : public HpuOperator {
  public:
   TrilTriuOperator(std::string guid_prefix, std::string node_name)
-    : HpuOperator(guid_prefix), pName_(node_name) {}
+      : HpuOperator(guid_prefix), pName_(node_name) {}
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
                synDataType datatype,
@@ -49,7 +50,8 @@ class TrilTriuOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };
@@ -69,22 +71,22 @@ void TrilTriuKernel(const Context& dev_ctx,
   std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
   ns_MatrixBandPartKernel::triParams params;
 
-  if (lower ) {
+  if (lower) {
     params.numLower = INT_MIN;
     params.numUpper = diagonal;
     params.excludeDiag = 1;
-  }
-  else {
+  } else {
     params.numLower = diagonal;
     params.numUpper = INT_MAX;
     params.excludeDiag = 1;
   }
 
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, ns_MatrixBandPartKernel::triParams>("matrix_band_part_fwd", {inputs_dim}, &params);
+  op_info.prepareOpInfo<T, ns_MatrixBandPartKernel::triParams>(
+      "matrix_band_part_fwd", {inputs_dim}, &params);
 
   auto recipe = op_info.GetRecipe();
-  if(recipe == nullptr){
+  if (recipe == nullptr) {
     // compile
     TrilTriuOperator op(op_info.guid_, lower ? "Tril_op" : "Triu_op");
     op.AddNode({inputs_dim}, {outputs_dim}, op_info.datatype_, params);
@@ -97,8 +99,8 @@ void TrilTriuKernel(const Context& dev_ctx,
   std::map<std::string, uint64_t> tensors;
   tensors["input"] = reinterpret_cast<uint64_t>(x.data<T>());
   tensors["output"] = reinterpret_cast<uint64_t>(out->data<T>());
-  
-  RecipeRunner runner(recipe); 
+
+  RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
@@ -119,7 +121,6 @@ void TriuKernel(const Context& dev_ctx,
 }
 
 }  // namespace custom_kernel
-
 
 PD_REGISTER_PLUGIN_KERNEL(tril_triu,
                           intel_hpu,

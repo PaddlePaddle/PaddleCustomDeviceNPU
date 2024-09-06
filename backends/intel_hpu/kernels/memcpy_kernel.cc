@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
+#include "kernels/funcs.h"
 #include "paddle/phi/extension.h"
 
 namespace custom_kernel {

@@ -12,23 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
-#include "utils/utills.h"
 #include <iostream>
-using namespace std;
+
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
+#include "utils/utills.h"
+
 namespace custom_kernel {
 
 class CumsumOperator : public HpuOperator {
  public:
   CumsumOperator(std::string guid_prefix, std::string node_name)
-    : HpuOperator(guid_prefix), pName_(node_name) {}
-  void AddNode(ConvertTensors& ct,
-               ns_CumSumKernel::Params params) {
-
+      : HpuOperator(guid_prefix), pName_(node_name) {}
+  void AddNode(ConvertTensors& ct, ns_CumSumKernel::Params params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
@@ -50,7 +49,7 @@ class CumsumOperator : public HpuOperator {
                                          outputs[i].name));
     }
 
-    std::string guid = + "cumsum_fwd_" + SynDataTypeToStr(inputs[0].type);
+    std::string guid = +"cumsum_fwd_" + SynDataTypeToStr(inputs[0].type);
 
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
@@ -63,7 +62,8 @@ class CumsumOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };
@@ -97,18 +97,20 @@ void CumsumKernel(const Context& dev_ctx,
     input_tensor.Resize(phi::make_ddim({x.numel()}));
   }
 
-  std::vector<int64_t> inputs_dim = phi::vectorize<int64_t>(input_tensor.dims());
+  std::vector<int64_t> inputs_dim =
+      phi::vectorize<int64_t>(input_tensor.dims());
   ct.Add(input_tensor);
-  int params_exclusive=static_cast<int>(exclusive);
-  int params_reverse=static_cast<int>(reverse);
-  ns_CumSumKernel::Params params{params_axis, params_exclusive, params_reverse };
+  int params_exclusive = static_cast<int>(exclusive);
+  int params_reverse = static_cast<int>(reverse);
+  ns_CumSumKernel::Params params{params_axis, params_exclusive, params_reverse};
 
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, ns_CumSumKernel::Params>("cumsum_fwd_", {inputs_dim}, &params);
+  op_info.prepareOpInfo<T, ns_CumSumKernel::Params>(
+      "cumsum_fwd_", {inputs_dim}, &params);
 
   auto recipe = op_info.GetRecipe();
   ct.Add(out, false);
-  if(recipe == nullptr){
+  if (recipe == nullptr) {
     // compile
     CumsumOperator op(op_info.guid_, "cumsum_op");
     op.AddNode(ct, params);
@@ -119,7 +121,7 @@ void CumsumKernel(const Context& dev_ctx,
 
   std::map<std::string, uint64_t> tensors = ct.GetDeviceAddr();
 
-  RecipeRunner runner(recipe); 
+  RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
 
 namespace custom_kernel {
@@ -28,9 +28,13 @@ namespace custom_kernel {
   }
 
 #define PD_REGISTER_PLUGIN_KERNEL_16f32f(OP_NAME, GUID)                     \
-  PD_REGISTER_PLUGIN_KERNEL(                                                \
-      GUID, intel_hpu, ALL_LAYOUT, custom_kernel::OP_NAME##Kernel, float,   \
-      phi::dtype::bfloat16, phi::dtype::float16) {                          \
+  PD_REGISTER_PLUGIN_KERNEL(GUID,                                           \
+                            intel_hpu,                                      \
+                            ALL_LAYOUT,                                     \
+                            custom_kernel::OP_NAME##Kernel,                 \
+                            float,                                          \
+                            phi::dtype::bfloat16,                           \
+                            phi::dtype::float16) {                          \
     kernel->InputAt(0).SetDataType(phi::dtype::ToReal(kernel_key.dtype())); \
   }
 
@@ -57,7 +61,8 @@ class Unary : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };

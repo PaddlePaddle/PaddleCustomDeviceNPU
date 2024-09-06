@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
 
 namespace custom_kernel {
@@ -34,7 +34,7 @@ class Expand : public HpuOperator {
                                         true,
                                         inputs[i].name));
     }
-    
+
     std::vector<synTensor> syn_outputs;
     for (size_t i = 0; i < outputs.size(); i++) {
       syn_outputs.push_back(createTensor(outputs[i].dims.size(),
@@ -43,7 +43,7 @@ class Expand : public HpuOperator {
                                          true,
                                          outputs[i].name));
     }
-    
+
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
                                      syn_outputs.data(),
@@ -55,7 +55,8 @@ class Expand : public HpuOperator {
                                      "Expand",
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
 };
 
@@ -148,7 +149,7 @@ void ExpandKernel(const Context& dev_ctx,
   ct.Add(out, false);
   std::vector<DIMS> in_out_dims = ct.GetDims(true);
   std::vector<DIMS> out_dims = ct.GetDims(false);
-  in_out_dims.insert(in_out_dims.end(),out_dims.begin(),out_dims.end());
+  in_out_dims.insert(in_out_dims.end(), out_dims.begin(), out_dims.end());
 
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, nullptr_t>("broadcast", in_out_dims, nullptr);
@@ -158,7 +159,7 @@ void ExpandKernel(const Context& dev_ctx,
   // for (int i = 0; i < siz_ar; ++i)
   //   printf("%d ", op_info.key_creator_.GetKey()[i]);
   // std::cout << std::endl;
-  
+
   if (recipe == nullptr) {
     Expand op;
 
@@ -173,7 +174,6 @@ void ExpandKernel(const Context& dev_ctx,
   RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
-
 
 }  // namespace custom_kernel
 

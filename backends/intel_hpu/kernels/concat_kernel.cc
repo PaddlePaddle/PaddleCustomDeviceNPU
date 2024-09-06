@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
 
 namespace custom_kernel {
 
 class Concat : public HpuOperator {
  public:
-  Concat(synDataType dtype) : HpuOperator("concat"), dtype_(dtype) {}
+  explicit Concat(synDataType dtype) : HpuOperator("concat"), dtype_(dtype) {}
 
   void AddNode(ConvertTensors& ct, unsigned params) {
     auto inputs = ct.GetTensors();

@@ -12,19 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
 
 namespace custom_kernel {
 
 class SoftmaxOperator : public HpuOperator {
  public:
   SoftmaxOperator(std::string guid_prefix, std::string node_name)
-    : HpuOperator(guid_prefix), pName_(node_name) {}
+      : HpuOperator(guid_prefix), pName_(node_name) {}
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
                synDataType datatype,
@@ -48,7 +48,8 @@ class SoftmaxOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };
@@ -68,13 +69,15 @@ void SoftmaxKernel(const Context& dev_ctx,
   }
   std::vector<int64_t> inputs_dim = phi::vectorize<int64_t>(x.dims());
   std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
-  ns_Softmax::Params params{static_cast<int>(inputs_dim.size()) - 1 - calc_axis};
-  
+  ns_Softmax::Params params{static_cast<int>(inputs_dim.size()) - 1 -
+                            calc_axis};
+
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, ns_Softmax::Params>("softmax_fwd", {inputs_dim}, &params);
+  op_info.prepareOpInfo<T, ns_Softmax::Params>(
+      "softmax_fwd", {inputs_dim}, &params);
 
   auto recipe = op_info.GetRecipe();
-  if(recipe == nullptr){
+  if (recipe == nullptr) {
     // compile
     SoftmaxOperator op(op_info.guid_, "softmax_op");
     op.AddNode({inputs_dim}, {outputs_dim}, op_info.datatype_, params);
@@ -87,8 +90,8 @@ void SoftmaxKernel(const Context& dev_ctx,
   std::map<std::string, uint64_t> tensors;
   tensors["input"] = reinterpret_cast<uint64_t>(x.data<T>());
   tensors["output"] = reinterpret_cast<uint64_t>(out->data<T>());
-  
-  RecipeRunner runner(recipe); 
+
+  RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 

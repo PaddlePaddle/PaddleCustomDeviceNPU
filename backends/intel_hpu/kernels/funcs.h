@@ -167,12 +167,10 @@ inline void TensorCopy(const Context& dev_ctx,
           dev_ctx.Wait();
         }
       } else {
-        // TODO: phi::errors::Unimplemented("TensorCopy is not supported.")
         PADDLE_THROW("TensorCopy is not supported.");
       }
 
     } else {
-      // TODO: phi::errors::Unimplemented("TensorCopy is not supported.")
       PADDLE_THROW("TensorCopy is not supported.");
     }
   } else if (src_place.GetType() == phi::AllocationType::CPU &&
@@ -209,7 +207,6 @@ class ConvertTensors {
 
   void Add(const phi::DenseTensor& x, bool is_input = true) {
     phi::DenseTensorMeta meta = x.meta();
-    // auto addr = x.data() - meta.offset;
     auto addr = x.data();
 
     phi::vectorize<int64_t>(x.dims());

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 
 namespace custom_kernel {
 
@@ -25,9 +25,9 @@ void AddKernel(const Context& dev_ctx,
 
 template <typename T, typename Context>
 void MultKernel(const Context& dev_ctx,
-               const phi::DenseTensor& x,
-               const phi::DenseTensor& y,
-               phi::DenseTensor* out);
+                const phi::DenseTensor& x,
+                const phi::DenseTensor& y,
+                phi::DenseTensor* out);
 
 template <typename T, typename Context>
 void FullKernel(const Context& dev_ctx,
@@ -56,7 +56,7 @@ void ScaleKernel(const Context& dev_ctx,
   phi::IntArray scalar_shape(shape_vec);
   custom_kernel::FullKernel<float, Context>(
       dev_ctx, scalar_shape, in_scale, phi::DataType::FLOAT32, &scale_tensor);
-      
+
   phi::DenseTensor x_f32;
   phi::DenseTensorMeta x_f32_meta({phi::DataType::FLOAT32, x.dims()});
   x_f32.set_meta(x_f32_meta);
@@ -66,7 +66,8 @@ void ScaleKernel(const Context& dev_ctx,
   phi::DenseTensor mul_out;
   phi::DenseTensorMeta out_meta({x_f32.dtype(), x_f32.dims()});
   mul_out.set_meta(out_meta);
-  custom_kernel::MultKernel<float, Context>(dev_ctx, x_f32, scale_tensor, &mul_out);
+  custom_kernel::MultKernel<float, Context>(
+      dev_ctx, x_f32, scale_tensor, &mul_out);
 
   phi::DenseTensor bias_tensor;
   bias_tensor.set_meta(tensor_meta);
@@ -81,10 +82,10 @@ void ScaleKernel(const Context& dev_ctx,
 
   phi::DenseTensor add_out;
   add_out.set_meta(out_meta);
-  custom_kernel::AddKernel<float, Context>(dev_ctx, mul_out, bias_tensor, &add_out);
-  
-  custom_kernel::CastKernel<float, Context>(
-      dev_ctx, add_out, x.dtype(), out);
+  custom_kernel::AddKernel<float, Context>(
+      dev_ctx, mul_out, bias_tensor, &add_out);
+
+  custom_kernel::CastKernel<float, Context>(dev_ctx, add_out, x.dtype(), out);
 }
 
 }  // namespace custom_kernel

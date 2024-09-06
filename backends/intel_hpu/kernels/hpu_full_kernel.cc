@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "perf_lib_layer_params.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "utils/utills.h"
 
 namespace custom_kernel {
@@ -38,7 +38,7 @@ class Full : public HpuOperator {
                                          true,
                                          outputs[i].name));
     }
-    if(outputs[0].type == syn_type_int64)
+    if (outputs[0].type == syn_type_int64)
       guid_ = guid_ + "i32";
     else
       guid_ = guid_ + SynDataTypeToStr(outputs[0].type);

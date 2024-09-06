@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "funcs.h"
-#include "hpu_operator.h"
-#include "utils/utills.h"
-#include "perf_lib_layer_params.h"
-#include "synapse_api.h"
-#include "synapse_common_types.h"
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
+#include "kernels/funcs.h"
+#include "kernels/hpu_operator.h"
 #include "paddle/phi/extension.h"
 #include "paddle/phi/kernels/funcs/slice_utils.h"
+#include "utils/utills.h"
 
 namespace custom_kernel {
 
 class SliceOperator : public HpuOperator {
  public:
   SliceOperator(std::string guid_prefix, std::string node_name)
-    : HpuOperator(guid_prefix), pName_(node_name) {}
+      : HpuOperator(guid_prefix), pName_(node_name) {}
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
                synDataType datatype,
@@ -50,11 +50,11 @@ class SliceOperator : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK( status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
   std::string pName_;
 };
-
 
 template <typename T = int64_t>
 inline phi::DDim GetDecreasedDims(const phi::DDim slice_dims,
@@ -96,15 +96,15 @@ void SliceRawKernel(const Context& dev_ctx,
                     const std::vector<int64_t>& infer_flags,
                     const std::vector<int64_t>& decrease_axis,
                     phi::DenseTensor* out) {
-
   auto starts = starts_array.GetData();
   auto ends = ends_array.GetData();
   std::vector<int64_t> strides(axes.size(), 1);
 
-  PADDLE_ENFORCE_EQ(starts.size(),
-                    axes.size(),
-                    phi::errors::InvalidArgument(
-                        "The size of starts must be equal to the size of axes."));
+  PADDLE_ENFORCE_EQ(
+      starts.size(),
+      axes.size(),
+      phi::errors::InvalidArgument(
+          "The size of starts must be equal to the size of axes."));
   PADDLE_ENFORCE_EQ(ends.size(),
                     axes.size(),
                     phi::errors::InvalidArgument(
@@ -124,7 +124,7 @@ void SliceRawKernel(const Context& dev_ctx,
       }
     }
   }
-  
+
   phi::funcs::UpdateSliceAttrs(in_dims, axes, &starts, &ends);
   slice_dims = phi::funcs::GetSliceDims<int64_t>(
       in_dims, axes, starts, ends, nullptr, nullptr);
@@ -133,39 +133,40 @@ void SliceRawKernel(const Context& dev_ctx,
 
   // allocate memory on device.
   dev_ctx.template Alloc<T>(out);
-  
+
   synSliceParamsV2 params;
-  for (int i = 0; i < in_dims.size(); i++)
-  {
+  for (int i = 0; i < in_dims.size(); i++) {
     params.axes[i] = i;
     params.steps[i] = 1;
     params.starts[i] = 0;
     params.ends[i] = in_dims[in_dims.size() - 1 - i];
   }
-  for (int i = 0; i < static_cast<int>(axes.size()); i++)
-  {
+  for (int i = 0; i < static_cast<int>(axes.size()); i++) {
     params.starts[in_dims.size() - 1 - axes[i]] = starts[i];
     params.ends[in_dims.size() - 1 - axes[i]] = ends[i];
   }
-/*
-  for (size_t i = 0; i < in_dims.size(); i++)
-  {     
-    std::cout << "**************************    " << std::endl;
-    std::cout << i << ": " << params.axes[i] << ", " << params.starts[i] << ", " << params.ends[i] << ", " << params.steps[i] << std::endl;
-  }
-    params.axes  [0] = 0;    params.axes  [1] = 1;    params.axes  [2] = 2;    params.axes  [3] = 3;
-    params.starts[0] = 0;    params.starts[1] = 2;    params.starts[2] = 0;    params.starts[3] = 1;
-    params.ends  [0] = 6;    params.ends  [1] = 4;    params.ends  [2] = 3;    params.ends  [3] = 3;
-    params.steps [0] = 1;    params.steps [1] = 1;    params.steps [2] = 1;    params.steps [3] = 1;
-*/
+  /*
+    for (size_t i = 0; i < in_dims.size(); i++)
+    {
+      std::cout << "**************************    " << std::endl;
+      std::cout << i << ": " << params.axes[i] << ", " << params.starts[i] << ",
+    " << params.ends[i] << ", " << params.steps[i] << std::endl;
+    }
+      params.axes  [0] = 0;    params.axes  [1] = 1;    params.axes  [2] = 2;
+    params.axes  [3] = 3; params.starts[0] = 0;    params.starts[1] = 2;
+    params.starts[2] = 0;    params.starts[3] = 1; params.ends  [0] = 6;
+    params.ends  [1] = 4;    params.ends  [2] = 3;    params.ends  [3] = 3;
+      params.steps [0] = 1;    params.steps [1] = 1;    params.steps [2] = 1;
+    params.steps [3] = 1;
+  */
   std::vector<int64_t> inputs_dim = phi::vectorize<int64_t>(x.dims());
   std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
-  
+
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, synSliceParamsV2>("slice", {inputs_dim}, &params);
 
   auto recipe = op_info.GetRecipe();
-  if(recipe == nullptr){
+  if (recipe == nullptr) {
     // compile
     SliceOperator op("slice", "Slice");
     op.AddNode({inputs_dim}, {outputs_dim}, op_info.datatype_, params);
@@ -178,8 +179,8 @@ void SliceRawKernel(const Context& dev_ctx,
   std::map<std::string, uint64_t> tensors;
   tensors["input"] = reinterpret_cast<uint64_t>(x.data<T>());
   tensors["output"] = reinterpret_cast<uint64_t>(out->data<T>());
-  
-  RecipeRunner runner(recipe); 
+
+  RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
