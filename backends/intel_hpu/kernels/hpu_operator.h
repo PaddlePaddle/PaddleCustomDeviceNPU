@@ -54,13 +54,11 @@ class HpuOperator {
 
     VLOG(9) << " synGraphCompile =" << guid_ << ", count = " << recipe_count;
     recipe_count += 1;
+    // cleanup
     status = synGraphDestroy(graphHandle_);
     LOG_IF(ERROR, status != synSuccess)
         << "synGraphDestroy() failed = " << status;
-  }
 
-  virtual ~HpuOperator() {
-    synStatus status = synFail;
     for (auto it = tensors_.begin(); it != tensors_.end(); ++it) {
       status = synTensorDestroy(it->second);
       LOG_IF(ERROR, status != synSuccess)
@@ -72,6 +70,8 @@ class HpuOperator {
           << "synSectionDestroy() failed = " << status;
     }
   }
+
+  virtual ~HpuOperator() {}
 
   synTensor createTensor(unsigned dims,
                          synDataType data_type,
