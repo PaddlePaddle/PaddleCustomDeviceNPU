@@ -202,9 +202,6 @@ class TestGroupNormOpFP16(TestGroupNormOp):
     def init_dtype(self):
         self.dtype = np.float16
 
-    def init_test_case(self):
-        self.atol = 1e-2
-
 
 class TestGroupNormOpFP16_With_NHWC(TestGroupNormOp):
     def init_dtype(self):
@@ -212,7 +209,6 @@ class TestGroupNormOpFP16_With_NHWC(TestGroupNormOp):
 
     def init_test_case(self):
         self.data_format = "NHWC"
-        self.atol = 1e-2
 
 
 class TestGroupNormException(unittest.TestCase):

@@ -153,16 +153,27 @@ phi::DenseTensor ReduceMeanToNG(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void GroupNormKernel(const Context& dev_ctx,
-                     const phi::DenseTensor& x,
-                     const paddle::optional<phi::DenseTensor>& scale,
-                     const paddle::optional<phi::DenseTensor>& bias,
-                     float epsilon,
-                     int groups,
-                     const std::string& data_layout,
-                     phi::DenseTensor* y,
-                     phi::DenseTensor* mean,
-                     phi::DenseTensor* variance) {
+void SquareKernel(const Context& dev_ctx,
+                  const phi::DenseTensor& x,
+                  phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void SubtractKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    const phi::DenseTensor& y,
+                    phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void AclopGroupNormKernel(const Context& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const paddle::optional<phi::DenseTensor>& scale,
+                          const paddle::optional<phi::DenseTensor>& bias,
+                          float epsilon,
+                          int groups,
+                          const std::string& data_layout,
+                          phi::DenseTensor* y,
+                          phi::DenseTensor* mean,
+                          phi::DenseTensor* variance) {
   auto x_dims = phi::vectorize(x.dims());
   const phi::DataLayout data_layout_data =
       common::StringToDataLayout(data_layout);
@@ -186,16 +197,16 @@ void GroupNormKernel(const Context& dev_ctx,
                     x_dims.back()};
     }
     x_tmp.Resize(phi::make_ddim(x_tmp_dims));
-    custom_kernel::GroupNormKernel<T, Context>(dev_ctx,
-                                               x_tmp,
-                                               scale,
-                                               bias,
-                                               epsilon,
-                                               groups,
-                                               data_layout,
-                                               y,
-                                               mean,
-                                               variance);
+    custom_kernel::AclopGroupNormKernel<T, Context>(dev_ctx,
+                                                    x_tmp,
+                                                    scale,
+                                                    bias,
+                                                    epsilon,
+                                                    groups,
+                                                    data_layout,
+                                                    y,
+                                                    mean,
+                                                    variance);
     y->Resize(x.dims());
     return;
   }
@@ -275,6 +286,170 @@ void GroupNormKernel(const Context& dev_ctx,
   }
   mean->Resize(reduce_dim);
   variance->Resize(reduce_dim);
+}
+
+template <typename T, typename Context>
+void AclnnGroupNormKernel(const Context& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const paddle::optional<phi::DenseTensor>& scale,
+                          const paddle::optional<phi::DenseTensor>& bias,
+                          float epsilon,
+                          int groups,
+                          const std::string& data_layout,
+                          phi::DenseTensor* y,
+                          phi::DenseTensor* mean,
+                          phi::DenseTensor* variance) {
+  auto x_dims = phi::vectorize(x.dims());
+  const phi::DataLayout data_layout_data =
+      common::StringToDataLayout(data_layout);
+
+  if (x_dims.size() > 3) {
+    phi::DenseTensor x_tmp(x);
+    std::vector<int64_t> x_tmp_dims;
+    if (data_layout_data == phi::DataLayout::kNCHW) {
+      x_tmp_dims = {x_dims[0],
+                    x_dims[1],
+                    std::accumulate(x_dims.cbegin() + 2,
+                                    x_dims.cend(),
+                                    1,
+                                    std::multiplies<int64_t>())};
+    } else {
+      x_tmp_dims = {x_dims[0],
+                    std::accumulate(x_dims.cbegin() + 1,
+                                    x_dims.cend() - 1,
+                                    1,
+                                    std::multiplies<int64_t>()),
+                    x_dims.back()};
+    }
+    x_tmp.Resize(phi::make_ddim(x_tmp_dims));
+    custom_kernel::AclnnGroupNormKernel<T, Context>(dev_ctx,
+                                                    x_tmp,
+                                                    scale,
+                                                    bias,
+                                                    epsilon,
+                                                    groups,
+                                                    data_layout,
+                                                    y,
+                                                    mean,
+                                                    variance);
+    y->Resize(x.dims());
+    return;
+  }
+
+  auto stream = dev_ctx.stream();
+
+  phi::DenseTensor xnorm;
+  phi::DenseTensorMeta xnorm_meta = {x.dtype(), x.dims()};
+  xnorm.set_meta(xnorm_meta);
+  dev_ctx.template Alloc<T>(&xnorm);
+  if (data_layout_data != phi::DataLayout::kNCHW) {
+    xnorm.Resize({x.dims()[0], x.dims()[2], x.dims()[1]});
+    Transpose<Context>(dev_ctx, &x, &xnorm, std::vector<int>{0, 2, 1});
+  } else {
+    TensorCopy(dev_ctx, x, false, &xnorm, dev_ctx.GetPlace());
+  }
+  auto N = xnorm.dims()[0];
+  auto C = xnorm.dims()[1];
+  auto L = xnorm.dims()[2];
+  auto reduce_dim = mean->dims();
+  y->Resize(xnorm.dims());
+  dev_ctx.template Alloc<T>(y);
+  mean->Resize({N, groups});
+  dev_ctx.template Alloc<T>(mean);
+  variance->Resize({N, groups});
+  dev_ctx.template Alloc<T>(variance);
+
+  phi::DenseTensor scale_tensor, bias_tensor;
+  if (scale) {
+    scale_tensor = scale.get();
+  } else {
+    scale_tensor.Resize({C});
+    FillNpuTensorWithConstant<T>(&scale_tensor, dev_ctx, static_cast<T>(1));
+  }
+  if (bias) {
+    bias_tensor = bias.get();
+  } else {
+    bias_tensor.Resize({C});
+    FillNpuTensorWithConstant<T>(&bias_tensor, dev_ctx, static_cast<T>(0));
+  }
+  double eps = static_cast<double>(epsilon);
+  EXEC_NPU_CMD(aclnnGroupNorm,
+               dev_ctx,
+               xnorm,
+               scale_tensor,
+               bias_tensor,
+               N,
+               C,
+               L,
+               groups,
+               eps,
+               *y,
+               *mean,
+               *variance);  // variance: (N, group)
+
+  const auto& inv_runner = NpuOpRunner("Inv", {*variance}, {*variance}, {});
+  inv_runner.Run(stream);
+  custom_kernel::SquareKernel<T, Context>(dev_ctx, *variance, variance);
+
+  phi::DenseTensor eps_tensor;
+  phi::DenseTensorMeta eps_tensor_meta = {variance->dtype(), variance->dims()};
+  eps_tensor.set_meta(eps_tensor_meta);
+  dev_ctx.template Alloc<T>(&eps_tensor);
+
+  phi::DenseTensor ones_tensor;
+  phi::DenseTensorMeta ones_tensor_meta = {variance->dtype(), variance->dims()};
+  ones_tensor.set_meta(ones_tensor_meta);
+  dev_ctx.template Alloc<T>(&ones_tensor);
+
+  const auto& runner_one_dx =
+      NpuOpRunner("OnesLike", {*variance}, {ones_tensor}, {});
+  runner_one_dx.Run(stream);
+
+  const auto& muls_runner =
+      NpuOpRunner("Muls", {ones_tensor}, {eps_tensor}, {{"value", epsilon}});
+  muls_runner.Run(stream);
+
+  custom_kernel::SubtractKernel<T, Context>(
+      dev_ctx, *variance, eps_tensor, variance);
+  if (data_layout_data != phi::DataLayout::kNCHW) {
+    phi::DenseTensor y_out;
+    phi::DenseTensorMeta y_out_meta = {
+        y->dtype(), {y->dims()[0], y->dims()[2], y->dims()[1]}};
+    y_out.set_meta(y_out_meta);
+    dev_ctx.template Alloc<T>(&y_out);
+    Transpose<Context>(dev_ctx, y, &y_out, std::vector<int>{0, 2, 1});
+    // assign y_out to y
+    Transpose<Context>(dev_ctx, &y_out, y, std::vector<int>{0, 1, 2});
+    y->Resize(x.dims());
+  }
+  mean->Resize(reduce_dim);
+  variance->Resize(reduce_dim);
+}
+
+template <typename T, typename Context>
+void GroupNormKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const paddle::optional<phi::DenseTensor>& scale,
+                     const paddle::optional<phi::DenseTensor>& bias,
+                     float epsilon,
+                     int groups,
+                     const std::string& data_layout,
+                     phi::DenseTensor* y,
+                     phi::DenseTensor* mean,
+                     phi::DenseTensor* variance) {
+  DO_COMPATIBILITY(aclnnGroupNorm,
+                   (custom_kernel::AclopGroupNormKernel<T, Context>(dev_ctx,
+                                                                    x,
+                                                                    scale,
+                                                                    bias,
+                                                                    epsilon,
+                                                                    groups,
+                                                                    data_layout,
+                                                                    y,
+                                                                    mean,
+                                                                    variance)));
+  AclnnGroupNormKernel<T, Context>(
+      dev_ctx, x, scale, bias, epsilon, groups, data_layout, y, mean, variance);
 }
 
 template <typename T, typename Context>
