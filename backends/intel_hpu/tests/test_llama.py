@@ -24,4 +24,13 @@ outputs = model.generate(**input_features, max_length=20)
 print(outputs[0])
 print(tokenizer.batch_decode(outputs[0]))
 
-# python -m paddle.distributed.launch --devices "3,4" test_llama.py
+'''
+# example (multi cards):
+
+export INTEL_HPU_VISIBLE_DEVICES=0,1
+export PADDLE_DISTRI_BACKEND=xccl
+export PADDLE_XCCL_BACKEND=intel_hpu
+# export FLAGS_intel_hpu_runtime_debug=1
+# echo $INTEL_HPU_VISIBLE_DEVICES
+python -m paddle.distributed.launch --devices "0,1" test_llama.py
+'''

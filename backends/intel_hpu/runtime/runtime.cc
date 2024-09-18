@@ -153,12 +153,12 @@ class RuntimeManager {
     PD_CHECK(status == synSuccess,
              "[RUNTIME] synDeviceGetCount() failed = %d",
              status);
-    if (num_devices >= 1) {
-      LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-          << "total device num =" << num_devices
-          << " actual return 1, only support 1 thread acquire 1 device";
-      num_devices = 1;
-    }
+    // if (num_devices >= 1) {
+    //   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+    //       << "total device num =" << num_devices
+    //       << " actual return 1, only support 1 thread acquire 1 device";
+    //   num_devices = 1;
+    // }
 
     *count = static_cast<size_t>(num_devices);
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
@@ -498,7 +498,17 @@ C_Status GetDevicesCount(size_t *count) {
 }
 
 C_Status GetDevicesList(size_t *devices) {
-  devices[0] = 0;
+  // TODO: suse HABANA_VISIBLE_DEVICES to get available device
+  // devices[0] = 0;
+  // // devices[1] = 1;
+  uint32_t count = 0;
+  synStatus status = synDeviceGetCount(&count);
+  PD_CHECK(status == synSuccess,
+          "[RUNTIME] synDeviceGetCount() failed = %d",
+          status);
+  for (size_t dev_id = 0; dev_id < count; dev_id++) {
+    devices[dev_id] = dev_id;
+  }
   return C_SUCCESS;
 }
 
