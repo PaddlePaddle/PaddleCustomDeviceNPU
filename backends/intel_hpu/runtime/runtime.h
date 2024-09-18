@@ -14,22 +14,19 @@
 
 #pragma once
 
-#include "flags.h"
 #include "glog/logging.h"
 #include "paddle/phi/backends/device_ext.h"
+#include "runtime/flags.h"
 #include "utils/hpu_helper.h"
-
-#define DEBUG_LOG                             \
-  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) \
-      << __FUNCTION__ << ", " << __LINE__;
 
 #define CHECK_HCCL_STATUS(x)                                            \
   {                                                                     \
     const auto _res = (x);                                              \
-    if (_res != hcclSuccess)                                            \
-      std::cerr << "In function " + std::string{__FUNCTION__} +         \
+    if (_res != hcclSuccess) {                                          \
+      std::cerr << "In function " + std::string(__FUNCTION__) +         \
                        "(): " #x " failed: " + hcclGetErrorString(_res) \
                 << std::endl;                                           \
+    }                                                                   \
   };
 
 C_Status MemCpyH2D(const C_Device device,

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "runtime.h"
+#include "runtime/runtime.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -31,11 +31,15 @@
 #include <string>
 #include <unordered_map>
 
-#include "hccl.h"
-#include "hccl_types.h"
+#include "habanalabs/hccl.h"
+#include "habanalabs/hccl_types.h"
 #include "paddle/phi/common/type_traits.h"
 
 FLAGS_DEFINE_bool(intel_hpu_runtime_debug, false, "runtime debug log");
+FLAGS_DEFINE_uint32(
+    intel_hpu_profiling_type,
+    1,
+    "set runtime profiling type, 1=all, 2 = host only, 3 = device only");
 
 inline hcclDataType_t PDDataTypeToHcclDataType(C_DataType type) {
   if (type == C_DataType::FLOAT32) {
@@ -335,7 +339,6 @@ class RuntimeManager {
   }
 
   C_Status CreateEvent(const C_Device device, C_Event *event) {
-    DEBUG_LOG
     LOG_IF(ERROR, static_cast<synModuleId>(device->id) != moduleID)
         << "[RUNTIME] moduleID mismatch : moduleID = " << moduleID
         << ", current = " << moduleID;
@@ -354,13 +357,10 @@ class RuntimeManager {
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
         << "device id=" << device->id << " create event = " << *event;
 
-    DEBUG_LOG
-
     return C_SUCCESS;
   }
 
   C_Status DestroyEvent(const C_Device device, C_Event event) {
-    DEBUG_LOG
     LOG_IF(ERROR, static_cast<synModuleId>(device->id) != moduleID)
         << "[RUNTIME] moduleID mismatch : moduleID = " << moduleID
         << ", current = " << moduleID;
@@ -377,7 +377,6 @@ class RuntimeManager {
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
         << "device id=" << device->id << " remove event = " << event;
 
-    DEBUG_LOG
     return C_SUCCESS;
   }
 
@@ -409,6 +408,23 @@ class RuntimeManager {
     }
   }
 
+  void GetUniqueIdSize(size_t *sz) {
+    if (uid != nullptr) {
+      *sz = uid->length;
+    } else {
+      *sz = 0;
+    }
+  }
+
+  C_Status GetUniqueId(C_CCLRootId *unique_id) {
+    if (uid == nullptr) {
+      CHECK_HCCL_STATUS(hcclGetUniqueId(uid));
+      unique_id = reinterpret_cast<C_CCLRootId *>(uid);
+    }
+
+    return C_SUCCESS;
+  }
+
  private:
   synModuleId moduleID = 0;
   std::string busID = "";
@@ -417,7 +433,7 @@ class RuntimeManager {
   uint32_t count = 0;
 
   // hccl
-  hcclUniqueId uid;
+  hcclUniqueId *uid = nullptr;
 
   // user streams
   std::set<synStreamHandle> streams;
@@ -437,66 +453,52 @@ class RuntimeManager {
 static RuntimeManager runtimeManager;
 
 C_Status Init() {
-  DEBUG_LOG
   synStatus status = synInitialize();
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synInitialize() failed = %d", status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status InitDevice(const C_Device device) {
-  DEBUG_LOG
   runtimeManager.SetDevice(device);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status SetDevice(const C_Device device) {
-  DEBUG_LOG
   runtimeManager.SetDevice(device);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status GetDevice(const C_Device device) {
-  DEBUG_LOG
   device->id = runtimeManager.GetDevice();
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status DestroyDevice(const C_Device device) {
-  DEBUG_LOG
   runtimeManager.Release(device);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status Finalize() {
-  DEBUG_LOG
-
   synStatus status = synDestroy();
   PD_CHECK(status == synSuccess, "[RUNTIME] synDestroy() failed = %d", status);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status GetDevicesCount(size_t *count) {
-  DEBUG_LOG
   runtimeManager.GetNumDevices(count);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status GetDevicesList(size_t *devices) {
-  DEBUG_LOG
-
-  // TODO: suse HABANA_VISIBLE_DEVICES to get available device
   devices[0] = 0;
-  // devices[1] = 1;
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
@@ -504,9 +506,8 @@ C_Status MemCpyH2D(const C_Device device,
                    void *dst,
                    const void *src,
                    size_t size) {
-  DEBUG_LOG
   runtimeManager.Copy(device, dst, src, size, 0);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
@@ -514,9 +515,8 @@ C_Status MemCpyD2H(const C_Device device,
                    void *dst,
                    const void *src,
                    size_t size) {
-  DEBUG_LOG
   runtimeManager.Copy(device, dst, src, size, 1);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
@@ -524,9 +524,8 @@ C_Status MemCpyD2D(const C_Device device,
                    void *dst,
                    const void *src,
                    size_t size) {
-  DEBUG_LOG
   runtimeManager.Copy(device, dst, src, size, 2);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
@@ -535,9 +534,8 @@ C_Status AsyncMemCpyH2D(const C_Device device,
                         void *dst,
                         const void *src,
                         size_t size) {
-  DEBUG_LOG
   runtimeManager.AsyncCopy(device, stream, dst, src, size, 0);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
@@ -546,9 +544,8 @@ C_Status AsyncMemCpyD2H(const C_Device device,
                         void *dst,
                         const void *src,
                         size_t size) {
-  DEBUG_LOG
   runtimeManager.AsyncCopy(device, stream, dst, src, size, 1);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
@@ -557,14 +554,12 @@ C_Status AsyncMemCpyD2D(const C_Device device,
                         void *dst,
                         const void *src,
                         size_t size) {
-  DEBUG_LOG
   runtimeManager.AsyncCopy(device, stream, dst, src, size, 2);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
-  DEBUG_LOG
   uint64_t p;
   synStatus status =
       synDeviceMalloc(runtimeManager.GetDeviceID(), size, 0, 0, &p);
@@ -575,12 +570,10 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
       << "device id = " << runtimeManager.GetDeviceID()
       << " malloc ptr=" << *ptr << " size=" << size;
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
-  DEBUG_LOG
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
       << "device id=" << runtimeManager.GetDeviceID() << " free ptr = " << ptr
       << " size=" << size;
@@ -591,55 +584,46 @@ C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synDeviceFree() failed = %d", status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
-  DEBUG_LOG
   synStatus status = synHostMalloc(runtimeManager.GetDeviceID(), size, 0, ptr);
 
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synHostMalloc() failed = %d", status);
 
-  DEBUG_LOG
   return C_FAILED;
 }
 
 C_Status Deallocate_host(const C_Device device, void *ptr, size_t size) {
-  DEBUG_LOG
   synStatus status = synHostFree(runtimeManager.GetDeviceID(), ptr, 0);
   PD_CHECK(status == synSuccess, "[RUNTIME] synHostFree() failed = %d", status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status CreateStream(const C_Device device, C_Stream *stream) {
-  DEBUG_LOG
   runtimeManager.CreateStream(device, stream);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status DestroyStream(const C_Device device, C_Stream stream) {
-  DEBUG_LOG
   runtimeManager.DestroyStream(device, stream);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
       << "device id=" << device->id << " stream=" << stream;
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status CreateEvent(const C_Device device, C_Event *event) {
-  DEBUG_LOG
   runtimeManager.CreateEvent(device, event);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status RecordEvent(const C_Device device, C_Stream stream, C_Event event) {
-  DEBUG_LOG
   LOG_IF(ERROR,
          static_cast<synModuleId>(device->id) != runtimeManager.GetModuleID())
       << "[RUNTIME] moduleID mismatch : moduleID = "
@@ -651,19 +635,16 @@ C_Status RecordEvent(const C_Device device, C_Stream stream, C_Event event) {
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synEventRecord() failed = %d", status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status DestroyEvent(const C_Device device, C_Event event) {
-  DEBUG_LOG
   runtimeManager.DestroyEvent(device, event);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status SyncDevice(const C_Device device) {
-  DEBUG_LOG
   LOG_IF(ERROR,
          static_cast<synModuleId>(device->id) != runtimeManager.GetModuleID())
       << "[RUNTIME] moduleID mismatch : moduleID = "
@@ -674,12 +655,10 @@ C_Status SyncDevice(const C_Device device) {
            "[RUNTIME] synDeviceSynchronize() failed = %d",
            status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status SyncStream(const C_Device device, C_Stream stream) {
-  DEBUG_LOG
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
       << "SyncStream: " << static_cast<synModuleId>(device->id) << ", "
       << reinterpret_cast<const synStreamHandle>(stream);
@@ -695,12 +674,10 @@ C_Status SyncStream(const C_Device device, C_Stream stream) {
            "[RUNTIME] synStreamSynchronize() failed = %d",
            status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status SyncEvent(const C_Device device, C_Event event) {
-  DEBUG_LOG
   LOG_IF(ERROR,
          static_cast<synModuleId>(device->id) != runtimeManager.GetModuleID())
       << "[RUNTIME] moduleID mismatch : moduleID = "
@@ -713,14 +690,12 @@ C_Status SyncEvent(const C_Device device, C_Event event) {
            "[RUNTIME] synEventSynchronize() failed = %d",
            status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status StreamWaitEvent(const C_Device device,
                          C_Stream stream,
                          C_Event event) {
-  DEBUG_LOG
   LOG_IF(ERROR,
          static_cast<synModuleId>(device->id) != runtimeManager.GetModuleID())
       << "[RUNTIME] moduleID mismatch : moduleID = "
@@ -735,59 +710,47 @@ C_Status StreamWaitEvent(const C_Device device,
            "[RUNTIME] synStreamWaitEvent() failed = %d",
            status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status DeviceMemStats(const C_Device device,
                         size_t *total_memory,
                         size_t *free_memory) {
-  DEBUG_LOG
   runtimeManager.GetMemoryStats(device, total_memory, free_memory);
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status DeviceMinChunkSize(const C_Device device, size_t *size) {
-  DEBUG_LOG
   *size = 1;
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "min chunksize=" << *size;
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status XcclGetUniqueIdSize(size_t *sz) {
-  DEBUG_LOG
-
-  DEBUG_LOG
+  runtimeManager.GetUniqueIdSize(sz);
   return C_SUCCESS;
 }
 
 C_Status XcclGetUniqueId(C_CCLRootId *unique_id) {
-  DEBUG_LOG
-  CHECK_HCCL_STATUS(
-      hcclGetUniqueId(reinterpret_cast<hcclUniqueId *>(unique_id)));
-  DEBUG_LOG
-  return C_SUCCESS;
+  return runtimeManager.GetUniqueId(unique_id);
 }
 
 C_Status XcclCommInitRank(size_t ranks,
                           C_CCLRootId *unique_id,
                           size_t rank,
                           C_CCLComm *comm) {
-  DEBUG_LOG
   hcclUniqueId uniqueId{};
   CHECK_HCCL_STATUS(hcclCommInitRank(
       reinterpret_cast<hcclComm_t *>(comm), ranks, uniqueId, rank));
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
 C_Status XcclDestroyComm(C_CCLComm comm) {
-  DEBUG_LOG
   CHECK_HCCL_STATUS(hcclCommDestroy(reinterpret_cast<hcclComm_t>(comm)));
-  DEBUG_LOG
+
   return C_SUCCESS;
 }
 
@@ -917,57 +880,48 @@ C_Status XcclRecv(void *recv_buf,
 }
 
 C_Status ProfilerInitialize(C_Profiler prof, void **user_data) {
-  DEBUG_LOG
-
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status ProfilerFinalize(C_Profiler prof, void *user_data) {
-  DEBUG_LOG
-
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
-C_Status ProfilerPrepare(C_Profiler prof, void *user_data) {
-  DEBUG_LOG
-
-  DEBUG_LOG
-  return C_SUCCESS;
-}
+C_Status ProfilerPrepare(C_Profiler prof, void *user_data) { return C_SUCCESS; }
 
 C_Status ProfilerStart(C_Profiler prof, void *user_data) {
-  DEBUG_LOG
+  auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
+  synStatus status = synProfilerStart(type, runtimeManager.GetDevice());
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] start intel hpu profiling failed  = %d",
+           status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status ProfilerStop(C_Profiler prof, void *user_data) {
-  DEBUG_LOG
+  auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
+  synStatus status = synProfilerStop(type, runtimeManager.GetDevice());
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] stop intel hpu profiling failed  = %d",
+           status);
 
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 C_Status ProfilerCollectData(C_Profiler prof,
                              uint64_t start_ns,
                              void *user_data) {
-  DEBUG_LOG
-
-  DEBUG_LOG
   return C_SUCCESS;
 }
 
 void InitPlugin(CustomRuntimeParams *params) {
-  DEBUG_LOG
   PADDLE_CUSTOM_RUNTIME_CHECK_VERSION(params);
   params->version.major = 1;
   params->version.minor = 16;
   params->version.patch = 0;
-  params->device_type = (char*)"intel_hpu";
-  params->sub_device_type = (char*)"intel_hpu";
+  params->device_type = const_cast<char *>("intel_hpu");
+  params->sub_device_type = const_cast<char *>("intel_hpu");
 
   memset(reinterpret_cast<void *>(params->interface),
          0,
@@ -1031,6 +985,4 @@ void InitPlugin(CustomRuntimeParams *params) {
   params->interface->profiler_start_tracing = ProfilerStart;
   params->interface->profiler_stop_tracing = ProfilerStop;
   params->interface->profiler_prepare_tracing = ProfilerPrepare;
-
-  DEBUG_LOG
 }
