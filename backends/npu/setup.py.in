@@ -114,7 +114,8 @@ def main():
         packages= [
             'paddle_custom_device',
             'paddle_custom_device.npu',
-            'paddle_custom_device.npu.passes'
+            'paddle_custom_device.npu.passes',
+            'paddle_custom_device.npu.profile'
         ],
         include_package_data=True,
         package_data = {
