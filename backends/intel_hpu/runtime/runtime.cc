@@ -80,9 +80,10 @@ class RuntimeManager {
 
   void SetDevice(const C_Device device) {
     synStatus status = synFail;
-    if (static_cast<synModuleId>(device->id) == moduleID) {
+    auto require_id = static_cast<synModuleId>(device->id);
+    if (require_id == moduleID) {
       if (Status == 0) {
-        status = synDeviceAcquire(&deviceId, nullptr);
+        status = synDeviceAcquireByModuleId(&deviceId, require_id);
         PD_CHECK(status == synSuccess,
                  "[RUNTIME] synDeviceAcquireByModuleId() failed = %d",
                  status);
@@ -95,9 +96,9 @@ class RuntimeManager {
                  "[RUNTIME] synDeviceRelease() failed = %d",
                  status);
       }
-      status = synDeviceAcquire(&deviceId, nullptr);
+      status = synDeviceAcquireByModuleId(&deviceId, require_id);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synDeviceAcquire() failed = %d",
+               "[RUNTIME] synDeviceAcquireByModuleId() failed = %d",
                status);
     }
     Status = 1;
@@ -122,8 +123,6 @@ class RuntimeManager {
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
         << "moduleID =  " << moduleID << " released";
   }
-
-  int GetDevice() { return deviceId; }
 
   void GetMemoryStats(const C_Device device,
                       size_t *total_memory,
@@ -414,6 +413,8 @@ class RuntimeManager {
     } else {
       *sz = 0;
     }
+
+    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "uid size = " << *sz;
   }
 
   C_Status GetUniqueId(C_CCLRootId *unique_id) {
@@ -472,9 +473,8 @@ C_Status SetDevice(const C_Device device) {
   return C_SUCCESS;
 }
 
-C_Status GetDevice(const C_Device device) {
-  device->id = runtimeManager.GetDevice();
-
+C_Status GetDeviceID(const C_Device device) {
+  device->id = static_cast<int>(runtimeManager.GetModuleID());
   return C_SUCCESS;
 }
 
@@ -498,14 +498,11 @@ C_Status GetDevicesCount(size_t *count) {
 }
 
 C_Status GetDevicesList(size_t *devices) {
-  // TODO: suse HABANA_VISIBLE_DEVICES to get available device
-  // devices[0] = 0;
-  // // devices[1] = 1;
   uint32_t count = 0;
   synStatus status = synDeviceGetCount(&count);
   PD_CHECK(status == synSuccess,
-          "[RUNTIME] synDeviceGetCount() failed = %d",
-          status);
+           "[RUNTIME] synDeviceGetCount() failed = %d",
+           status);
   for (size_t dev_id = 0; dev_id < count; dev_id++) {
     devices[dev_id] = dev_id;
   }
@@ -660,7 +657,7 @@ C_Status SyncDevice(const C_Device device) {
       << "[RUNTIME] moduleID mismatch : moduleID = "
       << runtimeManager.GetModuleID() << ", current = " << device->id;
 
-  synStatus status = synDeviceSynchronize(runtimeManager.GetDevice());
+  synStatus status = synDeviceSynchronize(runtimeManager.GetDeviceID());
   PD_CHECK(status == synSuccess,
            "[RUNTIME] synDeviceSynchronize() failed = %d",
            status);
@@ -901,7 +898,7 @@ C_Status ProfilerPrepare(C_Profiler prof, void *user_data) { return C_SUCCESS; }
 
 C_Status ProfilerStart(C_Profiler prof, void *user_data) {
   auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
-  synStatus status = synProfilerStart(type, runtimeManager.GetDevice());
+  synStatus status = synProfilerStart(type, runtimeManager.GetDeviceID());
   PD_CHECK(status == synSuccess,
            "[RUNTIME] start intel hpu profiling failed  = %d",
            status);
@@ -911,7 +908,7 @@ C_Status ProfilerStart(C_Profiler prof, void *user_data) {
 
 C_Status ProfilerStop(C_Profiler prof, void *user_data) {
   auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
-  synStatus status = synProfilerStop(type, runtimeManager.GetDevice());
+  synStatus status = synProfilerStop(type, runtimeManager.GetDeviceID());
   PD_CHECK(status == synSuccess,
            "[RUNTIME] stop intel hpu profiling failed  = %d",
            status);
@@ -942,7 +939,7 @@ void InitPlugin(CustomRuntimeParams *params) {
 
   params->interface->init_device = InitDevice;
   params->interface->set_device = SetDevice;
-  params->interface->get_device = GetDevice;
+  params->interface->get_device = GetDeviceID;
   params->interface->deinit_device = DestroyDevice;
 
   params->interface->create_stream = CreateStream;
