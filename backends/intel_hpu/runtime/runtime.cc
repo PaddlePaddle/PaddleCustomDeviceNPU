@@ -79,10 +79,14 @@ class RuntimeManager {
   ~RuntimeManager() {}
 
   void SetDevice(const C_Device device) {
+    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+        << "set device id to " << device->id << ", current = " << moduleID;
     synStatus status = synFail;
     auto require_id = static_cast<synModuleId>(device->id);
     if (require_id == moduleID) {
       if (Status == 0) {
+        LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+            << "1st ================================= " << require_id;
         status = synDeviceAcquireByModuleId(&deviceId, require_id);
         PD_CHECK(status == synSuccess,
                  "[RUNTIME] synDeviceAcquireByModuleId() failed = %d",
@@ -102,9 +106,6 @@ class RuntimeManager {
                status);
     }
     Status = 1;
-
-    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-        << "set device id to " << device->id;
     moduleID = device->id;
   }
 
@@ -408,17 +409,18 @@ class RuntimeManager {
   }
 
   void GetUniqueIdSize(size_t *sz) {
-    if (uid != nullptr) {
-      *sz = uid->length;
-    } else {
-      *sz = 0;
+    if (uid == nullptr) {
+      uid = new hcclUniqueId();
+      CHECK_HCCL_STATUS(hcclGetUniqueId(uid));
     }
 
+    *sz = uid->length;
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "uid size = " << *sz;
   }
 
   C_Status GetUniqueId(C_CCLRootId *unique_id) {
     if (uid == nullptr) {
+      uid = new hcclUniqueId();
       CHECK_HCCL_STATUS(hcclGetUniqueId(uid));
       unique_id = reinterpret_cast<C_CCLRootId *>(uid);
     }
@@ -475,6 +477,8 @@ C_Status SetDevice(const C_Device device) {
 
 C_Status GetDeviceID(const C_Device device) {
   device->id = static_cast<int>(runtimeManager.GetModuleID());
+  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+      << __FUNCTION__ << " : " << device->id;
   return C_SUCCESS;
 }
 
@@ -897,21 +901,21 @@ C_Status ProfilerFinalize(C_Profiler prof, void *user_data) {
 C_Status ProfilerPrepare(C_Profiler prof, void *user_data) { return C_SUCCESS; }
 
 C_Status ProfilerStart(C_Profiler prof, void *user_data) {
-  auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
-  synStatus status = synProfilerStart(type, runtimeManager.GetDeviceID());
-  PD_CHECK(status == synSuccess,
-           "[RUNTIME] start intel hpu profiling failed  = %d",
-           status);
+  // auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
+  // synStatus status = synProfilerStart(type, runtimeManager.GetDeviceID());
+  // PD_CHECK(status == synSuccess,
+  //          "[RUNTIME] start intel hpu profiling failed  = %d",
+  //          status);
 
   return C_SUCCESS;
 }
 
 C_Status ProfilerStop(C_Profiler prof, void *user_data) {
-  auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
-  synStatus status = synProfilerStop(type, runtimeManager.GetDeviceID());
-  PD_CHECK(status == synSuccess,
-           "[RUNTIME] stop intel hpu profiling failed  = %d",
-           status);
+  // auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
+  // synStatus status = synProfilerStop(type, runtimeManager.GetDeviceID());
+  // PD_CHECK(status == synSuccess,
+  //          "[RUNTIME] stop intel hpu profiling failed  = %d",
+  //          status);
 
   return C_SUCCESS;
 }
