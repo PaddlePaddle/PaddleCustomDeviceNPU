@@ -45,6 +45,8 @@ inline hcclDataType_t PDDataTypeToHcclDataType(C_DataType type) {
   if (type == C_DataType::FLOAT32) {
     return hcclFloat32;
   } else if (type == C_DataType::FLOAT16) {
+    return hcclHalf;
+  } else if (type == C_DataType::BFLOAT16) {
     return hcclBfloat16;
   } else if (type == C_DataType::INT32) {
     return hcclInt32;
