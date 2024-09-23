@@ -409,22 +409,38 @@ class RuntimeManager {
   }
 
   void GetUniqueIdSize(size_t *sz) {
-    if (uid == nullptr) {
-      uid = new hcclUniqueId();
-      CHECK_HCCL_STATUS(hcclGetUniqueId(uid));
+    if (uid.length == 0) {
+      CHECK_HCCL_STATUS(hcclGetUniqueId(&uid));
     }
-
-    *sz = uid->length;
+    *sz = uid.length;
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "uid size = " << *sz;
   }
 
   C_Status GetUniqueId(C_CCLRootId *unique_id) {
-    if (uid == nullptr) {
-      uid = new hcclUniqueId();
-      CHECK_HCCL_STATUS(hcclGetUniqueId(uid));
-      unique_id = reinterpret_cast<C_CCLRootId *>(uid);
+    if (uid.length == 0) {
+      CHECK_HCCL_STATUS(hcclGetUniqueId(&uid));
     }
+    unique_id->sz = uid.length;
+    memcpy(reinterpret_cast<void *>(unique_id->data),
+           reinterpret_cast<void *>(uid.internal),
+           uid.length);
+    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+        << "uid size = " << reinterpret_cast<hcclUniqueId *>(unique_id)->length;
+    return C_SUCCESS;
+  }
 
+  C_Status CommInitRank(size_t ranks,
+                        C_CCLRootId *unique_id,
+                        size_t rank,
+                        C_CCLComm *comm) {
+    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+        << "uid size = " << unique_id->sz << ", rank = " << rank;
+    uid.length = unique_id->sz;
+    memcpy(reinterpret_cast<void *>(uid.internal),
+           reinterpret_cast<void *>(unique_id->data),
+           unique_id->sz);
+    CHECK_HCCL_STATUS(hcclCommInitRank(
+        reinterpret_cast<hcclComm_t *>(comm), ranks, uid, rank));
     return C_SUCCESS;
   }
 
@@ -436,7 +452,7 @@ class RuntimeManager {
   uint32_t count = 0;
 
   // hccl
-  hcclUniqueId *uid = nullptr;
+  hcclUniqueId uid = hcclUniqueId{.length = 0};
 
   // user streams
   std::set<synStreamHandle> streams;
@@ -752,10 +768,7 @@ C_Status XcclCommInitRank(size_t ranks,
                           C_CCLRootId *unique_id,
                           size_t rank,
                           C_CCLComm *comm) {
-  hcclUniqueId uniqueId{};
-  CHECK_HCCL_STATUS(hcclCommInitRank(
-      reinterpret_cast<hcclComm_t *>(comm), ranks, uniqueId, rank));
-
+  runtimeManager.CommInitRank(ranks, unique_id, rank, comm);
   return C_SUCCESS;
 }
 
@@ -772,6 +785,9 @@ C_Status XcclAllReduce(void *send_buf,
                        C_CCLReduceOp op,
                        C_CCLComm comm,
                        C_Stream stream) {
+  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+      << send_buf << ", " << recv_buf << ", " << count << ", " << data_type
+      << ", " << op << ", " << comm << ", " << stream;
   CHECK_HCCL_STATUS(hcclAllReduce(static_cast<const void *>(send_buf),
                                   recv_buf,
                                   count,
