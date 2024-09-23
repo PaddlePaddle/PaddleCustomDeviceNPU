@@ -125,7 +125,7 @@ void EmbeddingKernel(const Context& dev_ctx,
   OpCacheOperator op_info;
 
   GatherParams params;
-  params.params.axis = static_cast<int32_t>(inputx.dims().size()) - 1;
+  params.params.axis = 1;
   params.type = inputx.dtype();
 
   std::vector<DIMS> inputs_dims = ct.GetDims();

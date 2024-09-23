@@ -174,10 +174,15 @@ void PowKernelScalar(const Context& dev_ctx,
   HPU_KERNEL_REGISTER(GUID##_raw,                     \
                       OP_NAME##RawKernel,             \
                       float,                          \
+                      int32_t,                        \
                       phi::dtype::float16,            \
                       phi::dtype::bfloat16)           \
-  HPU_KERNEL_REGISTER(                                \
-      GUID, OP_NAME##Kernel, float, phi::dtype::float16, phi::dtype::bfloat16)
+  HPU_KERNEL_REGISTER(GUID,                           \
+                      OP_NAME##Kernel,                \
+                      float,                          \
+                      int32_t,                        \
+                      phi::dtype::float16,            \
+                      phi::dtype::bfloat16)
 
 #define PD_REGISTER_PLUGIN_KERNEL_FPx2(OP_NAME, GUID)        \
   HPU_KERNEL_REGISTER(GUID##_raw, OP_NAME##RawKernel, float) \
