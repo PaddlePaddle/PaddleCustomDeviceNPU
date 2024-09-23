@@ -425,7 +425,7 @@ class RuntimeManager {
            reinterpret_cast<void *>(uid.internal),
            uid.length);
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-        << "uid size = " << reinterpret_cast<hcclUniqueId *>(unique_id)->length;
+        << "uid size = " << unique_id->sz;
     return C_SUCCESS;
   }
 
