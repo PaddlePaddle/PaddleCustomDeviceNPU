@@ -107,6 +107,9 @@ void ContiguousKernel(const Context& dev_ctx,
    for (size_t i = 0; i < rank; i++) {
      params.params.strides[rank - 1 - i] = input_strides[i];
    }
+   for (size_t i = rank; i < HABANA_DIM_MAX; i++) {
+     params.params.strides[i] = 0;
+   }
    // calculate inputs dim
    std::vector<int64_t> input_dims = phi::vectorize<int64_t>(meta.dims);
    uint64_t lastElementOffset = 0;
