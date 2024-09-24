@@ -12,43 +12,112 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
 #include "kernels/funcs.h"
 #include "kernels/hpu_operator.h"
 #include "paddle/phi/common/amp_type_traits.h"
+#include "utils/utills.h"
 
 namespace custom_kernel {
 
+struct GaussianParams {
+  ns_RandomNormal::Params params;
+};
+
+class Gaussian : public HpuOperator {
+ public:
+  explicit Gaussian(std::string guid_prefix) : HpuOperator(guid_prefix) {}
+
+  void AddNode(ConvertTensors& ct, GaussianParams params) {
+    auto outputs = ct.GetTensors(false);
+
+    std::vector<synTensor> syn_outputs;
+    for (size_t i = 0; i < outputs.size(); i++) {
+      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
+                                         outputs[i].type,
+                                         outputs[i].dims,
+                                         true,
+                                         outputs[i].name));
+    }
+
+    guid_ = guid_ + "_" + SynDataTypeToStr(outputs[0].type);
+
+    synStatus status = synNodeCreate(graphHandle_,
+                                     nullptr,
+                                     syn_outputs.data(),
+                                     0,
+                                     syn_outputs.size(),
+                                     &params.params,
+                                     sizeof(params.params),
+                                     guid_.c_str(),
+                                     "Gaussian",
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+  }
+};
+
 template <typename T, typename Context>
-void GaussianKernel(const Context& ctx,
+void GaussianKernel(const Context& dev_ctx,
                     const phi::IntArray& shape,
                     float mean,
                     float std,
                     int seed,
                     phi::DataType dtype,
                     phi::DenseTensor* out) {
-  ctx.template Alloc<T>(out);
+  dev_ctx.template Alloc<T>(out);
 
-  phi::DenseTensor cpu_tensor;
-  phi::DenseTensorMeta cpu_meta = {out->dtype(), out->dims()};
-  cpu_tensor.set_meta(cpu_meta);
-  T* cpu_data = ctx.template HostAlloc<T>(&cpu_tensor);
-  std::normal_distribution<typename phi::dtype::MPTypeTrait<T>::Type> dist(mean,
-                                                                           std);
+  // phi::DenseTensor cpu_tensor;
+  // phi::DenseTensorMeta cpu_meta = {out->dtype(), out->dims()};
+  // cpu_tensor.set_meta(cpu_meta);
+  // T* cpu_data = ctx.template HostAlloc<T>(&cpu_tensor);
+  // std::normal_distribution<typename phi::dtype::MPTypeTrait<T>::Type>
+  // dist(mean,
+  //                                                                          std);
 
-  int64_t size = out->numel();
+  // int64_t size = out->numel();
 
-  std::shared_ptr<std::mt19937_64> engine;
-  if (seed) {
-    engine = std::make_shared<std::mt19937_64>();
-    engine->seed(seed);
-  } else {
-    engine = ctx.GetGenerator()->GetCPUEngine();
+  // std::shared_ptr<std::mt19937_64> engine;
+  // if (seed) {
+  //   engine = std::make_shared<std::mt19937_64>();
+  //   engine->seed(seed);
+  // } else {
+  //   engine = ctx.GetGenerator()->GetCPUEngine();
+  // }
+
+  // for (int64_t i = 0; i < size; ++i) {
+  //   cpu_data[i] = static_cast<T>(dist(*engine));
+  // }
+  // TensorCopy(ctx, cpu_tensor, false, out);
+  ConvertTensors ct;
+  ct.Add(out, false);
+
+  GaussianParams params;
+  params.params.seed = seed;
+  params.params.mean = mean;
+  params.params.stddev = std;
+
+  std::vector<DIMS> inputs_dims = ct.GetDims();
+
+  OpCacheOperator op_info;
+  op_info.prepareOpInfo<T, GaussianParams>(
+      "GaussianKernel", inputs_dims, &params);
+  auto recipe = op_info.GetRecipe();
+
+  if (recipe == nullptr) {
+    Gaussian op("random_normal_fwd");
+    op.AddNode(ct, params);
+    op.Compile();
+    op_info.setOp(op);
+    recipe = op_info.GetRecipe();
   }
 
-  for (int64_t i = 0; i < size; ++i) {
-    cpu_data[i] = static_cast<T>(dist(*engine));
-  }
-  TensorCopy(ctx, cpu_tensor, true, out);
+  RecipeRunner runner(recipe);
+  auto tensors = ct.GetDeviceAddr();
+  runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
 }  // namespace custom_kernel
@@ -59,5 +128,4 @@ PD_REGISTER_PLUGIN_KERNEL(gaussian,
                           custom_kernel::GaussianKernel,
                           phi::dtype::float16,
                           phi::dtype::bfloat16,
-                          float,
-                          double) {}
+                          float) {}
