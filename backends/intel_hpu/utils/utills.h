@@ -90,7 +90,7 @@ class KeyCreator {
 
   void AddAsKey(const std::vector<int64_t>& dims) {
     for (unsigned int i = 0; i < dims.size(); i++) {
-      AddAsKey<int>(dims[i]);
+      AddAsKey<int64_t>(dims[i]);
     }
   }
 

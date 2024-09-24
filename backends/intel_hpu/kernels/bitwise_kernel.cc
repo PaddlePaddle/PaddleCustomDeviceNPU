@@ -79,8 +79,7 @@ void BitwiseAndKernel(const Context& dev_ctx,
   params.op = "bitwise_and";
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, BitwiseParams>(
-      "BitwiseAndKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("BitwiseAndKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
@@ -111,8 +110,7 @@ void BitwiseNotKernel(const Context& dev_ctx,
   params.op = "bitwise_not";
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, BitwiseParams>(
-      "BitwiseNotKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("BitwiseNotKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
@@ -145,8 +143,7 @@ void BitwiseOrKernel(const Context& dev_ctx,
   params.op = "bitwise_or";
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, BitwiseParams>(
-      "BitwiseOrKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("BitwiseOrKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
@@ -179,8 +176,7 @@ void BitwiseXorKernel(const Context& dev_ctx,
   params.op = "bitwise_xor";
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, BitwiseParams>(
-      "BitwiseXorKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("BitwiseXorKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {

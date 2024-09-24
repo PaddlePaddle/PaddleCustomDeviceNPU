@@ -77,8 +77,7 @@ void LogicalNotKernel(const Context& dev_ctx,
   params.op = "not";
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, LogicalParams>(
-      "LogicalNotKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("LogicalNotKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
@@ -112,8 +111,7 @@ void LogicalOrKernel(const Context& dev_ctx,
   LogicalParams params;
   params.op = "or";
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, LogicalParams>(
-      "LogicalOrKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("LogicalOrKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
@@ -146,8 +144,7 @@ void LogicalAndKernel(const Context& dev_ctx,
   LogicalParams params;
   params.op = "and";
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, LogicalParams>(
-      "LogicalAndKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, nullptr_t>("LogicalAndKernel", inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
