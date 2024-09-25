@@ -290,6 +290,7 @@ PD_REGISTER_PLUGIN_KERNEL(not_equal,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(not_equal_raw,
@@ -301,6 +302,7 @@ PD_REGISTER_PLUGIN_KERNEL(not_equal_raw,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(equal,
@@ -323,6 +325,7 @@ PD_REGISTER_PLUGIN_KERNEL(equal_raw,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(less_than,
@@ -345,6 +348,7 @@ PD_REGISTER_PLUGIN_KERNEL(less_than_raw,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(less_equal,
@@ -356,6 +360,7 @@ PD_REGISTER_PLUGIN_KERNEL(less_equal,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(less_equal_raw,
@@ -367,7 +372,7 @@ PD_REGISTER_PLUGIN_KERNEL(less_equal_raw,
                           uint8_t,
                           int16_t,
                           int32_t,
-
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(greater_than,
@@ -379,6 +384,7 @@ PD_REGISTER_PLUGIN_KERNEL(greater_than,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(greater_than_raw,
@@ -390,6 +396,7 @@ PD_REGISTER_PLUGIN_KERNEL(greater_than_raw,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(greater_equal,
@@ -401,6 +408,7 @@ PD_REGISTER_PLUGIN_KERNEL(greater_equal,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(greater_equal_raw,
@@ -412,4 +420,5 @@ PD_REGISTER_PLUGIN_KERNEL(greater_equal_raw,
                           uint8_t,
                           int16_t,
                           int32_t,
+                          int64_t,
                           bool) {}
