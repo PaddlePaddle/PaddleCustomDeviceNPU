@@ -144,8 +144,11 @@ class OpCacheOperator {
   synRecipeHandle GetRecipe() {
     auto& lru_cache = OpCacheOperator::GetLRUCache();
     if (lru_cache.exist(key_creator_.GetKey())) {
-      return lru_cache.get(key_creator_.GetKey());
+      auto h = lru_cache.get(key_creator_.GetKey());
+      VLOG(4) << "hint cache " << key_creator_.GetKey() << ", " << h;
+      return h;
     } else {
+      VLOG(4) << "mis hint cache " << key_creator_.GetKey();
       return nullptr;
     }
   }

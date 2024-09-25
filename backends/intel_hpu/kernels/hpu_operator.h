@@ -169,7 +169,7 @@ class RecipeRunner {
     }
 
     VLOG(6) << "workspace size = " << cached_workspaceSize
-            << ", stream = " << stream;
+            << ", stream = " << stream << ", recipe = " << recipeHandle_;
 
     std::vector<synLaunchTensorInfo> concatTensors;
     for (auto& tensor : tensors) {
