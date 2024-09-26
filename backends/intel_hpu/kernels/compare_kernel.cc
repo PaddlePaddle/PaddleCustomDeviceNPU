@@ -408,7 +408,6 @@ PD_REGISTER_PLUGIN_KERNEL(greater_equal,
                           uint8_t,
                           int16_t,
                           int32_t,
-                          int64_t,
                           bool) {}
 
 PD_REGISTER_PLUGIN_KERNEL(greater_equal_raw,
