@@ -104,6 +104,29 @@ void FullLikeKernel(const Context& dev_ctx,
               dev_ctx);
   }
 }
+
+template <typename T, typename Context>
+void FullBatchSizeLikeKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const std::vector<int>& shape,
+                             const phi::Scalar& val,
+                             phi::DataType dtype,
+                             int x_batch_size_dim,
+                             int out_batch_size_dim,
+                             phi::DenseTensor* out) {
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+
+    std::vector<int> out_shpae = shape;
+    if (x_batch_size_dim == 0 && x.dims().size() > 0) {
+      out_shpae[out_batch_size_dim] = x.dims().at(0);
+    }
+
+    custom_kernel::FullKernel<T, Context>(dev_ctx, out_shpae, val, dtype, out);
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(full,
@@ -121,6 +144,19 @@ PD_REGISTER_PLUGIN_KERNEL(full_like,
                           gcu,
                           ALL_LAYOUT,
                           custom_kernel::FullLikeKernel,
+                          bool,
+                          int,
+                          int64_t,
+                          float,
+                          double,
+                          phi::dtype::float16) {
+  kernel->InputAt(0).SetBackend(phi::Backend::ALL_BACKEND);
+}
+
+PD_REGISTER_PLUGIN_KERNEL(full_batch_size_like,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::FullBatchSizeLikeKernel,
                           bool,
                           int,
                           int64_t,

@@ -100,7 +100,7 @@ void AnyKernel(const Context& dev_ctx,
       }
       LAUNCH_TOPSATENOP(topsatenAny, dev_ctx, *out, x, dim, keep_dim);
     } else {
-      ContextPinnedGuard ctx_pinned_guard(dev_ctx);
+      ContextPinnedGuard<Context> ctx_pinned_guard(dev_ctx);
       // fallback to CPU
       // 1. Copy x to CPU
       phi::DenseTensor x_cpu;
@@ -364,6 +364,75 @@ void MeanGradKernel(const Context& dev_ctx,
   }
 }
 
+template <typename T, typename Context>
+void AMaxKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                const std::vector<int64_t>& dims,
+                bool keep_dim,
+                phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("amax");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    auto reduce_axis = dims;
+    int64_t rank = x.dims().size();
+    if (reduce_axis.empty()) {
+      reduce_axis.assign(rank, 0);
+      std::iota(reduce_axis.begin(), reduce_axis.end(), 0);
+    } else {
+      for (size_t i = 0; i < reduce_axis.size(); ++i) {
+        if (reduce_axis[i] < 0) {
+          reduce_axis[i] += rank;
+        }
+      }
+    }
+    LAUNCH_TOPSATENOP(topsatenAmax, dev_ctx, *out, x, reduce_axis, keep_dim);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void AMinKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                const std::vector<int64_t>& dims,
+                bool keep_dim,
+                phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("amin");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    auto reduce_axis = dims;
+    int64_t rank = x.dims().size();
+    if (reduce_axis.empty()) {
+      reduce_axis.assign(rank, 0);
+      std::iota(reduce_axis.begin(), reduce_axis.end(), 0);
+    } else {
+      for (size_t i = 0; i < reduce_axis.size(); ++i) {
+        if (reduce_axis[i] < 0) {
+          reduce_axis[i] += rank;
+        }
+      }
+    }
+
+    auto x_tensor = CreateTopsatenTensor(x);
+    auto out_tensor = CreateTopsatenTensor(*out);
+    auto reduce_dims = IntArrayToTopsatenSize(reduce_axis);
+    std::string abstract_info = custom_kernel::GetAbstractInfo(
+        "topsatenAmin", *out, x, reduce_axis, keep_dim);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenAmin,
+                                        dev_ctx,
+                                        abstract_info,
+                                        out_tensor,
+                                        x_tensor,
+                                        reduce_dims,
+                                        keep_dim);
+    // LAUNCH_TOPSATENOP(topsatenAmin, dev_ctx, *out, x, reduce_axis, keep_dim);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(any,
@@ -433,4 +502,24 @@ PD_REGISTER_PLUGIN_KERNEL(mean_grad,
                           ALL_LAYOUT,
                           custom_kernel::MeanGradKernel,
                           float,
+                          phi::dtype::float16) {}
+
+PD_REGISTER_PLUGIN_KERNEL(amax,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::AMaxKernel,
+                          int,
+                          int64_t,
+                          float,
+                          double,
+                          phi::dtype::float16) {}
+
+PD_REGISTER_PLUGIN_KERNEL(amin,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::AMinKernel,
+                          int,
+                          int64_t,
+                          float,
+                          double,
                           phi::dtype::float16) {}

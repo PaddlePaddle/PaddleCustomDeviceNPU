@@ -43,7 +43,7 @@ void UniformRawKernel(const Context& dev_ctx,
                       float diag_val,
                       phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("uniform_raw");
-  ContextPinnedGuard ctx_pinned_guard(dev_ctx);
+  ContextPinnedGuard<Context> ctx_pinned_guard(dev_ctx);
   VLOG(6) << "[HOST_KERNEL] Impl on host for uniform_raw";
   VLOG(6) << "Enter UniformRawKernel with min:" << min.ToString()
           << ", max:" << max.ToString() << ", seed:" << seed

@@ -56,8 +56,8 @@ void ScatterKernel(const Context& dev_ctx,
     // * @param computation: Computation to be used for combining the existing
     //                       values in the input array and the updates
     //                       during scatter.
-    topsopScatterComputationType_t computation_type =
-        TOPSOP_SCATTER_COMP_UPDATE;
+    topsatenScatterComputationType_t computation_type =
+        TOPSATEN_SCATTER_COMP_UPDATE;
 
     // * @param index_vector_dim: The dimension in indices that contains the
     //                            starting indices.
@@ -106,37 +106,37 @@ void ScatterKernel(const Context& dev_ctx,
       auto zero_updates = TensorZeros(dev_ctx, input_updates.meta());
       phi::DenseTensor tmp_out = TensorEmpty(dev_ctx, output.meta());
 
-      LAUNCH_TOPSOP(topsopScatter,
-                    dev_ctx,
-                    tmp_out,
-                    input_x,
-                    input_index,
-                    zero_updates,
-                    computation_type,
-                    index_vector_dim,
-                    update_window_dims,
-                    inserted_window_dims,
-                    scatter_dims_to_operand_dims,
-                    indices_are_sorted,
-                    unique_indices);
+      LAUNCH_TOPSATENOP(topsxlaScatter,
+                        dev_ctx,
+                        tmp_out,
+                        input_x,
+                        input_index,
+                        zero_updates,
+                        computation_type,
+                        index_vector_dim,
+                        update_window_dims,
+                        inserted_window_dims,
+                        scatter_dims_to_operand_dims,
+                        indices_are_sorted,
+                        unique_indices);
 
-      computation_type = TOPSOP_SCATTER_COMP_ADD;
+      computation_type = TOPSATEN_SCATTER_COMP_ADD;
       tmp_copy_x = tmp_out;
     }
 
-    LAUNCH_TOPSOP(topsopScatter,
-                  dev_ctx,
-                  output,
-                  tmp_copy_x,
-                  input_index,
-                  input_updates,
-                  computation_type,
-                  index_vector_dim,
-                  update_window_dims,
-                  inserted_window_dims,
-                  scatter_dims_to_operand_dims,
-                  indices_are_sorted,
-                  unique_indices);
+    LAUNCH_TOPSATENOP(topsxlaScatter,
+                      dev_ctx,
+                      output,
+                      tmp_copy_x,
+                      input_index,
+                      input_updates,
+                      computation_type,
+                      index_vector_dim,
+                      update_window_dims,
+                      inserted_window_dims,
+                      scatter_dims_to_operand_dims,
+                      indices_are_sorted,
+                      unique_indices);
 
     MaybeTransResult(dev_ctx, output, out);
 

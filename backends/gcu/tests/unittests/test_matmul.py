@@ -19,198 +19,40 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 MATMUL_CASE = [
-    {
-        "x_shape": [1],
-        "y_shape": [1],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [6],
-        "y_shape": [6],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [6],
-        "y_shape": [6],
-        "dtype": np.float32,
-        "trans_x": True,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [6],
-        "y_shape": [6],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "y_shape": [2, 3],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "y_shape": [3, 2],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "y_shape": [2],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [3, 512, 256],
-        "y_shape": [3, 256, 256],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 256, 512],
-        "y_shape": [3, 256, 512],
-        "dtype": np.float32,
-        "trans_x": True,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 512, 256],
-        "y_shape": [3, 512, 256],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [2, 3, 512, 256],
-        "y_shape": [2, 3, 256, 256],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [2, 3, 256, 512],
-        "y_shape": [2, 3, 256, 512],
-        "dtype": np.float32,
-        "trans_x": True,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [2, 3, 512, 256],
-        "y_shape": [2, 3, 512, 256],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [2, 3, 256, 512],
-        "y_shape": [2, 3, 512, 256],
-        "dtype": np.float32,
-        "trans_x": True,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [4, 5, 6],
-        "y_shape": [6, 6],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [4, 5, 6, 7],
-        "y_shape": [4, 5, 7, 6],
-        "dtype": np.float32,
-        "trans_x": False,
-        "trans_y": False,
-    },
+    {"x_shape": [1], "y_shape": [1], "dtype": np.float32, "trans_x": False, "trans_y": False},
+    {"x_shape": [6], "y_shape": [6], "dtype": np.float32, "trans_x": False, "trans_y": False},
+    {"x_shape": [6], "y_shape": [6], "dtype": np.float32, "trans_x": True, "trans_y": False},
+    {"x_shape": [6], "y_shape": [6], "dtype": np.float32, "trans_x": False, "trans_y": True},
+    {"x_shape": [3, 2], "y_shape": [2, 3], "dtype": np.float32, "trans_x": False, "trans_y": False},
+    {"x_shape": [3, 2], "y_shape": [3, 2], "dtype": np.float32, "trans_x": False, "trans_y": True},
+    {"x_shape": [3, 2], "y_shape": [2], "dtype": np.float32, "trans_x": False, "trans_y": True},
+    {"x_shape": [3, 512, 256], "y_shape": [3, 256, 256], "dtype": np.float32, "trans_x": False, "trans_y": False},
+    {"x_shape": [3, 256, 512], "y_shape": [3, 256, 512], "dtype": np.float32, "trans_x": True, "trans_y": False},
+    {"x_shape": [3, 512, 256], "y_shape": [3, 512, 256], "dtype": np.float32, "trans_x": False, "trans_y": True},
+    {"x_shape": [2, 3, 512, 256], "y_shape": [2, 3, 256, 256], "dtype": np.float32, "trans_x": False, "trans_y": False},
+    {"x_shape": [2, 3, 256, 512], "y_shape": [2, 3, 256, 512], "dtype": np.float32, "trans_x": True, "trans_y": False},
+    {"x_shape": [2, 3, 512, 256], "y_shape": [2, 3, 512, 256], "dtype": np.float32, "trans_x": False, "trans_y": True},
+    {"x_shape": [2, 3, 256, 512], "y_shape": [2, 3, 512, 256], "dtype": np.float32, "trans_x": True, "trans_y": True},
+    {"x_shape": [4, 5, 6], "y_shape": [6, 6], "dtype": np.float32, "trans_x": False, "trans_y": False},
+    {"x_shape": [4, 5, 6, 7], "y_shape": [4, 5, 7, 6], "dtype": np.float32, "trans_x": False, "trans_y": False},
+
     # float16
-    {
-        "x_shape": [1],
-        "y_shape": [1],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "y_shape": [2, 3],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "y_shape": [3, 2],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "y_shape": [2],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [3, 512, 256],
-        "y_shape": [3, 256, 256],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 256, 512],
-        "y_shape": [3, 256, 512],
-        "dtype": np.float16,
-        "trans_x": True,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [3, 512, 256],
-        "y_shape": [3, 512, 256],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [2, 3, 512, 256],
-        "y_shape": [2, 3, 256, 256],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [2, 3, 256, 512],
-        "y_shape": [2, 3, 256, 512],
-        "dtype": np.float16,
-        "trans_x": True,
-        "trans_y": False,
-    },
-    {
-        "x_shape": [2, 3, 512, 256],
-        "y_shape": [2, 3, 512, 256],
-        "dtype": np.float16,
-        "trans_x": False,
-        "trans_y": True,
-    },
-    {
-        "x_shape": [2, 3, 256, 512],
-        "y_shape": [2, 3, 512, 256],
-        "dtype": np.float16,
-        "trans_x": True,
-        "trans_y": True,
-    },
+    {"x_shape": [1], "y_shape": [1], "dtype": np.float16, "trans_x": False, "trans_y": False},
+    {"x_shape": [3, 2], "y_shape": [2, 3], "dtype": np.float16, "trans_x": False, "trans_y": False},
+    {"x_shape": [3, 2], "y_shape": [3, 2], "dtype": np.float16, "trans_x": False, "trans_y": True},
+    {"x_shape": [3, 2], "y_shape": [2], "dtype": np.float16, "trans_x": False, "trans_y": True},
+    {"x_shape": [3, 512, 256], "y_shape": [3, 256, 256], "dtype": np.float16, "trans_x": False, "trans_y": False},
+    {"x_shape": [3, 256, 512], "y_shape": [3, 256, 512], "dtype": np.float16, "trans_x": True, "trans_y": False},
+    {"x_shape": [3, 512, 256], "y_shape": [3, 512, 256], "dtype": np.float16, "trans_x": False, "trans_y": True},
+    {"x_shape": [2, 3, 512, 256], "y_shape": [2, 3, 256, 256], "dtype": np.float16, "trans_x": False, "trans_y": False},
+    {"x_shape": [2, 3, 256, 512], "y_shape": [2, 3, 256, 512], "dtype": np.float16, "trans_x": True, "trans_y": False},
+    {"x_shape": [2, 3, 512, 256], "y_shape": [2, 3, 512, 256], "dtype": np.float16, "trans_x": False, "trans_y": True},
+    {"x_shape": [2, 3, 256, 512], "y_shape": [2, 3, 512, 256], "dtype": np.float16, "trans_x": True, "trans_y": True},
 ]
+# fmt: on
 
 
 @ddt
@@ -225,7 +67,7 @@ class TestMatmul(TestAPIBase):
         self.trans_x = False
         self.trans_y = False
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
         self.data_y = self.generate_data(self.y_shape, self.dtype)
 

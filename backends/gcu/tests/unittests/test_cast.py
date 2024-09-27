@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 CAST_CASE = [
     {"x_shape": [3, 2], "x_dtype": np.float32, "out_dtype": np.uint8},
     {"x_shape": [3, 2], "x_dtype": np.float32, "out_dtype": np.int8},
@@ -58,6 +60,7 @@ CAST_F16_CASE = [
     {"x_shape": [2, 3, 4, 5], "x_dtype": np.float32, "out_dtype": np.float16},
     {"x_shape": [2, 3, 4, 5, 6], "x_dtype": np.float32, "out_dtype": np.float16},
 ]
+# fmt: on
 
 
 class TestCast(TestAPIBase):
@@ -69,7 +72,7 @@ class TestCast(TestAPIBase):
         self.x_dtype = np.float32
         self.out_dtype = np.int32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
         if self.x_dtype in [np.int8, np.int16, np.int32, np.int64]:
             self.data_x = self.generate_integer_data(

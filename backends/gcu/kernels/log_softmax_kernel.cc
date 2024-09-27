@@ -25,16 +25,7 @@ void LogSoftmaxKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    // TODO(wangzhengjun): switch to topsatenLogSoftmaxForward
-    // The accuracy is not up to standard in topsatenSoftmaxForward fp16
-    // scenario. Flame op is still commonly used here, due to concerns that the
-    // accuracy of topsatenLogSoftmaxForward will also be affected.
-    auto alpha = phi::Scalar(1.0f);
-    auto beta = phi::Scalar(0.0f);
-    if (axis < 0) {
-      axis += x.dims().size();
-    }
-    LAUNCH_TOPSOP(topsopLogSoftmaxForward, dev_ctx, *out, x, axis, alpha, beta);
+    LAUNCH_TOPSATENOP(topsatenLogSoftmaxForward, dev_ctx, *out, x, axis);
 
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;

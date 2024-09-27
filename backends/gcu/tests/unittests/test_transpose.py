@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 TRANSPOSE_CASE = [
     {"x_shape": [2, 3, 32, 64], "perm": [0, 2, 3, 1], "x_dtype": np.float32},
     {"x_shape": [2, 3, 32, 64], "perm": [0, 2, 3, 1], "x_dtype": np.float64},
@@ -36,10 +38,12 @@ TRANSPOSE_CASE = [
     {"x_shape": [4, 48, 16, 32, 64], "perm": [1, 0, 3, 4, 2], "x_dtype": np.float64},
     {"x_shape": [4, 48, 16, 32, 64], "perm": [1, 0, 3, 4, 2], "x_dtype": np.int32},
     {"x_shape": [4, 48, 16, 32, 64], "perm": [1, 0, 3, 4, 2], "x_dtype": np.int64},
+
     {"x_shape": [2, 3, 32, 72], "perm": [1, 2, 3, 0], "x_dtype": np.float16},
     {"x_shape": [2, 4, 16], "perm": [0, 2, 1], "x_dtype": np.float16},
     {"x_shape": [4, 48], "perm": [1, 0], "x_dtype": np.float16},
     {"x_shape": [4, 48, 16, 32, 64], "perm": [1, 0, 3, 4, 2], "x_dtype": np.float16},
+
     {"x_shape": [2, 3, 32, 72], "perm": [1, 2, 3, 0], "x_dtype": np.uint8},
     {"x_shape": [2, 3, 32, 48], "perm": [0, 2, 1, 3], "x_dtype": np.int8},
     {"x_shape": [2, 4, 16], "perm": [0, 2, 1], "x_dtype": np.uint8},
@@ -49,6 +53,7 @@ TRANSPOSE_CASE = [
     {"x_shape": [4, 48, 16, 32, 64], "perm": [1, 0, 3, 4, 2], "x_dtype": np.uint8},
     {"x_shape": [4, 48, 16, 32, 64], "perm": [1, 0, 3, 4, 2], "x_dtype": np.int8},
 ]
+# fmt: on
 
 
 @ddt
@@ -61,7 +66,7 @@ class TestTranspose(TestAPIBase):
         self.perm = [0, 2, 3, 1]
         self.x_dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

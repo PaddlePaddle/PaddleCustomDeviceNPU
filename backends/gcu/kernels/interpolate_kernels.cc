@@ -128,67 +128,72 @@ void InterpolateKernel(
   output->set_meta(out_meta);
   ctx.template Alloc<T>(output);
   if (LaunchAOTKernel()) {
-    phi::IntArray output_size{out_h, out_w};
-    if (interp_method == "bilinear" || interp_method == "linear" ||
-        interp_method == "trilinear" || interp_method == "bicubic" ||
-        interp_method == "area") {
-      PADDLE_THROW(phi::errors::Unimplemented(
-          "Interpolate AOT kernel is unimplemented mode[%s]",
-          interp_method.c_str()));
-    } else if (interp_method == "nearest") {
-      auto aten_x = CreateTopsatenTensor(x);
-      auto aten_out = CreateTopsatenTensor(*output);
-      // adjust tensor according to data_layout
+    phi::DenseTensor output_perm = *output;
+    if (DataPdCustomNHWC(x)) {
+      PADDLE_ENFORCE_EQ(data_layout,
+                        "NCHW",
+                        phi::errors::InvalidArgument(
+                            "Layout of kernel attr should be NCHW."));
+      PdCustomNHWCRepresentAsAtenNHWC(input);
+      PdCustomNHWCRepresentAsAtenNHWC(output_perm, true);
+    } else {
       if (data_layout == "NHWC") {
-        std::vector<int64_t> shapes{
-            input_dims[0], input_dims[3], input_dims[1], input_dims[2]};
-        std::vector<int64_t> strides{x.meta().strides.at(0),
-                                     1,
-                                     input_dims[2] * input_dims[3],
-                                     input_dims[3]};
-        topsatenSize_t aten_nchw_shape{shapes.data(),
-                                       static_cast<int64_t>(shapes.size())};
-        topsatenSize_t aten_nhwc_strides{strides.data(),
-                                         static_cast<int64_t>(strides.size())};
-        auto status = aten_x.SetTensorShape(aten_nchw_shape);
-        PADDLE_ENFORCE_EQ(
-            status,
-            TOPSATEN_STATUS_SUCCESS,
-            phi::errors::Fatal("Failed to set tensor shape, get error: %d.",
-                               status));
-        status = aten_x.SetTensorStrides(aten_nhwc_strides);
-        PADDLE_ENFORCE_EQ(
-            status,
-            TOPSATEN_STATUS_SUCCESS,
-            phi::errors::Fatal("Failed to set tensor strides, get error: %d.",
-                               status));
-        status = aten_out.SetTensorShape(aten_nchw_shape);
-        PADDLE_ENFORCE_EQ(
-            status,
-            TOPSATEN_STATUS_SUCCESS,
-            phi::errors::Fatal("Failed to set tensor shape, get error: %d.",
-                               status));
-        status = aten_out.SetTensorStrides(aten_nhwc_strides);
-        PADDLE_ENFORCE_EQ(
-            status,
-            TOPSATEN_STATUS_SUCCESS,
-            phi::errors::Fatal("Failed to set tensor strides, get error: %d.",
-                               status));
+        PermutedShapeAndStrides(
+            input, layout_trans::kNHWC_to_NCHW, common::DataLayout::kNCHW);
+        PermutedShapeAndStrides(output_perm,
+                                layout_trans::kNHWC_to_NCHW,
+                                common::DataLayout::kNCHW);
       }
-      std::vector<int64_t> output_size{out_h, out_w};
-      topsatenSize_t aten_output_size{output_size.data(),
-                                      static_cast<int64_t>(output_size.size())};
-      topsatenScalar_t aten_scales_h;
-      aten_scales_h.dtype = TOPSATEN_DATA_NONE;
-      aten_scales_h.fval = scale_h;
-      topsatenScalar_t aten_scales_w;
-      aten_scales_w.dtype = TOPSATEN_DATA_NONE;
-      aten_scales_w.fval = scale_w;
+    }
+    auto aten_x = CreateTopsatenTensor(input);
+    auto aten_out = CreateTopsatenTensor(output_perm);
+    std::vector<int64_t> output_size{out_h, out_w};
+    topsatenSize_t aten_output_size{output_size.data(),
+                                    static_cast<int64_t>(output_size.size())};
+    topsatenScalar_t aten_scales_h;
+    aten_scales_h.dtype = TOPSATEN_DATA_NONE;
+    aten_scales_h.fval = scale_h;
+    topsatenScalar_t aten_scales_w;
+    aten_scales_w.dtype = TOPSATEN_DATA_NONE;
+    aten_scales_w.fval = scale_w;
+
+    if (interp_method == "nearest") {
+      std::string abstract_info =
+          custom_kernel::GetAbstractInfo("topsatenUpsampleNearest2d",
+                                         output_perm,
+                                         input,
+                                         output_size,
+                                         scale_h,
+                                         scale_w);
       LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenUpsampleNearest2d,
                                           ctx,
+                                          abstract_info,
                                           aten_out,
                                           aten_x,
                                           aten_output_size,
+                                          aten_scales_h,
+                                          aten_scales_w);
+
+    } else if (interp_method == "bilinear") {
+      PADDLE_ENFORCE_EQ((!align_corners && align_mode == 1),
+                        false,
+                        phi::errors::Unimplemented(
+                            "Interpolate bilinear AOT kernel is unimplemented "
+                            "for align_corners(false) and align_mode(1)"));
+      std::string abstract_info =
+          custom_kernel::GetAbstractInfo("topsatenUpsampleBilinear2d",
+                                         output_perm,
+                                         input,
+                                         output_size,
+                                         scale_h,
+                                         scale_w);
+      LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenUpsampleBilinear2d,
+                                          ctx,
+                                          abstract_info,
+                                          aten_out,
+                                          aten_x,
+                                          aten_output_size,
+                                          align_corners,
                                           aten_scales_h,
                                           aten_scales_w);
     } else {
@@ -196,7 +201,13 @@ void InterpolateKernel(
           "Interpolate AOT kernel is unimplemented mode[%s]",
           interp_method.c_str()));
     }
-  } else {
+
+    if (DataPdCustomNHWC(x)) {
+      AtenNHWCRepresentAsPdCustomNHWC(output_perm);
+      AtenNHWCRepresentAsPdCustomNHWC(*output, true);
+    }
+
+  } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
 
@@ -321,25 +332,21 @@ void BilinearInterpKernel(
     int align_mode,
     DenseTensor* output) {
   PADDLE_GCU_KERNEL_TRACE("bilinear_interp");
-  if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
-  } else {  // kernel impl base on JIT
-    InterpolateKernel<T, Context>("bilinear_interp_v2",
-                                  ctx,
-                                  x,
-                                  out_size,
-                                  size_tensor,
-                                  scale_tensor,
-                                  data_layout,
-                                  out_d,
-                                  out_h,
-                                  out_w,
-                                  scale,
-                                  interp_method,
-                                  align_corners,
-                                  align_mode,
-                                  output);
-  }
+  InterpolateKernel<T, Context>("bilinear_interp_v2",
+                                ctx,
+                                x,
+                                out_size,
+                                size_tensor,
+                                scale_tensor,
+                                data_layout,
+                                out_d,
+                                out_h,
+                                out_w,
+                                scale,
+                                interp_method,
+                                align_corners,
+                                align_mode,
+                                output);
 }
 
 template <typename T, typename Context>

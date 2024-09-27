@@ -25,6 +25,8 @@ for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             lib
         )
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 FUSED_ADD_RMSNORM_CASE = [
     {"x_shape": [6, 60], "weight_shape": [60], "dtype": np.float32, "epsilon": 1e-6},
     {"x_shape": [6, 60], "weight_shape": [60], "dtype": np.float32, "epsilon": 1e-5},
@@ -35,13 +37,10 @@ FUSED_ADD_RMSNORM_CASE = [
     {"x_shape": [5, 6, 60], "weight_shape": [60], "dtype": np.float16, "epsilon": 1e-6},
     {"x_shape": [5, 6, 60], "weight_shape": [60], "dtype": np.float16, "epsilon": 1e-5},
     # for llama2
-    {
-        "x_shape": [4, 512, 5120],
-        "weight_shape": [5120],
-        "dtype": np.float16,
-        "epsilon": 1e-5,
-    },
+    {"x_shape": [4, 512, 5120], "weight_shape": [5120], "dtype": np.float16, "epsilon": 1e-5},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -55,7 +54,7 @@ class TestFusedAddRMSNorm(TestAPIBase):
         self.dtype = np.float32
         self.epsilon = 1e-6
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
         self.data_residual = self.generate_data(self.x_shape, self.dtype)
         self.data_weight = self.generate_data(self.weight_shape, self.dtype)

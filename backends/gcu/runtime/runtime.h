@@ -18,7 +18,6 @@
 
 #include <string>
 
-#include "kernels/topsflame/include/topsop/topsop_define.h"
 #include "paddle/phi/extension.h"
 
 #define RT_DISALLOW_COPY_AND_ASSIGN(TypeName)     \

@@ -19,85 +19,22 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 GATHER_CASE = [
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int32,
-        "axis": 0,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "axis": 0,
-    },
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.int32,
-        "index": [1, 3],
-        "index_dtype": np.int32,
-        "axis": 1,
-    },
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.int64,
-        "index": [1, 3],
-        "index_dtype": np.int32,
-        "axis": 1,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": 1,
-        "index_dtype": np.int32,
-        "axis": 0,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": 1,
-        "index_dtype": np.int64,
-        "axis": 0,
-    },
-    {
-        "x_shape": [3, 4, 5],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int32,
-        "axis": 1,
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.float32,
-        "index": [1, 2, 3],
-        "index_dtype": np.int32,
-        "axis": 2,
-    },
-    {
-        "x_shape": [3, 4, 5, 6, 7],
-        "x_dtype": np.float32,
-        "index": [1, 2, 3],
-        "index_dtype": np.int32,
-        "axis": 3,
-    },
-    {
-        "x_shape": [3, 4, 5],
-        "x_dtype": np.float16,
-        "index": [1, 2, 3],
-        "index_dtype": np.int32,
-        "axis": 2,
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.float16,
-        "index": [1, 2, 3],
-        "index_dtype": np.int32,
-        "axis": 3,
-    },
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int32, "axis": 0},
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int64, "axis": 0},
+    {"x_shape": [3, 4], "x_dtype": np.int32, "index": [1, 3], "index_dtype": np.int32, "axis": 1},
+    {"x_shape": [3, 4], "x_dtype": np.int64, "index": [1, 3], "index_dtype": np.int32, "axis": 1},
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1], "index_dtype": np.int32, "axis": 0},
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1], "index_dtype": np.int64, "axis": 0},
+    {"x_shape": [3, 4, 5], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int32, "axis": 1},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float32, "index": [1, 2, 3], "index_dtype": np.int32, "axis": 2},
+    {"x_shape": [3, 4, 5, 6, 7], "x_dtype": np.float32, "index": [1, 2, 3], "index_dtype": np.int32, "axis": 3},
+    {"x_shape": [3, 4, 5], "x_dtype": np.float16, "index": [1, 2, 3], "index_dtype": np.int32, "axis": 2},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float16, "index": [1, 2, 3], "index_dtype": np.int32, "axis": 3},
 ]
+# fmt: on
 
 
 @ddt
@@ -112,7 +49,7 @@ class TestGather(TestAPIBase):
         self.index_dtype = np.int32
         self.axis = 0
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

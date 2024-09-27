@@ -19,58 +19,43 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 INTERPOLATE_NEAREST_CASE = [
-    {
-        "x_shape": [1, 3, 4, 4],
-        "x_dtype": np.float32,
-        "size": [8, 8],
-        "scale_factor": None,
-        "mode": "nearest",
-        "align_corners": False,
-        "align_mode": 0,
-        "data_format": "NCHW",
-    },
-    {
-        "x_shape": [1, 4, 4, 3],
-        "x_dtype": np.float32,
-        "size": [8, 8],
-        "scale_factor": None,
-        "mode": "nearest",
-        "align_corners": False,
-        "align_mode": 0,
-        "data_format": "NHWC",
-    },
-    {
-        "x_shape": [1, 3, 4, 4],
-        "x_dtype": np.float32,
-        "size": [8, 8],
-        "scale_factor": None,
-        "mode": "nearest",
-        "align_corners": False,
-        "align_mode": 1,
-        "data_format": "NCHW",
-    },
-    {
-        "x_shape": [1, 3, 4, 4],
-        "x_dtype": np.float32,
-        "size": None,
-        "scale_factor": [2, 2],
-        "mode": "nearest",
-        "align_corners": False,
-        "align_mode": 1,
-        "data_format": "NCHW",
-    },
-    {
-        "x_shape": [1, 3, 5, 10],
-        "x_dtype": np.float32,
-        "size": None,
-        "scale_factor": [3, 5],
-        "mode": "nearest",
-        "align_corners": False,
-        "align_mode": 1,
-        "data_format": "NCHW",
-    },
+    # nearest
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "nearest", "align_corners": False, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 4, 4, 3], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "nearest", "align_corners": False, "align_mode": 0, "data_format": "NHWC"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "nearest", "align_corners": False, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": None, "scale_factor": [2, 2], "mode": "nearest", "align_corners": False, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 5, 10], "x_dtype": np.float32, "size": None, "scale_factor": [3, 5], "mode": "nearest", "align_corners": False, "align_mode": 1, "data_format": "NCHW"},
+
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float16, "size": [8, 8], "scale_factor": None, "mode": "nearest", "align_corners": False, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 4, 4, 3], "x_dtype": np.float16, "size": [8, 8], "scale_factor": None, "mode": "nearest", "align_corners": False, "align_mode": 0, "data_format": "NHWC"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float16, "size": [8, 8], "scale_factor": None, "mode": "nearest", "align_corners": False, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float16, "size": None, "scale_factor": [2, 2], "mode": "nearest", "align_corners": False, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 5, 10], "x_dtype": np.float16, "size": None, "scale_factor": [3, 5], "mode": "nearest", "align_corners": False, "align_mode": 1, "data_format": "NCHW"},
+
+    # bilinear Interpolate bilinear AOT kernel is unimplemented for align_corners(false) and align_mode(1)
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": False, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 4, 4, 3], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": False, "align_mode": 0, "data_format": "NHWC"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": False, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": None, "scale_factor": [2, 2], "mode": "bilinear", "align_corners": False, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 5, 10], "x_dtype": np.float32, "size": None, "scale_factor": [3, 5], "mode": "bilinear", "align_corners": False, "align_mode": 0, "data_format": "NCHW"},
+
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": True, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 4, 4, 3], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": True, "align_mode": 0, "data_format": "NHWC"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": True, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float32, "size": None, "scale_factor": [2, 2], "mode": "bilinear", "align_corners": True, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 5, 10], "x_dtype": np.float32, "size": None, "scale_factor": [3, 5], "mode": "bilinear", "align_corners": True, "align_mode": 1, "data_format": "NCHW"},
+
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float16, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": True, "align_mode": 0, "data_format": "NCHW"},
+    {"x_shape": [1, 4, 4, 3], "x_dtype": np.float16, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": True, "align_mode": 0, "data_format": "NHWC"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float16, "size": [8, 8], "scale_factor": None, "mode": "bilinear", "align_corners": True, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 4, 4], "x_dtype": np.float16, "size": None, "scale_factor": [2, 2], "mode": "bilinear", "align_corners": True, "align_mode": 1, "data_format": "NCHW"},
+    {"x_shape": [1, 3, 5, 10], "x_dtype": np.float16, "size": None, "scale_factor": [3, 5], "mode": "bilinear", "align_corners": True, "align_mode": 1, "data_format": "NCHW"},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -88,7 +73,7 @@ class TestNearestInterpolate(TestAPIBase):
         self.align_mode = 0
         self.data_format = "NCHW"
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

@@ -18,10 +18,14 @@
 
 namespace custom_kernel {
 
-topsatenTensor CreateTopsatenTensor(const phi::DenseTensor &tensor);
+topsatenTensor CreateTopsatenTensor(const phi::DenseTensor &tensor,
+                                    bool pinned = false);
 
 topsatenTensor OptionalTensorToTopsatenTensor(
     const paddle::optional<phi::DenseTensor> &opt_tensor);
+
+topsatenTensor CreateTopsatenTensorWithoutInitialized(
+    const phi::DenseTensor &tensor);
 
 topsatenDataType_t DataTypeToTopsatenDataType(const phi::DataType &dtype);
 

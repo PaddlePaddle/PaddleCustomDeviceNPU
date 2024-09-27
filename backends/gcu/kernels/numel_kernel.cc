@@ -24,7 +24,9 @@ void NumelKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<int64_t>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    int64_t size = input.numel();
+    FillGcuTensorWithConstant<int64_t>(out, dev_ctx, size);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["Input"] = {"input"};

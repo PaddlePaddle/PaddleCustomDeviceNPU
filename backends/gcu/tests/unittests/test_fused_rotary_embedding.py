@@ -25,41 +25,18 @@ for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             lib
         )
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 FUSED_ROPE_CASE = [
     # for llama2
-    {
-        "batch_size": 4,
-        "seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "dtype": np.float32,
-        "position_dtype": np.int64,
-    },
-    {
-        "batch_size": 4,
-        "seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "dtype": np.float16,
-        "position_dtype": np.int64,
-    },
-    {
-        "batch_size": 5,
-        "seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "dtype": np.float32,
-        "position_dtype": np.int32,
-    },
-    {
-        "batch_size": 5,
-        "seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "dtype": np.float16,
-        "position_dtype": np.int32,
-    },
+    {"batch_size": 4, "seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "dtype": np.float32, "position_dtype": np.int64},
+    {"batch_size": 4, "seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "dtype": np.float16, "position_dtype": np.int64},
+
+    {"batch_size": 5, "seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "dtype": np.float32, "position_dtype": np.int32},
+    {"batch_size": 5, "seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "dtype": np.float16, "position_dtype": np.int32},
+
 ]
+# fmt: on
 
 NATIVE_IMPL_DEV = "gcu"
 
@@ -152,7 +129,7 @@ class TestFusedRotaryEmbedding(TestAPIBase):
         self.positions_shape = [self.batch_size, self.seq_len]
         self.cos_sin_table_shape = [self.max_position, self.rotary_dim]
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_q = self.generate_data(self.q_shape, self.dtype)
         self.data_k = self.generate_data(self.k_shape, self.dtype)
         self.data_position_ids = np.tile(

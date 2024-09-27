@@ -13,11 +13,12 @@
 // limitations under the License.
 
 #pragma once
+#include <tops/tops_ext.h>
+
 #include <vector>
 
 #include "backend/executor/gcu_node.h"
 #include "backend/utils/utils.h"
-#include "tops/tops_ext.h"
 
 namespace backend {
 

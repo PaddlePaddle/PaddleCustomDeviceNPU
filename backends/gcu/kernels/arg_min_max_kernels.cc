@@ -60,7 +60,23 @@ void ArgMinKernel(const Context& dev_ctx,
                   phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("argmin");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.Alloc(out, out->dtype());
+    phi::DenseTensor output =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+
+    int64_t rank = x.dims().size();
+    int64_t axis_value = axis.to<int64_t>();
+    if (flatten) {
+      axis_value = rank;
+    } else if (axis_value < 0) {
+      axis_value += rank;
+    }
+    phi::Scalar reduce_axis(axis_value);
+    LAUNCH_TOPSATENOP(
+        topsatenArgmin, dev_ctx, output, x, reduce_axis, keepdims);
+
+    MaybeTransResult(dev_ctx, output, out);
+
   } else {  // kernel impl base on JIT
     ArgMinMaxKernel<T, Context>(
         dev_ctx, x, axis, keepdims, flatten, dtype, out, "arg_min");

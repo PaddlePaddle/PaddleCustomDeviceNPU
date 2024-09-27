@@ -19,73 +19,20 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 DROPOUT_CASE = [
-    {
-        "x_shape": [6],
-        "p": 0.5,
-        "axis": None,
-        "training": True,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [6],
-        "p": 0.5,
-        "axis": None,
-        "training": False,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [2, 3],
-        "p": 0.5,
-        "axis": [0, 1],
-        "training": True,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [2, 3],
-        "p": 0.5,
-        "axis": [0, 1],
-        "training": False,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [2, 3],
-        "p": 0.5,
-        "axis": [1],
-        "training": True,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [2, 3],
-        "p": 0.5,
-        "axis": [1],
-        "training": False,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [2, 3],
-        "p": 0.5,
-        "axis": [0],
-        "training": True,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
-    {
-        "x_shape": [2, 3],
-        "p": 0.5,
-        "axis": [0],
-        "training": False,
-        "mode": "upscale_in_train",
-        "x_dtype": np.float32,
-    },
+    {"x_shape": [6], "p": 0.5, "axis": None, "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [6], "p": 0.5, "axis": None, "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [2, 3], "p": 0.5, "axis": [0, 1], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [2, 3], "p": 0.5, "axis": [0, 1], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [2, 3], "p": 0.5, "axis": [1], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [2, 3], "p": 0.5, "axis": [1], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [2, 3], "p": 0.5, "axis": [0], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [2, 3], "p": 0.5, "axis": [0], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
     # TODO(xuelei.wan): Add test cases about mode='downscale_in_infer'
 ]
+# fmt: on
 
 
 @ddt
@@ -103,7 +50,7 @@ class TestDropout(TestAPIBase):
         self.x_dtype = np.float32
         self.mask = None
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype) * 0 + 2
 
     def forward(self):
@@ -143,7 +90,7 @@ class TestDropout(TestAPIBase):
         self.mode = mode
         self.x_dtype = x_dtype
 
-        self.prepare_datas()
+        self.prepare_data()
         t0 = self.forward().numpy()
         t1 = self.expect_output()
 

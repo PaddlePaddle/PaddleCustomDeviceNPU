@@ -19,108 +19,31 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 INDEX_SAMPLE_CASE = [
     # float32 int32
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.float32,
-        "index_shape": [3, 3],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.float32,
-        "index_shape": [3, 2],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [3, 1],
-        "x_dtype": np.float32,
-        "index_shape": [3, 1],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [10, 128],
-        "x_dtype": np.float32,
-        "index_shape": [10, 64],
-        "index_dtype": np.int32,
-    },
+    {"x_shape": [3, 4], "x_dtype": np.float32, "index_shape": [3, 3], "index_dtype": np.int32},
+    {"x_shape": [3, 4], "x_dtype": np.float32, "index_shape": [3, 2], "index_dtype": np.int32},
+    {"x_shape": [3, 1], "x_dtype": np.float32, "index_shape": [3, 1], "index_dtype": np.int32},
+    {"x_shape": [10, 128], "x_dtype": np.float32, "index_shape": [10, 64], "index_dtype": np.int32},
     # float16 int32
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.float16,
-        "index_shape": [3, 3],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.float16,
-        "index_shape": [3, 2],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [3, 1],
-        "x_dtype": np.float16,
-        "index_shape": [3, 1],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [10, 128],
-        "x_dtype": np.float16,
-        "index_shape": [10, 64],
-        "index_dtype": np.int32,
-    },
+    {"x_shape": [3, 4], "x_dtype": np.float16, "index_shape": [3, 3], "index_dtype": np.int32},
+    {"x_shape": [3, 4], "x_dtype": np.float16, "index_shape": [3, 2], "index_dtype": np.int32},
+    {"x_shape": [3, 1], "x_dtype": np.float16, "index_shape": [3, 1], "index_dtype": np.int32},
+    {"x_shape": [10, 128], "x_dtype": np.float16, "index_shape": [10, 64], "index_dtype": np.int32},
     # int64 int32
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.int64,
-        "index_shape": [3, 3],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.int64,
-        "index_shape": [3, 2],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [3, 1],
-        "x_dtype": np.int64,
-        "index_shape": [3, 1],
-        "index_dtype": np.int32,
-    },
-    {
-        "x_shape": [10, 128],
-        "x_dtype": np.int64,
-        "index_shape": [10, 64],
-        "index_dtype": np.int32,
-    },
+    {"x_shape": [3, 4], "x_dtype": np.int64, "index_shape": [3, 3], "index_dtype": np.int32},
+    {"x_shape": [3, 4], "x_dtype": np.int64, "index_shape": [3, 2], "index_dtype": np.int32},
+    {"x_shape": [3, 1], "x_dtype": np.int64, "index_shape": [3, 1], "index_dtype": np.int32},
+    {"x_shape": [10, 128], "x_dtype": np.int64, "index_shape": [10, 64], "index_dtype": np.int32},
     # float16 int64
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.float16,
-        "index_shape": [3, 3],
-        "index_dtype": np.int64,
-    },
-    {
-        "x_shape": [3, 4],
-        "x_dtype": np.float16,
-        "index_shape": [3, 2],
-        "index_dtype": np.int64,
-    },
-    {
-        "x_shape": [3, 1],
-        "x_dtype": np.float16,
-        "index_shape": [3, 1],
-        "index_dtype": np.int64,
-    },
-    {
-        "x_shape": [10, 128],
-        "x_dtype": np.float16,
-        "index_shape": [10, 64],
-        "index_dtype": np.int64,
-    },
+    {"x_shape": [3, 4], "x_dtype": np.float16, "index_shape": [3, 3], "index_dtype": np.int64},
+    {"x_shape": [3, 4], "x_dtype": np.float16, "index_shape": [3, 2], "index_dtype": np.int64},
+    {"x_shape": [3, 1], "x_dtype": np.float16, "index_shape": [3, 1], "index_dtype": np.int64},
+    {"x_shape": [10, 128], "x_dtype": np.float16, "index_shape": [10, 64], "index_dtype": np.int64},
 ]
+# fmt: on
 
 
 @ddt
@@ -137,7 +60,7 @@ class TestIndexSample(TestAPIBase):
             low=0, high=self.x_shape[1], size=self.index_shape
         ).astype(self.index_dtype)
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

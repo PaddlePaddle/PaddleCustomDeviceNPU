@@ -66,10 +66,137 @@ void BitwiseNotKernel(const Context& dev_ctx,
               dev_ctx);
   }
 }
+
+template <typename T, typename Context>
+void BitwiseOrKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::DenseTensor& y,
+                     phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("bitwise_or");
+  dev_ctx.template Alloc<T>(out);
+  if (LaunchAOTKernel()) {
+    LAUNCH_TOPSATENOP(topsatenBitwiseOr, dev_ctx, *out, x, y);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void BitwiseXorKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      const phi::DenseTensor& y,
+                      phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("bitwise_xor");
+  dev_ctx.template Alloc<T>(out);
+  if (LaunchAOTKernel()) {
+    LAUNCH_TOPSATENOP(topsatenBitwiseXor, dev_ctx, *out, x, y);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void BitwiseLeftShiftKernel(const Context& dev_ctx,
+                            const phi::DenseTensor& x,
+                            const phi::DenseTensor& y,
+                            bool is_arithmetic,
+                            phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("bitwise_left_shift");
+  dev_ctx.template Alloc<T>(out);
+  if (LaunchAOTKernel()) {
+    LAUNCH_TOPSATENOP(topsatenBitwiseLeftShift, dev_ctx, *out, x, y);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void BitwiseRightShiftKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::DenseTensor& y,
+                             bool is_arithmetic,
+                             phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("bitwise_right_shift");
+  dev_ctx.template Alloc<T>(out);
+  if (LaunchAOTKernel()) {
+    if (is_arithmetic) {
+      LAUNCH_TOPSATENOP(topsatenBitwiseRightShift, dev_ctx, *out, x, y);
+    } else {
+      PADDLE_THROW(
+          phi::errors::Unimplemented("Logical RightShift is unimplemented."));
+    }
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(
-    bitwise_and, gcu, ALL_LAYOUT, custom_kernel::BitwiseAndKernel, bool, int) {}
+PD_REGISTER_PLUGIN_KERNEL(bitwise_and,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::BitwiseAndKernel,
+                          bool,
+                          uint8_t,
+                          int8_t,
+                          int16_t,
+                          int,
+                          int64_t) {}
 
-PD_REGISTER_PLUGIN_KERNEL(
-    bitwise_not, gcu, ALL_LAYOUT, custom_kernel::BitwiseNotKernel, bool, int) {}
+PD_REGISTER_PLUGIN_KERNEL(bitwise_not,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::BitwiseNotKernel,
+                          bool,
+                          uint8_t,
+                          int8_t,
+                          int16_t,
+                          int,
+                          int64_t) {}
+
+PD_REGISTER_PLUGIN_KERNEL(bitwise_or,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::BitwiseOrKernel,
+                          bool,
+                          uint8_t,
+                          int8_t,
+                          int16_t,
+                          int,
+                          int64_t) {}
+
+PD_REGISTER_PLUGIN_KERNEL(bitwise_xor,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::BitwiseXorKernel,
+                          bool,
+                          uint8_t,
+                          int8_t,
+                          int16_t,
+                          int,
+                          int64_t) {}
+
+PD_REGISTER_PLUGIN_KERNEL(bitwise_left_shift,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::BitwiseLeftShiftKernel,
+                          bool,
+                          uint8_t,
+                          int8_t,
+                          int16_t,
+                          int,
+                          int64_t) {}
+
+// PD_REGISTER_PLUGIN_KERNEL(bitwise_right_shift,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::BitwiseRightShiftKernel,
+//                           bool,
+//                           uint8_t,
+//                           int8_t,
+//                           int16_t,
+//                           int,
+//                           int64_t) {}

@@ -19,28 +19,23 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 WHERE_CASE = [
     {"x_shape": [3, 2], "y_shape": [3, 2], "dtype": np.int32},
     {"x_shape": [3, 2], "y_shape": [3, 2], "dtype": np.float32},
     {"x_shape": [3, 1, 3], "y_shape": [3, 1, 3], "dtype": np.float32},
     {"x_shape": [1, 3, 128, 1], "y_shape": [1, 3, 128, 1], "dtype": np.float32},
-    {
-        "x_shape": [32, 3, 1, 128, 128],
-        "y_shape": [32, 3, 1, 128, 128],
-        "dtype": np.float32,
-    },
+    {"x_shape": [32, 3, 1, 128, 128], "y_shape": [32, 3, 1, 128, 128], "dtype": np.float32},
     {"x_shape": [1, 3, 128, 1], "y_shape": [1, 3, 128, 1], "dtype": np.float64},
     {"x_shape": [1, 3, 128, 1], "y_shape": [1, 3, 128, 1], "dtype": np.int64},
 ]
 
 WHERE_F16_CASE = [
     {"x_shape": [3, 2], "y_shape": [3, 2], "dtype": np.float16},
-    {
-        "x_shape": [32, 3, 1, 128, 128],
-        "y_shape": [32, 3, 1, 128, 128],
-        "dtype": np.float16,
-    },
+    {"x_shape": [32, 3, 1, 128, 128], "y_shape": [32, 3, 1, 128, 128], "dtype": np.float16},
 ]
+# fmt: on
 
 
 class TestWhere(TestAPIBase):
@@ -52,7 +47,7 @@ class TestWhere(TestAPIBase):
         self.y_shape = [3, 2]
         self.dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
         self.data_y = self.generate_data(self.y_shape, self.dtype)
 
@@ -107,7 +102,7 @@ class TestWhereNoneCommon(TestWhere):
 
 @ddt
 class TestWhereOtherCommon(TestWhere):
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
         self.data_y = self.generate_data(self.y_shape, self.dtype)
         self.data_z = self.generate_data(self.x_shape, np.float32)

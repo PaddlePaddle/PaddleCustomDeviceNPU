@@ -21,4 +21,5 @@ namespace env {
 const char *const kUseJitKernels = "PADDLE_GCU_USE_JIT_KERNELS_ONLY";
 const char *const kProfiler = "PADDLE_GCU_PROFILE";
 const char *const kStreamAsync = "PADDLE_RUN_ASYNC";
+const char *const kEnableTransOpt = "PADDLE_ENABLE_TRANSPOSE_OPT";
 }  // namespace env

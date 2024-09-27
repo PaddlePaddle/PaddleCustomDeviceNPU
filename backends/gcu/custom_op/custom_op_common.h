@@ -22,6 +22,9 @@
 namespace custom_op_common {
 paddle::Tensor CreateTensorFromDenseTensor(const phi::DenseTensor &x);
 
+paddle::optional<paddle::Tensor> CreateOptionalTensorFromOptionalDense(
+    const paddle::optional<phi::DenseTensor> &x);
+
 phi::DenseTensor CreateDenseTensorFromTernsor(const paddle::Tensor &x);
 
 std::vector<paddle::Tensor> FusedRotaryEmbedding(

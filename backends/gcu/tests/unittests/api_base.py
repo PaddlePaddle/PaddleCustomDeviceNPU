@@ -81,7 +81,7 @@ class TestAPIBase(unittest.TestCase):
             )
 
     def check_output_gcu_with_cpu(self, forward, rtol=1e-5, atol=1e-5):
-        self.prepare_datas()
+        self.prepare_data()
         gcu_out = self.calc_result(forward, "gcu")
         cpu_out = self.calc_result(forward, "cpu")
         # print(f"gcu_out:{gcu_out}")
@@ -94,7 +94,7 @@ class TestAPIBase(unittest.TestCase):
     def check_output_gcu_with_customized(
         self, forward, customized, rtol=1e-5, atol=1e-5
     ):
-        self.prepare_datas()
+        self.prepare_data()
         gcu_out = self.calc_result(forward, "gcu")
         cpu_out = self.calc_result(customized, "cpu")
         # print(f"gcu_out:{gcu_out}")
@@ -105,7 +105,7 @@ class TestAPIBase(unittest.TestCase):
             self.check_value(gcu_out, cpu_out, rtol, atol)
 
     def check_grad_gcu_with_cpu(self, backward, rtol=1e-5, atol=1e-5):
-        self.prepare_datas()
+        self.prepare_data()
         gcu_grad = self.calc_result(backward, "gcu")
         cpu_grad = self.calc_result(backward, "cpu")
         # print(f"gcu_grad:{gcu_grad}")
@@ -118,7 +118,7 @@ class TestAPIBase(unittest.TestCase):
     def check_grad_gcu_with_customized(
         self, backward, customized, rtol=1e-5, atol=1e-5
     ):
-        self.prepare_datas()
+        self.prepare_data()
         gcu_grad = self.calc_result(backward, "gcu")
         cpu_grad = self.calc_result(customized, "cpu")
         # print(f"gcu_grad:{gcu_grad}")

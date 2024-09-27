@@ -32,7 +32,8 @@ std::string TensorToString(const phi::DenseTensor &tensor) {
   if (tensor.initialized()) {
     ss << phi::DataTypeToString(tensor.dtype()) << ", ";
     ss << tensor.place() << ", ";
-    ss << "Shape(" << tensor.dims() << ")";
+    ss << "Shape(" << tensor.dims() << "), ";
+    ss << "layout:" << tensor.layout();
   } else {
     ss << "NOT_INITED";
   }
@@ -52,6 +53,23 @@ std::string TensorVectorToString(const std::vector<phi::DenseTensor> &tensors) {
     }
   }
   ss << "}";
+  return ss.str();
+}
+
+std::string TensorDetailsToString(const phi::DenseTensor &tensor) {
+  std::stringstream ss;
+  ss << "LoDTensor<";
+  if (tensor.initialized()) {
+    ss << phi::DataTypeToString(tensor.dtype()) << ", ";
+    ss << tensor.place() << ", ";
+    ss << "dims(" << tensor.dims() << "), ";
+    ss << "strides(" << tensor.strides() << "), ";
+    ss << "layout:" << tensor.layout() << ", ";
+    ss << "data:" << const_cast<void *>(tensor.data());
+  } else {
+    ss << "NOT_INITED";
+  }
+  ss << ">";
   return ss.str();
 }
 
@@ -155,8 +173,9 @@ std::vector<int64_t> ComputeBroadcastShape(
 
 void GcuOpMaybeStreamSync(const phi::DeviceContext &dev_ctx) {
   static const char *stream_async_env = std::getenv(env::kStreamAsync);
-  static bool stream_async =
-      (stream_async_env != nullptr && std::string(stream_async_env) == "true");
+  static bool stream_async = ((stream_async_env == nullptr) ||
+                              (stream_async_env != nullptr &&
+                               std::string(stream_async_env) == "true"));
   static bool stream_sync = ((VLOG(0) << "AOT kernel stream mode:"
                                       << (stream_async ? "async" : "sync")),
                              (!stream_async));

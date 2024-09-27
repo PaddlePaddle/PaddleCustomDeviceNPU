@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 MULTINOMIAL_CASE = [
     {"x_shape": [3, 16], "x_dtype": np.float32, "num_samples": 1, "replacement": False},
     {"x_shape": [3, 16], "x_dtype": np.float32, "num_samples": 1, "replacement": True},
@@ -34,6 +36,7 @@ MULTINOMIAL_CASE = [
     # {"x_shape": [3, 16], "x_dtype": np.float64, "num_samples": 3, "replacement": False},
     # {"x_shape": [3, 16], "x_dtype": np.float64, "num_samples": 3, "replacement": True},
 ]
+# fmt: on
 
 
 @ddt
@@ -47,7 +50,7 @@ class TestMultinomial(TestAPIBase):
         self.num_samples = 1
         self.replacement = False
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

@@ -25,15 +25,16 @@ void LogicalAndKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<bool>(out);
 
   if (LaunchAOTKernel()) {
-    phi::DenseTensor real_x = x;
-    phi::DenseTensor real_y = y;
-    if (x.dtype() != phi::DataType::BOOL) {
-      real_x = custom_kernel::Cast(dev_ctx, x, phi::DataType::BOOL);
-    }
-    if (y.dtype() != phi::DataType::BOOL) {
-      real_y = custom_kernel::Cast(dev_ctx, y, phi::DataType::BOOL);
-    }
-    LAUNCH_TOPSATENOP(topsatenBitwiseAnd, dev_ctx, *out, real_x, real_y);
+    // phi::DenseTensor real_x = x;
+    // phi::DenseTensor real_y = y;
+    // if (x.dtype() != phi::DataType::BOOL) {
+    //   real_x = custom_kernel::Cast(dev_ctx, x, phi::DataType::BOOL);
+    // }
+    // if (y.dtype() != phi::DataType::BOOL) {
+    //   real_y = custom_kernel::Cast(dev_ctx, y, phi::DataType::BOOL);
+    // }
+    // LAUNCH_TOPSATENOP(topsatenBitwiseAnd, dev_ctx, *out, real_x, real_y);
+    LAUNCH_TOPSATENOP(topsatenLogicalAnd, dev_ctx, *out, x, y);
 
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
@@ -67,10 +68,16 @@ void LogicalNotKernel(const Context& dev_ctx,
                       const phi::DenseTensor& x,
                       phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("logical_not");
-  dev_ctx.template Alloc<T>(out);
+  dev_ctx.template Alloc<bool>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    // phi::DenseTensor real_x = x;
+    // if (x.dtype() != phi::DataType::BOOL) {
+    //   real_x = custom_kernel::Cast(dev_ctx, x, phi::DataType::BOOL);
+    // }
+    // LAUNCH_TOPSATENOP(topsatenBitwiseNot, dev_ctx, *out, real_x);
+    LAUNCH_TOPSATENOP(topsatenLogicalNot, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
@@ -101,19 +108,46 @@ void LogicalOrKernel(const Context& dev_ctx,
                      const phi::DenseTensor& x,
                      const phi::DenseTensor& y,
                      phi::DenseTensor* out) {
-  PADDLE_GCU_KERNEL_TRACE("logical_not");
-  dev_ctx.template Alloc<T>(out);
+  PADDLE_GCU_KERNEL_TRACE("logical_or");
+  dev_ctx.template Alloc<bool>(out);
 
   if (LaunchAOTKernel()) {
-    phi::DenseTensor real_x = x;
-    phi::DenseTensor real_y = y;
-    if (x.dtype() != phi::DataType::BOOL) {
-      real_x = custom_kernel::Cast(dev_ctx, x, phi::DataType::BOOL);
-    }
-    if (y.dtype() != phi::DataType::BOOL) {
-      real_y = custom_kernel::Cast(dev_ctx, y, phi::DataType::BOOL);
-    }
-    LAUNCH_TOPSATENOP(topsatenBitwiseOr, dev_ctx, *out, real_x, real_y);
+    // phi::DenseTensor real_x = x;
+    // phi::DenseTensor real_y = y;
+    // if (x.dtype() != phi::DataType::BOOL) {
+    //   real_x = custom_kernel::Cast(dev_ctx, x, phi::DataType::BOOL);
+    // }
+    // if (y.dtype() != phi::DataType::BOOL) {
+    //   real_y = custom_kernel::Cast(dev_ctx, y, phi::DataType::BOOL);
+    // }
+    // LAUNCH_TOPSATENOP(topsatenBitwiseOr, dev_ctx, *out, real_x, real_y);
+    LAUNCH_TOPSATENOP(topsatenLogicalOr, dev_ctx, *out, x, y);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void LogicalXorKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      const phi::DenseTensor& y,
+                      phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("logical_xor");
+  dev_ctx.template Alloc<bool>(out);
+
+  if (LaunchAOTKernel()) {
+    // phi::DenseTensor real_x = x;
+    // phi::DenseTensor real_y = y;
+    // if (x.dtype() != phi::DataType::BOOL) {
+    //   real_x = custom_kernel::Cast(dev_ctx, x, phi::DataType::BOOL);
+    // }
+    // if (y.dtype() != phi::DataType::BOOL) {
+    //   real_y = custom_kernel::Cast(dev_ctx, y, phi::DataType::BOOL);
+    // }
+    // LAUNCH_TOPSATENOP(topsatenBitwiseOr, dev_ctx, *out, real_x, real_y);
+    LAUNCH_TOPSATENOP(topsatenLogicalXor, dev_ctx, *out, x, y);
+
   } else {  // kernel impl base on JIT
     THROW_JIT_UNIMPLEMENTED();
   }
@@ -144,6 +178,16 @@ PD_REGISTER_PLUGIN_KERNEL(logical_or,
                           gcu,
                           ALL_LAYOUT,
                           custom_kernel::LogicalOrKernel,
+                          bool,
+                          float,
+                          phi::dtype::float16) {
+  kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
+}
+
+PD_REGISTER_PLUGIN_KERNEL(logical_xor,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::LogicalXorKernel,
                           bool,
                           float,
                           phi::dtype::float16) {

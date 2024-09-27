@@ -18,6 +18,8 @@ import unittest
 from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SET_VALUE_CASE = [
     {"x_shape": [8, 9, 10], "x_dtype": np.float32},
     {"x_shape": [6, 8, 9, 10], "x_dtype": np.float32},
@@ -26,6 +28,7 @@ SET_VALUE_CASE = [
     {"x_shape": [8, 9, 10], "x_dtype": np.int64},
     {"x_shape": [6, 8, 9, 10], "x_dtype": np.int64},
 ]
+# fmt: on
 
 
 @ddt
@@ -37,7 +40,7 @@ class TestSetValueBase(TestAPIBase):
         self.x_shape = [2, 3, 4]
         self.x_dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def _call_setitem(self, x):

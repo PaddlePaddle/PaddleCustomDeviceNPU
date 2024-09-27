@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 ARANGE_CASE = [
     {"input_case": (0, 1, 0.2), "input_dtype": np.float32, "out_dtype": np.float32},
     {"input_case": (0, 1, 0.3), "input_dtype": np.float32, "out_dtype": np.float32},
@@ -36,6 +38,7 @@ ARANGE_CASE = [
     {"input_case": (0, 10, 3), "input_dtype": np.int32, "out_dtype": np.float32},
     {"input_case": (0, 10, 3), "input_dtype": np.int32, "out_dtype": None},
 ]
+# fmt: on
 
 
 @ddt
@@ -48,7 +51,7 @@ class TestArange(TestAPIBase):
         self.input_dtype = np.float32
         self.out_dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_start = np.array([self.input_case[0]]).astype(self.input_dtype)
         self.data_end = np.array([self.input_case[1]]).astype(self.input_dtype)
         self.data_step = np.array([self.input_case[2]]).astype(self.input_dtype)

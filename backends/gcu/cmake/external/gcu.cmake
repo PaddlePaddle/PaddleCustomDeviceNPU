@@ -17,20 +17,14 @@ set(TOPS_INCLUDE_DIR "/usr/include/tops")
 set(TOPSTX_INCLUDE_DIR "/usr/include/topstx")
 set(GCU_LIB_DIR "/usr/lib")
 set(TOPS_LIB_DIR "/opt/tops/lib")
-set(OP_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/kernels/topsflame/include/")
-set(TOPSOP_LIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/kernels/topsflame/")
 
 set(TOPS_VERSION "???")
 
 include_directories(${GCU_INCLUDE_DIR} ${TOPS_INCLUDE_DIR}
-                    ${TOPSTX_INCLUDE_DIR} ${OP_INCLUDE_DIR})
+                    ${TOPSTX_INCLUDE_DIR})
 
 find_library(SDK_LIB NAMES dtu_sdk ${GCU_LIB_DIR})
 find_library(ECCL_LIB NAMES eccl ${GCU_LIB_DIR})
-find_library(
-  RUNTIME_LIB
-  NAMES efrt ${GCU_LIB_DIR}
-  HINTS ${TOPS_LIB_DIR})
 find_library(
   TOPS_RT_LIB
   NAMES topsrt ${GCU_LIB_DIR}
@@ -40,9 +34,17 @@ find_library(
   NAMES topstx ${GCU_LIB_DIR}
   HINTS ${TOPS_LIB_DIR})
 find_library(TOPSATENOP_LIB NAMES topsaten ${GCU_LIB_DIR})
+find_library(TOPSCL_LIB NAMES topscl ${GCU_LIB_DIR})
 
-set(GCU_LIBS ${SDK_LIB} ${ECCL_LIB} ${RUNTIME_LIB} ${TOPS_RT_LIB} ${TOPSTX_LIB}
-             ${TOPSATENOP_LIB})
+set(GCU_LIBS
+    -Wl,--no-as-needed
+    ${SDK_LIB}
+    ${ECCL_LIB}
+    ${TOPS_RT_LIB}
+    ${TOPSTX_LIB}
+    ${TOPSATENOP_LIB}
+    ${TOPSCL_LIB}
+    -Wl,--as-needed)
 
 set(VERSION_REGEX "( [0-9]+\.[0-9]+\.(RC)?[0-9]*) ")
 macro(find_gcu_version component)

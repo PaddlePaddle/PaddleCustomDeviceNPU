@@ -42,16 +42,12 @@ void SwiGLUKernel(const Context& dev_ctx,
       std::vector<topsatenTensor> in_tensors = {CreateTopsatenTensor(x),
                                                 CreateTopsatenTensor(y.get())};
       auto out_tensor = CreateTopsatenTensor(concat_output);
-
-      auto stream = static_cast<topsStream_t>(dev_ctx.stream());
       int64_t axis = rank - 1;
-
-      VLOG(3) << "SwiGLUKernel, use topsatenCat, x dims:" << x.dims()
-              << ", x dims:" << y.get().dims() << ", out dims:" << out->dims()
-              << ", stream: " << stream;
-
-      ATEN_OP_CALL_MAYBE_SYNC(
-          topsaten::topsatenCat(out_tensor, in_tensors, axis, stream), dev_ctx);
+      std::vector<phi::DenseTensor> concat_ins = {x, y.get()};
+      std::string abstract_info = custom_kernel::GetAbstractInfo(
+          "topsatenCat", concat_output, concat_ins, axis);
+      LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+          topsatenCat, dev_ctx, abstract_info, out_tensor, in_tensors, axis);
       input_x = concat_output;
     }
     LAUNCH_TOPSATENOP(topsvllmSiluAndMul, dev_ctx, *out, input_x);

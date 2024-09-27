@@ -40,20 +40,21 @@ void IndexPutKernel(const Context& dev_ctx,
     phi::DenseTensor output =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
     auto out_tensor = CreateTopsatenTensor(output);
-    auto stream = static_cast<topsStream_t>(dev_ctx.stream());
-
-    VLOG(3) << "IndexPutKernel, use topsatenIndexPut, indices size:"
-            << indices.size() << ", x shape:" << x.dims().to_str()
-            << ", value shape:" << value.dims().to_str()
-            << ", out shape:" << out->dims().to_str() << ", stream: " << stream;
-
-    ATEN_OP_CALL_MAYBE_SYNC(topsaten::topsatenIndexPut(out_tensor,
-                                                       input_tensor,
-                                                       indices_tensors,
-                                                       value_tensor,
-                                                       accumulate,
-                                                       stream),
-                            dev_ctx);
+    std::string abstract_info =
+        custom_kernel::GetAbstractInfo("topsatenIndexPut",
+                                       output,
+                                       input_x,
+                                       input_indices,
+                                       input_value,
+                                       accumulate);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenIndexPut,
+                                        dev_ctx,
+                                        abstract_info,
+                                        out_tensor,
+                                        input_tensor,
+                                        indices_tensors,
+                                        value_tensor,
+                                        accumulate);
     MaybeTransResult(dev_ctx, output, out);
 
   } else {  // kernel impl base on JIT

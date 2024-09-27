@@ -21,35 +21,55 @@ void MeshgridKernel(const Context& dev_ctx,
                     const std::vector<const phi::DenseTensor*>& ins,
                     std::vector<phi::DenseTensor*> outs) {
   PADDLE_GCU_KERNEL_TRACE("meshgrid");
+  size_t tensor_size = ins.size();
   PADDLE_ENFORCE_EQ(
-      (ins.size() > 1) && (ins.size() < 7),
+      (tensor_size > 1) && (tensor_size < 7),
       true,
       phi::errors::InvalidArgument(
           "Excepted Tensor numbers between 2 and 6, but received %zu.",
-          ins.size()));
+          tensor_size));
 
   PADDLE_ENFORCE_EQ(
-      ins.size(),
+      tensor_size,
       outs.size(),
       phi::errors::InvalidArgument(
           "Excepted input size equals to output size, but received %zu vs %zu.",
-          ins.size(),
+          tensor_size,
           outs.size()));
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    std::vector<topsatenTensor> inputs;
+    std::vector<topsatenTensor> outputs;
+    inputs.reserve(tensor_size);
+    outputs.reserve(tensor_size);
+
+    for (size_t i = 0; i < tensor_size; ++i) {
+      inputs.emplace_back(CreateTopsatenTensor(*(ins[i])));
+      dev_ctx.template Alloc<T>(outs[i]);
+      outputs.emplace_back(CreateTopsatenTensor(*(outs[i])));
+    }
+    const std::string index = "ij";
+    std::string abstract_info =
+        custom_kernel::GetAbstractInfo("topsatenMeshgrid", outs, ins, index);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenMeshgrid,
+                                        dev_ctx,
+                                        abstract_info,
+                                        outputs,
+                                        inputs,
+                                        index.c_str());
+
   } else {  // kernel impl base on JIT
     std::vector<std::string> in_names;
-    in_names.reserve(ins.size());
+    in_names.reserve(tensor_size);
     std::vector<phi::DenseTensor*> in_tensors;
-    in_tensors.reserve(ins.size());
+    in_tensors.reserve(tensor_size);
 
     std::vector<std::string> out_names;
     out_names.reserve(outs.size());
     std::vector<phi::DenseTensor*> out_tensors;
     out_tensors.reserve(outs.size());
 
-    for (size_t i = 0; i < ins.size(); ++i) {
+    for (size_t i = 0; i < tensor_size; ++i) {
       in_names.emplace_back(std::string("x") + std::to_string(i));
       out_names.emplace_back(std::string("out") + std::to_string(i));
 

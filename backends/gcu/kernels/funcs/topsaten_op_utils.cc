@@ -19,16 +19,19 @@
 
 namespace custom_kernel {
 
-topsatenTensor CreateTopsatenTensor(const phi::DenseTensor &tensor) {
-  PADDLE_ENFORCE_EQ(
-      tensor.initialized(),
-      true,
-      phi::errors::InvalidArgument("Gcu tensor should be inited"));
-  PADDLE_ENFORCE_EQ(
-      tensor.place().GetDeviceType(),
-      "gcu",
-      phi::errors::InvalidArgument("Not gcu tensor, current tensor place: %s",
-                                   tensor.place().GetDeviceType().c_str()));
+topsatenTensor CreateTopsatenTensor(const phi::DenseTensor &tensor,
+                                    bool pinned) {
+  if (UNLIKELY(!tensor.initialized())) {
+    VLOG(6) << "Create default topsatenTensor.";
+    return topsatenTensor();
+  }
+  if (LIKELY(!pinned)) {
+    PADDLE_ENFORCE_EQ(
+        tensor.place().GetDeviceType(),
+        "gcu",
+        phi::errors::InvalidArgument("Not gcu tensor, current tensor place: %s",
+                                     tensor.place().GetDeviceType().c_str()));
+  }
 
   std::vector<int64_t> tensor_dims = phi::vectorize(tensor.dims());
   std::vector<int64_t> strides = phi::vectorize(tensor.strides());
@@ -44,12 +47,10 @@ topsatenTensor CreateTopsatenTensor(const phi::DenseTensor &tensor) {
   VLOG(6) << "topsopCreateTensor, input tensor:" << TensorToString(tensor);
 
   auto xt = topsatenTensor(xdims, xstrides, xdtype, GcuDataPtr(tensor));
-  auto t_dims = xt.GetTensorShape();
-  auto t_strides = xt.GetTensorStrides();
-  auto t_dtype = xt.GetTensorDataType();
   VLOG(6) << "Create tensor handle successfully with\n"
-          << "dims: " << t_dims << "\nstrides: " << t_strides
-          << "\ndtype: " << t_dtype;
+          << "dims: " << xt.GetTensorShape()
+          << "\nstrides: " << xt.GetTensorStrides()
+          << "\ndtype: " << xt.GetTensorDataType();
   return xt;
 }
 
@@ -60,6 +61,36 @@ topsatenTensor OptionalTensorToTopsatenTensor(
   } else {
     return {};
   }
+}
+
+topsatenTensor CreateTopsatenTensorWithoutInitialized(
+    const phi::DenseTensor &tensor) {
+  PADDLE_ENFORCE_EQ(
+      tensor.initialized(),
+      false,
+      phi::errors::InvalidArgument(
+          "Tensor is initialized, please use CreateTopsatenTensor api."));
+
+  std::vector<int64_t> tensor_dims = phi::vectorize(tensor.dims());
+  std::vector<int64_t> strides = phi::vectorize(tensor.strides());
+  int64_t rank = tensor_dims.size();
+  if (rank == 0) {
+    rank = 1;
+    tensor_dims = {1};
+    strides = {1};
+  }
+  auto xdims = topsatenSize_t{tensor_dims.data(), rank};
+  auto xstrides = topsatenSize_t{strides.data(), rank};
+  auto xdtype = DataTypeToTopsatenDataType(tensor.dtype());
+  VLOG(6) << "CreateTopsatenTensorWithoutInitialized, input tensor:"
+          << TensorToString(tensor);
+
+  auto xt = topsatenTensor(xdims, xstrides, xdtype, nullptr);
+  VLOG(6) << "Create tensor handle successfully with\n"
+          << "dims: " << xt.GetTensorShape()
+          << "\nstrides: " << xt.GetTensorStrides()
+          << "\ndtype: " << xt.GetTensorDataType();
+  return xt;
 }
 
 topsatenDataType_t DataTypeToTopsatenDataType(const phi::DataType &dtype) {

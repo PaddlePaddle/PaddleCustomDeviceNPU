@@ -19,72 +19,28 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 EINSUM_CASE = [
-    {
-        "equation": "i->",
-        "x_shapes": [
-            (4),
-        ],
-        "dtype": np.float32,
-    },
-    {"equation": "i,i->", "x_shapes": [(4), (4)], "dtype": np.float32},
-    {"equation": "i,j->ij", "x_shapes": [(4), (5)], "dtype": np.float32},
-    {"equation": "ijk->kji", "x_shapes": [(2, 3, 2)], "dtype": np.float32},
-    {
-        "equation": "ijk, ikl->ijl",
-        "x_shapes": [(2, 3, 2), (2, 2, 3)],
-        "dtype": np.float32,
-    },
-    {
-        "equation": "...jk->...kj",
-        "x_shapes": [
-            (2, 3, 2),
-        ],
-        "dtype": np.float32,
-    },
-    {
-        "equation": "...jk, ...kl->...jl",
-        "x_shapes": [(2, 3, 2), (2, 2, 3)],
-        "dtype": np.float32,
-    },
-    {
-        "equation": "mij,jk->ki",
-        "x_shapes": [(10, 10, 20), (20, 6)],
-        "dtype": np.float32,
-    },
-    {
-        "equation": "i->",
-        "x_shapes": [
-            (4),
-        ],
-        "dtype": np.float16,
-    },
-    {"equation": "i,i->", "x_shapes": [(4), (4)], "dtype": np.float16},
-    {"equation": "i,j->ij", "x_shapes": [(4), (5)], "dtype": np.float16},
-    {"equation": "ijk->kji", "x_shapes": [(2, 3, 2)], "dtype": np.float16},
-    {
-        "equation": "ijk, ikl->ijl",
-        "x_shapes": [(2, 3, 2), (2, 2, 3)],
-        "dtype": np.float16,
-    },
-    {
-        "equation": "...jk->...kj",
-        "x_shapes": [
-            (2, 3, 2),
-        ],
-        "dtype": np.float16,
-    },
-    {
-        "equation": "...jk, ...kl->...jl",
-        "x_shapes": [(2, 3, 2), (2, 2, 3)],
-        "dtype": np.float16,
-    },
-    {
-        "equation": "mij,jk->ki",
-        "x_shapes": [(10, 10, 20), (20, 6)],
-        "dtype": np.float16,
-    },
+    {"equation": 'i->', "x_shapes": [(4), ], "dtype": np.float32},
+    {"equation": 'i,i->', "x_shapes": [(4), (4)], "dtype": np.float32},
+    {"equation": 'i,j->ij', "x_shapes": [(4), (5)], "dtype": np.float32},
+    {"equation": 'ijk->kji', "x_shapes": [(2, 3, 2)], "dtype": np.float32},
+    {"equation": 'ijk, ikl->ijl', "x_shapes": [(2, 3, 2), (2, 2, 3)], "dtype": np.float32},
+    {"equation": '...jk->...kj', "x_shapes": [(2, 3, 2), ], "dtype": np.float32},
+    {"equation": '...jk, ...kl->...jl', "x_shapes": [(2, 3, 2), (2, 2, 3)], "dtype": np.float32},
+    {"equation": 'mij,jk->ki', "x_shapes": [(10, 10, 20), (20, 6)], "dtype": np.float32},
+    {"equation": 'i->', "x_shapes": [(4), ], "dtype": np.float16},
+    {"equation": 'i,i->', "x_shapes": [(4), (4)], "dtype": np.float16},
+    {"equation": 'i,j->ij', "x_shapes": [(4), (5)], "dtype": np.float16},
+    {"equation": 'ijk->kji', "x_shapes": [(2, 3, 2)], "dtype": np.float16},
+    {"equation": 'ijk, ikl->ijl', "x_shapes": [(2, 3, 2), (2, 2, 3)], "dtype": np.float16},
+    {"equation": '...jk->...kj', "x_shapes": [(2, 3, 2), ], "dtype": np.float16},
+    {"equation": '...jk, ...kl->...jl', "x_shapes": [(2, 3, 2), (2, 2, 3)], "dtype": np.float16},
+    {"equation": 'mij,jk->ki', "x_shapes": [(10, 10, 20), (20, 6)], "dtype": np.float16},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -97,7 +53,7 @@ class TestCumsum(TestAPIBase):
         self.shapes = [(10, 10, 20), (20, 6)]
         self.equation = "mij,jk->ki"
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.inputs = []
         for shape in self.shapes:
             self.inputs.append(self.generate_data(shape, self.dtype))

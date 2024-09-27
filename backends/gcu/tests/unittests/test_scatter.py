@@ -19,142 +19,38 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SCATTER_CASE = [
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": [1],
-        "index_dtype": np.int32,
-        "updates_shape": [1, 2],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int32,
-        "updates_shape": [2, 3],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": [1],
-        "index_dtype": np.int32,
-        "updates_shape": [1, 2],
-        "overwrite": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int32,
-        "updates_shape": [2, 3],
-        "overwrite": False,
-    },
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1], "index_dtype": np.int32, "updates_shape": [1, 2], "overwrite": True},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int32, "updates_shape": [2, 3], "overwrite": True},
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1], "index_dtype": np.int32, "updates_shape": [1, 2], "overwrite": False},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int32, "updates_shape": [2, 3], "overwrite": False},
     # TopsFlame not support float16
     # {"x_shape": [3, 2], "x_dtype": np.float16, "index": [1], "index_dtype": np.int32, "updates_shape": [1, 2], "overwrite": True},
     # {"x_shape": [3, 3], "x_dtype": np.float16, "index": [1, 2], "index_dtype": np.int32, "updates_shape": [2, 3], "overwrite": True},
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": [1],
-        "index_dtype": np.int64,
-        "updates_shape": [1, 2],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "updates_shape": [2, 3],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index": [1],
-        "index_dtype": np.int64,
-        "updates_shape": [1, 2],
-        "overwrite": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "updates_shape": [2, 3],
-        "overwrite": False,
-    },
+
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": True},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": True},
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": False},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": False},
     # TopsFlame not support float16
     # {"x_shape": [3, 2], "x_dtype": np.float16, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": True},
     # {"x_shape": [3, 3], "x_dtype": np.float16, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": True},
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.int32,
-        "index": [1],
-        "index_dtype": np.int64,
-        "updates_shape": [1, 2],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.int32,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "updates_shape": [2, 3],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.int32,
-        "index": [1],
-        "index_dtype": np.int64,
-        "updates_shape": [1, 2],
-        "overwrite": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.int32,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "updates_shape": [2, 3],
-        "overwrite": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.int64,
-        "index": [1],
-        "index_dtype": np.int64,
-        "updates_shape": [1, 2],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.int64,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "updates_shape": [2, 3],
-        "overwrite": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.int64,
-        "index": [1],
-        "index_dtype": np.int64,
-        "updates_shape": [1, 2],
-        "overwrite": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.int64,
-        "index": [1, 2],
-        "index_dtype": np.int64,
-        "updates_shape": [2, 3],
-        "overwrite": False,
-    },
+
+    {"x_shape": [3, 2], "x_dtype": np.int32, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": True},
+    {"x_shape": [3, 3], "x_dtype": np.int32, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": True},
+    {"x_shape": [3, 2], "x_dtype": np.int32, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": False},
+    {"x_shape": [3, 3], "x_dtype": np.int32, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": False},
+
+    {"x_shape": [3, 2], "x_dtype": np.int64, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": True},
+    {"x_shape": [3, 3], "x_dtype": np.int64, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": True},
+    {"x_shape": [3, 2], "x_dtype": np.int64, "index": [1], "index_dtype": np.int64, "updates_shape": [1, 2], "overwrite": False},
+    {"x_shape": [3, 3], "x_dtype": np.int64, "index": [1, 2], "index_dtype": np.int64, "updates_shape": [2, 3], "overwrite": False},
+
+
 ]
+# fmt: on
 
 
 @ddt
@@ -170,7 +66,7 @@ class TestScatter(TestAPIBase):
         self.updates_shape = [1, 2]
         self.overwrite = True
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
         self.updates = self.generate_data(self.updates_shape, self.x_dtype)
 

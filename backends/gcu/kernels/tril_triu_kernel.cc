@@ -80,7 +80,13 @@ void TrilTriuKernel(const Context& ctx,
                     phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("tril_triu");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    ctx.template Alloc<T>(out);
+    if (lower) {
+      LAUNCH_TOPSATENOP(topsatenTril, ctx, *out, x, diagonal);
+    } else {
+      LAUNCH_TOPSATENOP(topsatenTriu, ctx, *out, x, diagonal);
+    }
+
   } else {  // kernel impl base on JIT
     custom_kernel::TrilTriuCommon<T, Context>(
         "tril_triu", ctx, x, diagonal, lower, out);

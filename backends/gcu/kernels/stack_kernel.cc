@@ -25,22 +25,26 @@ void StackKernel(const Context& dev_ctx,
   PADDLE_GCU_KERNEL_TRACE("stack");
   dev_ctx.template Alloc<T>(y);
   if (LaunchAOTKernel()) {
-    auto out_tensor = CreateTopsatenTensor(*y);
+    phi::DenseTensor output = MaybeCreateOrTrans64To32bits(dev_ctx, *y, false);
+    auto out_tensor = CreateTopsatenTensor(output);
 
-    std::vector<topsatenTensor> in_tensors;
+    std::vector<phi::DenseTensor> input_tensors;
     for (const auto& in : x) {
-      in_tensors.emplace_back(CreateTopsatenTensor(*in));
+      input_tensors.emplace_back(MaybeCreateOrTrans64To32bits(dev_ctx, *in));
+    }
+    std::vector<topsatenTensor> in_tensors;
+    for (const auto& in : input_tensors) {
+      in_tensors.emplace_back(CreateTopsatenTensor(in));
     }
     int64_t dim = static_cast<int64_t>(axis);
     if (dim < 0 && !x.empty()) {
       dim += x[0]->dims().size() + 1;
     }
-    auto stream = static_cast<topsStream_t>(dev_ctx.stream());
-    VLOG(3) << "StackKernel, use topsatenStack, input size:"
-            << in_tensors.size() << ", axis:" << dim << ", stream: " << stream;
-
-    ATEN_OP_CALL_MAYBE_SYNC(
-        topsaten::topsatenStack(out_tensor, in_tensors, dim, stream), dev_ctx);
+    std::string abstract_info = custom_kernel::GetAbstractInfo(
+        "topsatenStack", output, input_tensors, dim);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+        topsatenStack, dev_ctx, abstract_info, out_tensor, in_tensors, dim);
+    MaybeTransResult(dev_ctx, output, y);
 
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
@@ -113,6 +117,39 @@ void StackGradKernel(const Context& dev_ctx,
   }
 }
 
+template <typename T, typename Context>
+void UnStackKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   int axis,
+                   int num,
+                   std::vector<phi::DenseTensor*> outs) {
+  PADDLE_GCU_KERNEL_TRACE("unstack");
+  if (LaunchAOTKernel()) {
+    for (auto y : outs) {
+      dev_ctx.template Alloc<T>(y);
+    }
+    LAUNCH_TOPSCLOP(unstack, dev_ctx, &outs, x, axis)
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void UnbindKernel(const Context& dev_ctx,
+                  const phi::DenseTensor& x,
+                  int axis,
+                  std::vector<phi::DenseTensor*> outs) {
+  PADDLE_GCU_KERNEL_TRACE("unbind");
+  if (LaunchAOTKernel()) {
+    for (auto y : outs) {
+      dev_ctx.template Alloc<T>(y);
+    }
+    LAUNCH_TOPSCLOP(unstack, dev_ctx, &outs, x, axis)
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(stack,
@@ -120,6 +157,8 @@ PD_REGISTER_PLUGIN_KERNEL(stack,
                           ALL_LAYOUT,
                           custom_kernel::StackKernel,
                           int,
+                          int64_t,
+                          double,
                           float,
                           phi::dtype::float16) {}
 
@@ -131,3 +170,23 @@ PD_REGISTER_PLUGIN_KERNEL(stack_grad,
                           int64_t,
                           float,
                           double) {}
+
+PD_REGISTER_PLUGIN_KERNEL(unstack,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::UnStackKernel,
+                          int,
+                          int64_t,
+                          double,
+                          float,
+                          phi::dtype::float16) {}
+
+PD_REGISTER_PLUGIN_KERNEL(unbind,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::UnbindKernel,
+                          int,
+                          int64_t,
+                          double,
+                          float,
+                          phi::dtype::float16) {}

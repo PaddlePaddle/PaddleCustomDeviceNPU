@@ -46,6 +46,72 @@ inline phi::DDim GetDimsWithAxis(const phi::DDim& x_dims,
   }
   return phi::make_ddim(y_shape);
 }
+
+std::vector<phi::DenseTensor> PaddingDims(const phi::DenseTensor& x,
+                                          const phi::DenseTensor& y,
+                                          const int axis) {
+  auto x_dims = x.dims();
+  auto y_dims = y.dims();
+  phi::DenseTensor x_tensor(x);
+  phi::DenseTensor y_tensor(y);
+
+  auto fixed_axis =
+      (axis == -1 ? std::abs(x_dims.size() - y_dims.size()) : axis);
+
+  if (x_dims.size() >= y_dims.size()) {
+    y_tensor.Resize(GetDimsWithAxis(x_dims, y_dims, fixed_axis));
+  } else {
+    x_tensor.Resize(GetDimsWithAxis(y_dims, x_dims, fixed_axis));
+  }
+  return {x_tensor, y_tensor};
+}
+
+bool NeedTranspose(const phi::DenseTensor& tensor) {
+  auto dims = common::vectorize(tensor.dims());
+  return std::count(dims.begin(), dims.end(), 1) < 3;
+}
+
+bool UnifyLayout(const phi::CustomContext& dev_ctx,
+                 phi::DenseTensor& x,    // NOLINT
+                 phi::DenseTensor& y) {  // NOLINT
+  if (!EnableTransposeOptimize()) {
+    return false;
+  }
+  if ((x.layout() != common::DataLayout::kNHWC) &&
+      (y.layout() != common::DataLayout::kNHWC)) {  // x: NCHW,  y: NCHW
+    return false;
+  }
+
+  PADDLE_ENFORCE_EQ(
+      x.dims().size(),
+      4,
+      phi::errors::InvalidArgument("Only support 4D tensor, but get x rank %d.",
+                                   x.dims().size()));
+  PADDLE_ENFORCE_EQ(
+      y.dims().size(),
+      4,
+      phi::errors::InvalidArgument("Only support 4D tensor, but get y rank %d.",
+                                   x.dims().size()));
+
+  if ((x.layout() == common::DataLayout::kNHWC) &&
+      (y.layout() == common::DataLayout::kNHWC)) {  // x: NHWC,  y: NHWC
+    PdCustomNHWCRepresentAsOriginNHWC(x);
+    PdCustomNHWCRepresentAsOriginNHWC(y);
+  } else if ((x.layout() == common::DataLayout::kNHWC) &&
+             (y.layout() != common::DataLayout::kNHWC)) {  // x: NHWC,  y: NCHW
+    PdCustomNHWCRepresentAsOriginNHWC(x);
+    y = NeedTranspose(y) ? NCHWTransToPdOriginNHWC(dev_ctx, y)
+                         : NoNeedTransNCHWRepresentAsOriginNHWC(y);
+  } else if ((x.layout() != common::DataLayout::kNHWC) &&
+             (y.layout() == common::DataLayout::kNHWC)) {  // x: NCHW,  y: NHWC
+    x = NeedTranspose(x) ? NCHWTransToPdOriginNHWC(dev_ctx, x)
+                         : NoNeedTransNCHWRepresentAsOriginNHWC(x);
+    PdCustomNHWCRepresentAsOriginNHWC(y);
+  }
+
+  return true;
+}
+
 }  // namespace
 
 template <typename T, typename Context>
@@ -140,64 +206,56 @@ void ElementBaseGradKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void AddKernel(const Context& dev_ctx,
-               const phi::DenseTensor& x,
-               const phi::DenseTensor& y,
-               phi::DenseTensor* out) {
-  PADDLE_GCU_KERNEL_TRACE("add");
-  if (LaunchAOTKernel()) {
-    dev_ctx.template Alloc<T>(out);
-    auto scalar = phi::Scalar(1.0f);
-    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
-    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
-    phi::DenseTensor output_z =
-        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
-    LAUNCH_TOPSATENOP(topsatenAdd, dev_ctx, output_z, input_x, input_y, scalar);
-    MaybeTransResult(dev_ctx, output_z, out);
-
-  } else {  // kernel impl base on JIT
-    ElementBaseKernel<T, Context>(dev_ctx, x, y, -1, out, "elementwise_add");
-  }
-}
-
-template <typename T, typename Context>
 void AddRawKernel(const Context& dev_ctx,
                   const phi::DenseTensor& x,
                   const phi::DenseTensor& y,
                   int axis,
                   phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("add_raw");
-  if (axis == -1) {
-    custom_kernel::AddKernel<T, Context>(dev_ctx, x, y, out);
-    return;
-  }
   if (LaunchAOTKernel()) {
-    PADDLE_ENFORCE_GE(
-        axis,
-        0,
-        phi::errors::InvalidArgument(
-            "axis should greater or equal than 0, but get %d.", axis));
     dev_ctx.template Alloc<T>(out);
-    auto x_dims = x.dims();
-    auto y_dims = y.dims();
-    phi::DenseTensor x_tensor(x);
-    phi::DenseTensor y_tensor(y);
-    if (x_dims.size() >= y_dims.size()) {
-      y_tensor.Resize(GetDimsWithAxis(x_dims, y_dims, axis));
-    } else {
-      x_tensor.Resize(GetDimsWithAxis(y_dims, x_dims, axis));
-    }
+    auto padding_shapes = PaddingDims(x, y, axis);
     auto scalar = phi::Scalar(1.0f);
-    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x_tensor);
-    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y_tensor);
+    phi::DenseTensor input_x =
+        MaybeCreateOrTrans64To32bits(dev_ctx, padding_shapes[0]);
+    phi::DenseTensor input_y =
+        MaybeCreateOrTrans64To32bits(dev_ctx, padding_shapes[1]);
     phi::DenseTensor output_z =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+
+    // VLOG(6) << "Transpose debug, AddKernel add_raw input_x:"
+    //           << custom_kernel::TensorDetailsToString(input_x);
+    // VLOG(6) << "Transpose debug, AddKernel add_raw input_y:"
+    //           << custom_kernel::TensorDetailsToString(input_y);
+
+    bool input_nhwc = UnifyLayout(dev_ctx, input_x, input_y);
+    if (input_nhwc) {
+      PdCustomNHWCRepresentAsOriginNHWC(output_z, true);
+    }
+
     LAUNCH_TOPSATENOP(topsatenAdd, dev_ctx, output_z, input_x, input_y, scalar);
+    if (input_nhwc) {
+      OriginNHWCRepresentAsPdCustomNHWC(output_z);
+      RepresentPdCustomNHWC(*out);
+    }
     MaybeTransResult(dev_ctx, output_z, out);
+    VLOG(6) << "Transpose debug, AddKernel output add raw:"
+            << custom_kernel::TensorDetailsToString(*out);
 
   } else {  // kernel impl base on JIT
     ElementBaseKernel<T, Context>(dev_ctx, x, y, axis, out, "elementwise_add");
   }
+}
+
+template <typename T, typename Context>
+void AddKernel(const Context& dev_ctx,
+               const phi::DenseTensor& x,  // NHWC
+               const phi::DenseTensor& y,  // NCHW
+               phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("add");
+  custom_kernel::AddRawKernel<T, Context>(dev_ctx, x, y, -1, out);
+  VLOG(6) << "Transpose debug, AddKernel output:"
+          << custom_kernel::TensorDetailsToString(*out);
 }
 
 template <typename T, typename Context>
@@ -258,12 +316,31 @@ void MultiplyKernel(const Context& dev_ctx,
   PADDLE_GCU_KERNEL_TRACE("multiply");
   if (LaunchAOTKernel()) {
     dev_ctx.template Alloc<T>(out);
-    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
-    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    auto padding_shapes = PaddingDims(x, y, -1);
+    phi::DenseTensor input_x =
+        MaybeCreateOrTrans64To32bits(dev_ctx, padding_shapes[0]);
+    phi::DenseTensor input_y =
+        MaybeCreateOrTrans64To32bits(dev_ctx, padding_shapes[1]);
     phi::DenseTensor output_z =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+
+    // VLOG(6) << "Transpose debug, MultiplyKernel input_x:"
+    //           << custom_kernel::TensorDetailsToString(input_x);
+    // VLOG(6) << "Transpose debug, MultiplyKernel input_y:"
+    //           << custom_kernel::TensorDetailsToString(input_y);
+
+    bool input_nhwc = UnifyLayout(dev_ctx, input_x, input_y);
+    if (input_nhwc) {
+      PdCustomNHWCRepresentAsOriginNHWC(output_z, true);
+    }
     LAUNCH_TOPSATENOP(topsatenMul, dev_ctx, output_z, input_x, input_y);
+    if (input_nhwc) {
+      OriginNHWCRepresentAsPdCustomNHWC(output_z);
+      RepresentPdCustomNHWC(*out);
+    }
     MaybeTransResult(dev_ctx, output_z, out);
+    VLOG(6) << "Transpose debug, MultiplyKernel output:"
+            << custom_kernel::TensorDetailsToString(*out);
 
   } else {  // kernel impl base on JIT
     ElementBaseKernel<T, Context>(dev_ctx, x, y, -1, out, "elementwise_mul");
@@ -327,7 +404,14 @@ void MinimumKernel(const Context& dev_ctx,
                    phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("minimum");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    phi::DenseTensor output_z =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    LAUNCH_TOPSATENOP(topsatenMinimum, dev_ctx, output_z, input_x, input_y);
+    MaybeTransResult(dev_ctx, output_z, out);
+
   } else {  // kernel impl base on JIT
     ElementBaseKernel<T, Context>(dev_ctx, x, y, -1, out, "elementwise_min");
   }
@@ -356,7 +440,14 @@ void MaximumKernel(const Context& dev_ctx,
                    phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("maximum");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    phi::DenseTensor output_z =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    LAUNCH_TOPSATENOP(topsatenMaximum, dev_ctx, output_z, input_x, input_y);
+    MaybeTransResult(dev_ctx, output_z, out);
+
   } else {  // kernel impl base on JIT
     ElementBaseKernel<T, Context>(dev_ctx, x, y, -1, out, "elementwise_max");
   }
@@ -391,14 +482,88 @@ void ElementwisePowKernel(const Context& dev_ctx,
     phi::DenseTensor output_z =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
     LAUNCH_TOPSATENOP(topsatenPow, dev_ctx, output_z, input_x, input_y);
+    MaybeTransResult(dev_ctx, output_z, out);
 
-    //   auto alpha1 = phi::Scalar(1.0f);
-    //   auto alpha2 = phi::Scalar(1.0f);
-    //   auto beta = phi::Scalar(0.0f);
-    //   LAUNCH_TOPSOP(topsopPower,
-    //                 dev_ctx,
-    //                 output_z, input_x, input_y, alpha1, alpha2, beta);
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
 
+template <typename T, typename Context>
+void RemainderKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::DenseTensor& y,
+                     phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("remainder");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    phi::DenseTensor output_z =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    LAUNCH_TOPSATENOP(topsatenRemainder, dev_ctx, output_z, input_x, input_y);
+    MaybeTransResult(dev_ctx, output_z, out);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void FloorDivideKernel(const Context& dev_ctx,
+                       const phi::DenseTensor& x,
+                       const phi::DenseTensor& y,
+                       phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("floor_divide");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    phi::DenseTensor output_z =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    static const char* const rounding_mode = "floor";
+    LAUNCH_TOPSATENOP(
+        topsatenDiv, dev_ctx, output_z, input_x, input_y, rounding_mode);
+    MaybeTransResult(dev_ctx, output_z, out);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void FMaxKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                const phi::DenseTensor& y,
+                phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("fmax");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    phi::DenseTensor output_z =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    LAUNCH_TOPSATENOP(topsatenFmax, dev_ctx, output_z, input_x, input_y);
+    MaybeTransResult(dev_ctx, output_z, out);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void FMinKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                const phi::DenseTensor& y,
+                phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("fmin");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    phi::DenseTensor output_z =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    LAUNCH_TOPSATENOP(topsatenFmin, dev_ctx, output_z, input_x, input_y);
     MaybeTransResult(dev_ctx, output_z, out);
 
   } else {  // kernel impl base on JIT
@@ -539,3 +704,43 @@ PD_REGISTER_PLUGIN_KERNEL(maximum_grad,
 //                           float,
 //                           double,
 //                           phi::dtype::float16) {}
+
+PD_REGISTER_PLUGIN_KERNEL(remainder,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::RemainderKernel,
+                          int,
+                          int64_t,
+                          float,
+                          phi::dtype::float16,
+                          double) {}
+
+// PD_REGISTER_PLUGIN_KERNEL(floor_divide,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::FloorDivideKernel,
+//                           int,
+//                           int64_t,
+//                           float,
+//                           phi::dtype::float16,
+//                           double) {}
+
+PD_REGISTER_PLUGIN_KERNEL(fmax,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::FMaxKernel,
+                          int,
+                          int64_t,
+                          float,
+                          double,
+                          phi::dtype::float16) {}
+
+PD_REGISTER_PLUGIN_KERNEL(fmin,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::FMinKernel,
+                          int,
+                          int64_t,
+                          float,
+                          double,
+                          phi::dtype::float16) {}

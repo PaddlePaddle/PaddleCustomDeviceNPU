@@ -78,12 +78,57 @@ void BatchNormKernel(const Context& dev_ctx,
     FillGcuTensorWithConstant<T>(&new_bias, dev_ctx, static_cast<T>(0));
   }
 
-  dev_ctx.template Alloc<T>(y);
-  dev_ctx.template Alloc<T>(saved_mean);
-  dev_ctx.template Alloc<T>(saved_variance);
+  // The data type is not set in BatchNormOp::InferShape.
+  // This may be a bug in the execution of NaiveExecutor.
+  auto meta = y->meta();
+  meta.dtype = x.dtype();
+  y->set_meta(meta);
+
+  dev_ctx.Alloc(y, y->dtype());
+  dev_ctx.Alloc(mean_out, mean_out->dtype());
+  dev_ctx.Alloc(variance_out, variance_out->dtype());
+  dev_ctx.Alloc(saved_mean, saved_mean->dtype());
+  dev_ctx.Alloc(saved_variance, saved_variance->dtype());
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor scale_x = MaybeCreateOrTrans64To32bits(dev_ctx, new_scale);
+    phi::DenseTensor bias_x = MaybeCreateOrTrans64To32bits(dev_ctx, new_bias);
+    phi::DenseTensor mean_x =
+        MaybeCreateOrTrans64To32bits(dev_ctx, running_mean);
+    phi::DenseTensor variance_x =
+        MaybeCreateOrTrans64To32bits(dev_ctx, running_var);
+
+    phi::DenseTensor output = MaybeCreateOrTrans64To32bits(dev_ctx, *y, false);
+    phi::DenseTensor saved_mean_output =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *saved_mean, false);
+    phi::DenseTensor saved_variance_output =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *saved_variance, false);
+
+    double momentum_d = 1.0 - momentum;
+    double epsilon_d = epsilon;
+
+    LAUNCH_TOPSATENOP(topsatenNativeBatchNorm,
+                      dev_ctx,
+                      output,
+                      saved_mean_output,
+                      saved_variance_output,
+                      input_x,
+                      scale_x,
+                      bias_x,
+                      mean_x,
+                      variance_x,
+                      !is_test,
+                      momentum_d,
+                      epsilon_d);
+    MaybeTransResult(dev_ctx, output, y);
+    MaybeTransResult(dev_ctx, saved_mean_output, saved_mean);
+    MaybeTransResult(dev_ctx, saved_variance_output, saved_variance);
+    // TensorCopy(dev_ctx, running_mean, false, mean_out);
+    // TensorCopy(dev_ctx, running_var, false, variance_out);
+    *mean_out = running_mean;
+    *variance_out = running_var;
+
   } else {  // kernel impl base on JIT
     phi::DenseTensor mean_out_tmp;
     mean_out_tmp.set_meta(mean_out->meta());
@@ -279,10 +324,50 @@ void BatchNormInferKernel(const Context& dev_ctx,
           "But received: the size of input's dimensions is [%d]",
           x_dims.size()));
 
-  dev_ctx.template Alloc<T>(y);
+  // The data type is not set in BatchNormOp::InferShape.
+  // This may be a bug in the execution of NaiveExecutor.
+  auto meta = y->meta();
+  meta.dtype = x.dtype();
+  y->set_meta(meta);
+
+  dev_ctx.Alloc(y, y->dtype());
+  dev_ctx.Alloc(mean_out, mean_out->dtype());
+  dev_ctx.Alloc(variance_out, variance_out->dtype());
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor scale_x = MaybeCreateOrTrans64To32bits(dev_ctx, scale);
+    phi::DenseTensor bias_x = MaybeCreateOrTrans64To32bits(dev_ctx, bias);
+    phi::DenseTensor mean_x = MaybeCreateOrTrans64To32bits(dev_ctx, mean);
+    phi::DenseTensor variance_x =
+        MaybeCreateOrTrans64To32bits(dev_ctx, variance);
+
+    phi::DenseTensor output = MaybeCreateOrTrans64To32bits(dev_ctx, *y, false);
+    phi::DenseTensor mean_output =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *mean_out, false);
+    phi::DenseTensor variance_output =
+        MaybeCreateOrTrans64To32bits(dev_ctx, *variance_out, false);
+
+    double momentum_d = 1.0 - momentum;
+    double epsilon_d = epsilon;
+
+    LAUNCH_TOPSATENOP(topsatenNativeBatchNorm,
+                      dev_ctx,
+                      output,
+                      mean_output,
+                      variance_output,
+                      input_x,
+                      scale_x,
+                      bias_x,
+                      mean_x,
+                      variance_x,
+                      false,
+                      momentum_d,
+                      epsilon_d);
+    MaybeTransResult(dev_ctx, output, y);
+    MaybeTransResult(dev_ctx, mean_output, mean_out);
+    MaybeTransResult(dev_ctx, variance_output, variance_out);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};

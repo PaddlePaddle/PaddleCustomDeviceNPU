@@ -24,7 +24,17 @@ void AddNKernel(const Context& dev_ctx,
   PADDLE_GCU_KERNEL_TRACE("add_n");
   dev_ctx.template Alloc<T>(out);
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    size_t num = x.size();
+    if (num == 1) {
+      TensorCopy(dev_ctx, *(x[0]), false, out);
+      return;
+    }
+    auto out_tmp = custom_kernel::Add(dev_ctx, *(x[0]), *(x[1]));
+    for (size_t i = 2; i < num; ++i) {
+      out_tmp = custom_kernel::Add(dev_ctx, out_tmp, *(x[i]));
+    }
+    *out = out_tmp;
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     TensorValueMap inputs;
@@ -56,5 +66,4 @@ PD_REGISTER_PLUGIN_KERNEL(add_n,
                           ALL_LAYOUT,
                           custom_kernel::AddNKernel,
                           float,
-                          phi::dtype::float16,
-                          double) {}
+                          phi::dtype::float16) {}

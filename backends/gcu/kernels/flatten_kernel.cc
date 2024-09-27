@@ -17,23 +17,23 @@
 
 namespace custom_kernel {
 template <typename T, typename Context>
-void FlattenKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   int start_axis,
-                   int stop_axis,
-                   phi::DenseTensor* out,
-                   phi::DenseTensor* xshape) {
-  PADDLE_GCU_KERNEL_TRACE("flatten");
+void FlattenInferKernel(const Context& dev_ctx,
+                        const phi::DenseTensor& x,
+                        int start_axis UNUSED,
+                        int stop_axis UNUSED,
+                        phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("flatten_infer");
   if (LaunchAOTKernel()) {
-    VLOG(6) << "[HOST_KERNEL] Impl on host for flatten";
+    VLOG(6) << "[HOST_KERNEL] Impl on host for flatten_infer";
     if (x.numel() == 0) {
       return;
     }
-    if (xshape != nullptr) {
-      dev_ctx.template Alloc<T>(xshape);
+    auto recovery = x;
+    if (DataPdCustomNHWC(x)) {
+      recovery = PdCustomNHWCTransToNCHW(dev_ctx, recovery);
     }
     dev_ctx.template Alloc<T>(out);
-    if (x.initialized() && x.data() == out->data()) {
+    if (recovery.initialized() && recovery.data() == out->data()) {
       return;
     }
 
@@ -48,9 +48,27 @@ void FlattenKernel(const Context& dev_ctx,
     // here we need to use copy method that only copy data
     auto dims = out->dims();
     auto lod = out->lod();
-    TensorCopy(dev_ctx, x, false, out);
+    TensorCopy(dev_ctx, recovery, false, out);
     out->Resize(dims);
     out->ResetLoD(lod);
+    SetLayout(*out, common::DataLayout::kNCHW);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void FlattenKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   int start_axis,
+                   int stop_axis,
+                   phi::DenseTensor* out,
+                   phi::DenseTensor* xshape) {
+  PADDLE_GCU_KERNEL_TRACE("flatten");
+  if (LaunchAOTKernel()) {
+    custom_kernel::FlattenInferKernel<T, Context>(
+        dev_ctx, x, start_axis, stop_axis, out);
 
   } else {  // kernel impl base on JIT
     dev_ctx.template Alloc<T>(out);
@@ -134,6 +152,19 @@ PD_REGISTER_PLUGIN_KERNEL(flatten,
                           gcu,
                           ALL_LAYOUT,
                           custom_kernel::FlattenKernel,
+                          phi::dtype::bfloat16,
+                          phi::dtype::float16,
+                          float,
+                          double,
+                          uint8_t,
+                          int8_t,
+                          int,
+                          int64_t) {}
+
+PD_REGISTER_PLUGIN_KERNEL(flatten_infer,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::FlattenInferKernel,
                           phi::dtype::bfloat16,
                           phi::dtype::float16,
                           float,

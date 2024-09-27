@@ -26,7 +26,13 @@ void HuberLossKernel(const Context& dev_ctx,
                      phi::DenseTensor* residual) {
   PADDLE_GCU_KERNEL_TRACE("huber_loss");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    int64_t reduction = 0;  // none, the unreduced loss is returned
+    double d_delta = delta;
+    LAUNCH_TOPSATENOP(
+        topsatenHuberLoss, dev_ctx, *out, input, label, reduction, d_delta);
+    *residual = custom_kernel::Subtract(dev_ctx, label, input);
+
   } else {  // kernel impl base on JIT
     out->Resize(input.dims());
     residual->Resize(label.dims());
@@ -114,7 +120,6 @@ PD_REGISTER_PLUGIN_KERNEL(huber_loss,
                           ALL_LAYOUT,
                           custom_kernel::HuberLossKernel,
                           float,
-                          double,
                           phi::dtype::float16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(huber_loss_grad,

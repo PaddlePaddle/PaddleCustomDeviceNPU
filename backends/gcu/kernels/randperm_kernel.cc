@@ -23,7 +23,7 @@ void RandpermRawKernel(const Context& dev_ctx,
                        unsigned int seed,
                        phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("randperm_raw");
-  ContextPinnedGuard ctx_pinned_guard(dev_ctx);
+  ContextPinnedGuard<Context> ctx_pinned_guard(dev_ctx);
   VLOG(6) << "[HOST_KERNEL] Impl on host for randperm";
   VLOG(6) << "Enter RandpermRawKernel with n:" << n << ", seed:" << seed
           << ", dtype:" << phi::DataTypeToString(dtype);

@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 LOG_SOFTMAX_CASE = [
     {"x_shape": [2, 6], "x_dtype": np.float32, "axis": -1},
     {"x_shape": [2, 3, 4], "x_dtype": np.float32, "axis": -1},
@@ -31,6 +33,7 @@ LOG_SOFTMAX_CASE = [
     {"x_shape": [2, 3, 4], "x_dtype": np.float16, "axis": 0},
     {"x_shape": [2, 3, 4], "x_dtype": np.float16, "axis": 1},
 ]
+# fmt: on
 
 
 @ddt
@@ -43,7 +46,7 @@ class TestLogSoftmax(TestAPIBase):
         self.x_dtype = np.float32
         self.axis = -1
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

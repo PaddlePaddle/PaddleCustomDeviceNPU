@@ -37,42 +37,17 @@ void ArgsortKernel(const Context& dev_ctx,
     phi::DenseTensor indices_out =
         MaybeCreateOrTrans64To32bits(dev_ctx, *indices, false);
 
-    topsopTensor out_value = CreateTopsopTensor(*output);
-    topsopTensor out_indices = CreateTopsopTensor(indices_out);
-    topsopTensor x_tensor = CreateTopsopTensor(x);
+    LAUNCH_TOPSATENOP(topsatenSort,
+                      dev_ctx,
+                      *output,
+                      indices_out,
+                      x,
+                      stable,
+                      axis,
+                      descending);
 
-    bool is_sorted = true;
-    topsopSortCmpMode_t cmp_mod =
-        descending ? TOPSOP_SORT_TYPE_DESCEND : TOPSOP_SORT_TYPE_ASCEND;
-    topsopSortStableMode_t stable_mod =
-        stable ? TOPSOP_SORT_STABLE : TOPSOP_SORT_INSTABLE;
-    topsopScalar_t alpha = ScalarToTopsopScalar(phi::Scalar(1.0f));
-    topsopScalar_t beta = ScalarToTopsopScalar(phi::Scalar(0.0f));
-    auto stream = static_cast<topsStream_t>(dev_ctx.stream());
-
-    VLOG(3) << "TopsFlame op topsopSortEx, out_value:" << out_value
-            << ", out_indices:" << out_indices << ", x_tensor:" << x_tensor
-            << ", axis:" << axis << ", is_sorted:" << is_sorted
-            << ", cmp_mod:" << cmp_mod << ", stable_mod:" << stable_mod;
-
-    TOPS_OP_CALL_MAYBE_SYNC(topsopSortEx(out_value.GetTensorHandle(),
-                                         out_indices.GetTensorHandle(),
-                                         x_tensor.GetTensorHandle(),
-                                         axis,
-                                         is_sorted,
-                                         cmp_mod,
-                                         stable_mod,
-                                         alpha,
-                                         beta,
-                                         stream),
-                            dev_ctx);
+    // topsatenArgSort output is i32
     MaybeTransResult(dev_ctx, indices_out, indices);
-
-    // LAUNCH_TOPSATENOP(topsatenArgSort, dev_ctx, indices_out, x, stable, axis,
-    //                   descending);
-
-    // // topsatenArgSort output is i32
-    // MaybeTransResult(dev_ctx, indices_out, indices);
 
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;

@@ -27,11 +27,62 @@ void InstanceNormKernel(const Context& dev_ctx,
                         phi::DenseTensor* saved_variance) {
   PADDLE_GCU_KERNEL_TRACE("instance_norm");
   dev_ctx.template Alloc<T>(y);
-  dev_ctx.template Alloc<T>(saved_mean);
-  dev_ctx.template Alloc<T>(saved_variance);
+  // The upper caller does not use these two outputs.
+  if (saved_mean != nullptr) {
+    dev_ctx.template Alloc<T>(saved_mean);
+  }
+  if (saved_variance != nullptr) {
+    dev_ctx.template Alloc<T>(saved_variance);
+  }
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    phi::DenseTensor new_scale;
+    phi::DenseTensor new_bias;
+    if (scale.get_ptr()) {
+      new_scale = scale.get();
+    }
+    if (bias.get_ptr()) {
+      new_bias = bias.get();
+    }
+    const phi::DenseTensor running_mean_null;
+    const phi::DenseTensor running_var_null;
+    // OpAtenInstancehNorm Expected running_mean and running_var exist when
+    // training is false.
+    const bool use_input_stats = true;
+    const double momentum = 1.0;
+    const double eps = epsilon_f;
+
+    auto output = CreateTopsatenTensor(*y);
+    auto input = CreateTopsatenTensor(x);
+    auto weight = CreateTopsatenTensor(new_scale);
+    auto bias = CreateTopsatenTensor(new_bias);
+    auto running_mean = CreateTopsatenTensor(running_mean_null);
+    auto running_var = CreateTopsatenTensor(running_var_null);
+
+    std::string abstract_info =
+        custom_kernel::GetAbstractInfo("topsatenInstanceNorm",
+                                       *y,
+                                       x,
+                                       new_scale,
+                                       new_bias,
+                                       running_mean_null,
+                                       running_var_null,
+                                       use_input_stats,
+                                       momentum,
+                                       eps);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenInstanceNorm,
+                                        dev_ctx,
+                                        abstract_info,
+                                        output,
+                                        input,
+                                        weight,
+                                        bias,
+                                        running_mean,
+                                        running_var,
+                                        use_input_stats,
+                                        momentum,
+                                        eps);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
@@ -136,7 +187,7 @@ PD_REGISTER_PLUGIN_KERNEL(instance_norm,
                           ALL_LAYOUT,
                           custom_kernel::InstanceNormKernel,
                           float,
-                          double) {}
+                          phi::dtype::float16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(instance_norm_grad,
                           gcu,

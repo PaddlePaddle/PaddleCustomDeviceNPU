@@ -18,6 +18,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 UNIFORM_RANDOM_CASE = [
     {"shape": [3, 2], "dtype": "float32", "min": -1.0, "max": 1.0, "seed": 0},
     {"shape": [3, 2], "dtype": "float32", "min": -1.0, "max": 6.0, "seed": 0},
@@ -47,6 +49,7 @@ UNIFORM_RANDOM_CASE = [
     {"shape": [2, 3, 2], "dtype": "float16", "min": -1.0, "max": 1.0, "seed": 0},
     {"shape": [2, 2, 3, 2], "dtype": "float16", "min": -1.0, "max": 1.0, "seed": 0},
 ]
+# fmt: on
 
 
 @ddt
@@ -61,7 +64,7 @@ class TestUniform(TestAPIBase):
         self.max = 1.0
         self.seed = 0
 
-    def prepare_datas(self):
+    def prepare_data(self):
         pass
 
     def forward(self):

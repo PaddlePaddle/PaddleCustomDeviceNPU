@@ -24,7 +24,7 @@ void EinsumKernel(const Context& dev_ctx,
                   std::vector<phi::DenseTensor*> xshape UNUSED) {
   PADDLE_GCU_KERNEL_TRACE("einsum");
   if (LaunchAOTKernel()) {
-    ContextPinnedGuard ctx_pinned_guard(dev_ctx);
+    ContextPinnedGuard<Context> ctx_pinned_guard(dev_ctx);
     //   topsaten::topsatenEinSum is not support yet.
     //   dev_ctx.template Alloc<T>(out);
     //   auto out_tensor = CreateTopsatenTensor(*out);

@@ -18,6 +18,20 @@
 
 namespace custom_kernel {
 
+#define DEFINE_UNARY_AOT_ACTIVATION_KERNEL(name, functor_prefix)     \
+  template <typename T, typename Context>                            \
+  void functor_prefix##Kernel(const Context& dev_ctx,                \
+                              const phi::DenseTensor& x,             \
+                              phi::DenseTensor* out) {               \
+    PADDLE_GCU_KERNEL_TRACE(#name);                                  \
+    if (LaunchAOTKernel()) {                                         \
+      dev_ctx.template Alloc<T>(out);                                \
+      LAUNCH_TOPSATENOP(topsaten##functor_prefix, dev_ctx, *out, x); \
+    } else { /* kernel impl base on JIT */                           \
+      THROW_JIT_UNIMPLEMENTED();                                     \
+    }                                                                \
+  }
+
 template <typename T, typename Context>
 void ActivationBaseKernel(const Context& dev_ctx,
                           const phi::DenseTensor& x,
@@ -76,7 +90,9 @@ void AbsKernel(const Context& dev_ctx,
                phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("abs");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenAbs, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "abs");
   }
@@ -144,7 +160,9 @@ void AtanKernel(const Context& dev_ctx,
                 phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("atan");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenAtan, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "atan");
   }
@@ -170,7 +188,9 @@ void ExpKernel(const Context& dev_ctx,
                phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("exp");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenExp, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "exp");
   }
@@ -196,7 +216,9 @@ void FloorKernel(const Context& dev_ctx,
                  phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("floor");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenFloor, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "floor");
   }
@@ -226,6 +248,20 @@ void FloorGradKernel(const Context& dev_ctx,
 
     GcuRunner(
         input_names, inputs, output_names, outputs, {}, "floor_grad", dev_ctx);
+  }
+}
+
+template <typename T, typename Context>
+void CeilKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("ceil");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenCeil, dev_ctx, *out, x);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
   }
 }
 
@@ -292,7 +328,8 @@ void Relu6Kernel(const Context& dev_ctx,
                  phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("relu6");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenRelu6, dev_ctx, *out, x);
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "relu6");
   }
@@ -319,7 +356,10 @@ void LeakyReluKernel(const Context& dev_ctx,
                      phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("leaky_relu");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar negative_slope(alpha);
+    LAUNCH_TOPSATENOP(topsatenLeakyRelu, dev_ctx, *out, x, negative_slope);
+
   } else {  // kernel impl base on JIT
     GcuAttributeMap attrs;
     attrs["alpha"] = alpha;
@@ -353,7 +393,13 @@ void GeluKernel(const Context& dev_ctx,
                 phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("gelu");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    const char* gelu_approximate = "none";
+    if (approximate) {
+      gelu_approximate = "tanh";
+    }
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenGelu, dev_ctx, *out, x, gelu_approximate);
+
   } else {  // kernel impl base on JIT
     GcuAttributeMap attrs;
     attrs["approximate"] = approximate;
@@ -390,7 +436,9 @@ void TanhKernel(const Context& dev_ctx,
                 phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("tanh");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenTanh, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "tanh");
   }
@@ -443,23 +491,11 @@ void SqrtKernel(const Context& dev_ctx,
                 phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("sqrt");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenSqrt, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "sqrt");
-  }
-}
-
-template <typename T, typename Context>
-void RsqrtKernel(const Context& dev_ctx,
-                 const phi::DenseTensor& x,
-                 phi::DenseTensor* out) {
-  PADDLE_GCU_KERNEL_TRACE("rsqrt");
-  if (LaunchAOTKernel()) {
-    dev_ctx.template Alloc<T>(out);
-    LAUNCH_TOPSATENOP(topsatenRsqrt, dev_ctx, *out, x);
-
-  } else {  // kernel impl base on JIT
-    THROW_JIT_UNIMPLEMENTED();
   }
 }
 
@@ -531,7 +567,9 @@ void SquareKernel(const Context& dev_ctx,
                   phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("square");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenSquare, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     ActivationBaseKernel<T, Context>(dev_ctx, x, {}, out, "square");
   }
@@ -634,20 +672,146 @@ void HardSwishGradKernel(const Context& dev_ctx,
   }
 }
 
-// Silu = x * sigmoid(x)
 template <typename T, typename Context>
-void SiluKernel(const Context& dev_ctx,
-                const phi::DenseTensor& x,
-                phi::DenseTensor* out) {
-  PADDLE_GCU_KERNEL_TRACE("silu");
+void LogitKernel(const Context& dev_ctx,
+                 const phi::DenseTensor& x,
+                 float eps,
+                 phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("logit");
   if (LaunchAOTKernel()) {
     dev_ctx.template Alloc<T>(out);
-    LAUNCH_TOPSATENOP(topsatenSilu, dev_ctx, *out, x);
+    phi::Scalar epsilon(eps);
+    LAUNCH_TOPSATENOP(topsatenLogit, dev_ctx, *out, x, epsilon);
 
   } else {  // kernel impl base on JIT
     THROW_JIT_UNIMPLEMENTED();
   }
 }
+
+template <typename T, typename Context>
+void CeluKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                float alpha,
+                phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("celu");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar a(alpha);
+    LAUNCH_TOPSATENOP(topsatenCelu, dev_ctx, *out, x, a);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void HardShrinkKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      float threshold,
+                      phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("hard_shrink");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar lambd(threshold);
+    LAUNCH_TOPSATENOP(topsatenHardshrink, dev_ctx, *out, x, lambd);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void SoftShrinkKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      float lambda,
+                      phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("softshrink");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar lambd(lambda);
+    LAUNCH_TOPSATENOP(topsatenSoftshrink, dev_ctx, *out, x, lambd);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void SoftplusKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    float beta,
+                    float threshold,
+                    phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("softplus");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar beta_s(beta);
+    phi::Scalar threshold_s(threshold);
+    LAUNCH_TOPSATENOP(topsatenSoftplus, dev_ctx, *out, x, beta_s, threshold_s);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void HardtanhKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    float t_min,
+                    float t_max,
+                    phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("hardtanh");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar min_val(t_min);
+    phi::Scalar max_val(t_max);
+    LAUNCH_TOPSATENOP(topsatenHardtanh, dev_ctx, *out, x, min_val, max_val);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+template <typename T, typename Context>
+void EluKernel(const Context& dev_ctx,
+               const phi::DenseTensor& x,
+               float alpha,
+               phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("elu");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    phi::Scalar alpha_s(alpha);
+    phi::Scalar scale_s(1.0f);
+    phi::Scalar in_scale_s(1.0f);
+    LAUNCH_TOPSATENOP(
+        topsatenElu, dev_ctx, *out, x, alpha_s, scale_s, in_scale_s);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(logsigmoid, LogSigmoid)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(rsqrt, Rsqrt)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(log2, Log2)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(log10, Log10)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(log1p, Log1p)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(silu, Silu)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(reciprocal, Reciprocal)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(acos, Acos)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(acosh, Acosh)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(asin, Asin)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(asinh, Asinh)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(atanh, Atanh)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(cosh, Cosh)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(sinh, Sinh)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(round, Round)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(tan, Tan)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(erf, Erf)
+DEFINE_UNARY_AOT_ACTIVATION_KERNEL(expm1, Expm1)
+
+#undef DEFINE_UNARY_AOT_ACTIVATION_KERNEL
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(abs,
@@ -657,7 +821,8 @@ PD_REGISTER_PLUGIN_KERNEL(abs,
                           float,
                           double,
                           int64_t,
-                          int32_t) {
+                          int32_t,
+                          phi::dtype::float16) {
   kernel->InputAt(0).SetDataType(phi::dtype::ToReal(kernel_key.dtype()));
 }
 
@@ -672,284 +837,75 @@ PD_REGISTER_PLUGIN_KERNEL(abs_grad,
   kernel->InputAt(1).SetDataType(phi::dtype::ToReal(kernel_key.dtype()));
 }
 
-PD_REGISTER_PLUGIN_KERNEL(cos,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::CosKernel,
-                          float,
-                          phi::dtype::float16) {}
+#define PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(name, func) \
+  PD_REGISTER_PLUGIN_KERNEL(name,                            \
+                            gcu,                             \
+                            ALL_LAYOUT,                      \
+                            custom_kernel::func,             \
+                            float,                           \
+                            phi::dtype::float16,             \
+                            double) {}
 
-PD_REGISTER_PLUGIN_KERNEL(cos_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::CosGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(cos, CosKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(cos_grad, CosGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(sin, SinKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(atan, AtanKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(atan_grad, AtanGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(exp, ExpKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(exp_grad, ExpGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(swish, SwishKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(swish_grad, SwishGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(relu, ReluKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(relu_grad, ReluGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(relu6, Relu6Kernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(relu6_grad, Relu6GradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(leaky_relu, LeakyReluKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(leaky_relu_grad, LeakyReluGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(pow, PowKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(pow_grad, PowGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(log, LogKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(log2, Log2Kernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(log10, Log10Kernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(log1p, Log1pKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(floor, FloorKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(floor_grad, FloorGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(ceil, CeilKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(gelu, GeluKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(gelu_grad, GeluGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(tanh, TanhKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(tanh_grad, TanhGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(sigmoid, SigmoidKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(sigmoid_grad, SigmoidGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(logsigmoid, LogSigmoidKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(sqrt, SqrtKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(rsqrt, RsqrtKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(square, SquareKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(square_grad, SquareGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hard_sigmoid, Hard_SigmoidKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hard_sigmoid_grad,
+                                         HardSigmoidGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hardsigmoid, HardSigmoidKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hardswish, HardSwishKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hardswish_grad, HardSwishGradKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(silu, SiluKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(reciprocal, ReciprocalKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(logit, LogitKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(celu, CeluKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hard_shrink, HardShrinkKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(softshrink, SoftShrinkKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(softplus, SoftplusKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(acos, AcosKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(acosh, AcoshKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(asin, AsinKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(asinh, AsinhKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(atanh, AtanhKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(cosh, CoshKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(sinh, SinhKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(tan, TanKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(round, RoundKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(elu, EluKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(erf, ErfKernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(expm1, Expm1Kernel)
+PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL(hardtanh, HardtanhKernel)
 
-PD_REGISTER_PLUGIN_KERNEL(sin,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SinKernel,
-                          float,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(atan,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::AtanKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(atan_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::AtanGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(exp,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::ExpKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(exp_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::ExpGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(swish,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SwishKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(swish_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SwishGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(relu,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::ReluKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(relu_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::ReluGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(relu6,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::Relu6Kernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(relu6_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::Relu6GradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(leaky_relu,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::LeakyReluKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(leaky_relu_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::LeakyReluGradKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(pow,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::PowKernel,
-                          float,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(pow_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::PowGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(log,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::LogKernel,
-                          float,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(floor,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::FloorKernel,
-                          double,
-                          float,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(floor_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::FloorGradKernel,
-                          double,
-                          float,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(gelu,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::GeluKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(gelu_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::GeluGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(tanh,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::TanhKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(tanh_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::TanhGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(sigmoid,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SigmoidKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(sigmoid_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SigmoidGradKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(sqrt,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SqrtKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(rsqrt,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::RsqrtKernel,
-                          float,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(square,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SquareKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(square_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SquareGradKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
-
-PD_REGISTER_PLUGIN_KERNEL(hard_sigmoid,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::Hard_SigmoidKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(hardsigmoid,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::HardSigmoidKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(hard_sigmoid_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::HardSigmoidGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(hardswish,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::HardSwishKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(hardswish_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::HardSwishGradKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
-
-PD_REGISTER_PLUGIN_KERNEL(silu,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SiluKernel,
-                          float,
-                          phi::dtype::float16) {}
+#undef PD_REGISTER_PLUGIN_GCU_ACTIVATION_KERNEL

@@ -71,25 +71,7 @@ void SliceKernel(const Context& dev_ctx,
       *out = TensorEmpty(dev_ctx, out->meta());
     }
 
-    auto rank = x.dims().size();
-    std::vector<int64_t> steps(rank, 1);
-
-    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
-    phi::DenseTensor output_tmp =
-        MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
-    auto alpha = phi::Scalar(1.0f);
-    auto beta = phi::Scalar(0.0f);
-    LAUNCH_TOPSOP(topsopSlice,
-                  dev_ctx,
-                  output_tmp,
-                  input_x,
-                  starts,
-                  ends,
-                  axes_t,
-                  steps,
-                  alpha,
-                  beta);
-    MaybeTransResult(dev_ctx, output_tmp, out);
+    custom_kernel::SliceBase(dev_ctx, x, axes, starts, out);
     out->Resize(out_dims);
 
   } else {  // kernel impl base on JIT

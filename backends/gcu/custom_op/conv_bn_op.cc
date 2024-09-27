@@ -231,6 +231,146 @@ std::vector<std::vector<int64_t>> ConvBnOpInferShape(
   return {output_shape, mean_shape, mean_shape, var_shape, var_shape};
 }
 
+void FuseConvBnWeights(const phi::CustomContext* dev_ctx,
+                       const phi::DenseTensor& filter,
+                       const phi::DenseTensor& conv_bias,
+                       const phi::DenseTensor& scale,
+                       const phi::DenseTensor& bn_bias,
+                       const phi::DenseTensor& mean,
+                       const phi::DenseTensor& var,
+                       const std::string data_format,
+                       const float epsilon,
+                       phi::DenseTensor*& fuse_filter_out,  // NOLINT
+                       phi::DenseTensor*& fuse_bias_out) {  // NOLINT
+  VLOG(6) << "start fuse conv bn weigths process.  " << filter.data() << " "
+          << conv_bias.data() << " " << scale.data() << " " << bn_bias.data()
+          << " " << mean.data() << " " << var.data() << " " << epsilon;
+  static std::map<const void*, std::vector<std::shared_ptr<phi::DenseTensor>>>
+      tensors2fuse_tensors;
+  if (tensors2fuse_tensors.count(filter.data()) != 0) {
+    fuse_filter_out = tensors2fuse_tensors.at(filter.data()).at(0).get();
+    fuse_bias_out = tensors2fuse_tensors.at(filter.data()).at(1).get();
+    VLOG(3) << "Conv Weight [" << filter.name() << ", " << conv_bias.name()
+            << "] have already done fuse batchnorm weghts.";
+    return;
+  }
+  // new_filter = filter * scale / sqrt(var + epsilon)
+  // new_bias = scale * (conv_bias - mean) / sqrt(var + epsilon) + bn_bias
+  // reshape
+  auto rank = filter.dims().size();
+  auto dims = phi::vectorize(scale.dims());
+  PADDLE_ENFORCE_EQ(
+      dims.size(),
+      1,
+      phi::errors::InvalidArgument("Scale should be 1-D tensor."));
+  if (data_format == "NCHW" || data_format == "NCDHW") {
+    for (int i = 1; i < rank; ++i) {
+      dims.push_back(1);
+    }
+  }
+  PADDLE_ENFORCE_EQ(dims.size(),
+                    rank,
+                    phi::errors::PreconditionNotMet(
+                        "reshaped dims rank should be same with input rank."));
+  auto new_filter = std::make_shared<phi::DenseTensor>();
+  auto new_conv_bias = std::make_shared<phi::DenseTensor>();
+  phi::DenseTensor new_scale;
+  phi::DenseTensor new_bn_bias;
+  phi::DenseTensor new_mean;
+  phi::DenseTensor new_var;
+  new_filter->set_meta(filter.meta());
+  new_conv_bias->set_meta(conv_bias.meta());
+  new_scale.set_meta(scale.meta());
+  new_bn_bias.set_meta(bn_bias.meta());
+  new_mean.set_meta(mean.meta());
+  new_var.set_meta(var.meta());
+  if (filter.dtype() == phi::DataType::FLOAT16) {
+    auto meta = new_scale.meta();
+    meta.dtype = phi::DataType::FLOAT16;
+    new_scale.set_meta(meta);
+    new_bn_bias.set_meta(meta);
+    new_mean.set_meta(meta);
+    new_var.set_meta(meta);
+  }
+  if (new_filter->dtype() == phi::DataType::FLOAT32) {
+    dev_ctx->Alloc<float>(new_filter.get());
+    dev_ctx->Alloc<float>(new_conv_bias.get());
+    dev_ctx->Alloc<float>(&new_scale);
+    dev_ctx->Alloc<float>(&new_bn_bias);
+    dev_ctx->Alloc<float>(&new_mean);
+    dev_ctx->Alloc<float>(&new_var);
+  } else {  // fp16
+    dev_ctx->Alloc<phi::float16>(new_filter.get());
+    dev_ctx->Alloc<phi::float16>(new_conv_bias.get());
+    dev_ctx->Alloc<phi::float16>(&new_scale);
+    dev_ctx->Alloc<phi::float16>(&new_bn_bias);
+    dev_ctx->Alloc<phi::float16>(&new_mean);
+    dev_ctx->Alloc<phi::float16>(&new_var);
+  }
+  phi::Copy(*dev_ctx, filter, dev_ctx->GetPlace(), false, new_filter.get());
+  // Do Cast
+  if (filter.dtype() == phi::DataType::FLOAT16) {
+    if (new_scale.dtype() == phi::DataType::FLOAT32) {
+      custom_kernel::Cast(*dev_ctx, scale, phi::DataType::FLOAT16, &new_scale);
+    }
+    if (new_bn_bias.dtype() == phi::DataType::FLOAT32) {
+      custom_kernel::Cast(
+          *dev_ctx, bn_bias, phi::DataType::FLOAT16, &new_bn_bias);
+    }
+    if (new_mean.dtype() == phi::DataType::FLOAT32) {
+      custom_kernel::Cast(*dev_ctx, mean, phi::DataType::FLOAT16, &new_mean);
+    }
+    if (new_var.dtype() == phi::DataType::FLOAT32) {
+      custom_kernel::Cast(*dev_ctx, var, phi::DataType::FLOAT16, &new_var);
+    }
+  } else {
+    if (new_scale.dtype() == phi::DataType::FLOAT16) {
+      phi::Copy(*dev_ctx, scale, dev_ctx->GetPlace(), false, &new_scale);
+    }
+    if (new_bn_bias.dtype() == phi::DataType::FLOAT16) {
+      phi::Copy(*dev_ctx, bn_bias, dev_ctx->GetPlace(), false, &new_bn_bias);
+    }
+    if (new_mean.dtype() == phi::DataType::FLOAT16) {
+      phi::Copy(*dev_ctx, mean, dev_ctx->GetPlace(), false, &new_mean);
+    }
+    if (new_var.dtype() == phi::DataType::FLOAT16) {
+      phi::Copy(*dev_ctx, var, dev_ctx->GetPlace(), false, &new_var);
+    }
+  }
+  // new_filter = filter * scale / sqrt(var + epsilon)
+  // new_bias = scale * (conv_bias - mean) / sqrt(var + epsilon) + bn_bias
+  phi::Scalar factor(1.0f);
+  phi::Scalar eps(epsilon);
+  LAUNCH_TOPSATENOP(topsatenAdd, (*dev_ctx), new_var, new_var, eps, factor);
+  LAUNCH_TOPSATENOP(topsatenRsqrt, (*dev_ctx), new_var, new_var);
+  LAUNCH_TOPSATENOP(topsatenMul, (*dev_ctx), new_scale, new_scale, new_var);
+  // new_filter
+  auto tmp_scale = new_scale;
+  if (data_format == "NCHW" || data_format == "NCDHW") {
+    tmp_scale.Resize(phi::make_ddim(dims));
+  }
+  LAUNCH_TOPSATENOP(topsatenMul, (*dev_ctx), *new_filter, tmp_scale, filter);
+  // new_bias
+  LAUNCH_TOPSATENOP(topsatenSub,
+                    (*dev_ctx),
+                    *new_conv_bias,
+                    *new_conv_bias,
+                    new_mean,
+                    factor);
+  LAUNCH_TOPSATENOP(
+      topsatenMul, (*dev_ctx), *new_conv_bias, *new_conv_bias, new_scale);
+  LAUNCH_TOPSATENOP(topsatenAdd,
+                    (*dev_ctx),
+                    *new_conv_bias,
+                    *new_conv_bias,
+                    new_bn_bias,
+                    factor);
+  tensors2fuse_tensors[filter.data()] = {new_filter, new_conv_bias};
+  fuse_filter_out = new_filter.get();
+  fuse_bias_out = new_conv_bias.get();
+  VLOG(6) << "end fuse conv bn weigths process.";
+}
+
 std::vector<paddle::Tensor> ConvBnOp(const paddle::Tensor& x,
                                      const paddle::Tensor& filter,
                                      const paddle::Tensor& mean,
@@ -249,16 +389,28 @@ std::vector<paddle::Tensor> ConvBnOp(const paddle::Tensor& x,
                                      float epsilon,
                                      bool trainable_statistics,
                                      bool use_global_stats) {
-  auto dev_ctx = static_cast<const phi::CustomContext*>(
+  PADDLE_GCU_KERNEL_TRACE("conv_bn");
+  auto dev_ctx = reinterpret_cast<const phi::CustomContext*>(
       paddle::experimental::DeviceContextPool::Instance().Get(x.place()));
 
-  auto x_tensor = static_cast<const phi::DenseTensor*>(x.impl().get());
+  auto x_tensor = reinterpret_cast<const phi::DenseTensor*>(x.impl().get());
   auto filter_tensor =
-      static_cast<const phi::DenseTensor*>(filter.impl().get());
-  auto mean_tensor = static_cast<const phi::DenseTensor*>(mean.impl().get());
-  auto bias_tensor = static_cast<const phi::DenseTensor*>(bias.impl().get());
-  auto scale_tensor = static_cast<const phi::DenseTensor*>(scale.impl().get());
-  auto var_tensor = static_cast<const phi::DenseTensor*>(var.impl().get());
+      reinterpret_cast<const phi::DenseTensor*>(filter.impl().get());
+  auto mean_tensor =
+      reinterpret_cast<const phi::DenseTensor*>(mean.impl().get());
+  auto bias_tensor =
+      reinterpret_cast<const phi::DenseTensor*>(bias.impl().get());
+  auto scale_tensor =
+      reinterpret_cast<const phi::DenseTensor*>(scale.impl().get());
+  auto var_tensor = reinterpret_cast<const phi::DenseTensor*>(var.impl().get());
+  PADDLE_ENFORCE_EQ(
+      x_tensor->dtype() == phi::DataType::FLOAT32 ||
+          x_tensor->dtype() == phi::DataType::FLOAT16,
+      true,
+      phi::errors::InvalidArgument(
+          "Only support float32/float16 data type in conv_bn op, but "
+          "received: %s.",
+          x_tensor->dtype()));
   // Infershape
   auto out_shapes = ConvBnOpInferShape(x.shape(),
                                        filter.shape(),
@@ -279,45 +431,96 @@ std::vector<paddle::Tensor> ConvBnOp(const paddle::Tensor& x,
                                        trainable_statistics,
                                        use_global_stats);
   paddle::Tensor out = paddle::empty(out_shapes[0], x.dtype(), x.place());
+  auto out_tensor = reinterpret_cast<phi::DenseTensor*>(out.impl().get());
+  if (custom_kernel::LaunchAOTKernel()) {
+    PADDLE_ENFORCE_EQ(
+        data_layout == "NCHW" || data_layout == "NCDHW",
+        true,
+        phi::errors::InvalidArgument(
+            "Only support NCHW/NCDHW layout in AOT mode, but received: %s.",
+            data_layout.c_str()));
+    paddle::Tensor conv_out =
+        paddle::empty(out_shapes[0], x.dtype(), x.place());
+    auto conv_out_tensor =
+        reinterpret_cast<phi::DenseTensor*>(conv_out.impl().get());
 
-  custom_kernel::TensorNameMap input_names;
-  custom_kernel::TensorValueMap inputs;
-  input_names["X"] = {"x"};
-  input_names["Filter"] = {"filter"};
-  input_names["Mean"] = {"mean"};
-  input_names["Bias"] = {"bias"};
-  input_names["Scale"] = {"scale"};
-  input_names["Variance"] = {"variance"};
-  inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
-  inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
-  inputs["Mean"] = {const_cast<phi::DenseTensor*>(mean_tensor)};
-  inputs["Bias"] = {const_cast<phi::DenseTensor*>(bias_tensor)};
-  inputs["Scale"] = {const_cast<phi::DenseTensor*>(scale_tensor)};
-  inputs["Variance"] = {const_cast<phi::DenseTensor*>(var_tensor)};
+    auto meta = phi::DenseTensorMeta(filter.dtype(),
+                                     phi::make_ddim({filter.dims().at(0)}));
+    phi::DenseTensor conv_bias = custom_kernel::TensorZeros(*dev_ctx, meta);
 
-  custom_kernel::GcuAttributeMap attrs;
-  attrs["groups"] = groups;
-  attrs["data_format"] = data_format;
-  attrs["padding_algorithm"] = padding_algorithm;
-  attrs["strides"] = strides;
-  attrs["paddings"] = paddings;
-  attrs["dilations"] = dilations;
-  attrs["is_test"] = is_test;
-  attrs["data_layout"] = data_layout;
-  attrs["momentum"] = momentum;
-  attrs["epsilon"] = epsilon;
-  attrs["trainable_statistics"] = trainable_statistics;
-  attrs["use_global_stats"] = use_global_stats;
+    std::vector<int64_t> strides_v;
+    strides_v.insert(strides_v.begin(), strides.begin(), strides.end());
+    std::vector<int64_t> paddings_v;
+    paddings_v.insert(paddings_v.begin(), paddings.begin(), paddings.end());
+    std::vector<int64_t> dilations_v;
+    dilations_v.insert(dilations_v.begin(), dilations.begin(), dilations.end());
+    int64_t groups_64 = groups;
 
-  custom_kernel::TensorNameMap output_names;
-  custom_kernel::TensorValueMap outputs;
-  output_names["Out"] = {"Out"};
-  outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
+    phi::DenseTensor* fused_filter;
+    phi::DenseTensor* fused_bias;
+    FuseConvBnWeights(dev_ctx,
+                      *filter_tensor,
+                      conv_bias,
+                      *scale_tensor,
+                      *bias_tensor,
+                      *mean_tensor,
+                      *var_tensor,
+                      data_format,
+                      epsilon,
+                      fused_filter,
+                      fused_bias);
 
-  custom_kernel::GcuRunner(
-      input_names, inputs, output_names, outputs, attrs, "conv_bn", *dev_ctx);
+    LAUNCH_TOPSATENOP(topsatenConv2d,
+                      (*dev_ctx),
+                      (*conv_out_tensor),
+                      (*x_tensor),
+                      (*fused_filter),
+                      (*fused_bias),
+                      strides_v,
+                      paddings_v,
+                      dilations_v,
+                      groups_64);
+    return {out, mean, mean, var, var};
+  } else {
+    custom_kernel::TensorNameMap input_names;
+    custom_kernel::TensorValueMap inputs;
+    input_names["X"] = {"x"};
+    input_names["Filter"] = {"filter"};
+    input_names["Mean"] = {"mean"};
+    input_names["Bias"] = {"bias"};
+    input_names["Scale"] = {"scale"};
+    input_names["Variance"] = {"variance"};
+    inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
+    inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
+    inputs["Mean"] = {const_cast<phi::DenseTensor*>(mean_tensor)};
+    inputs["Bias"] = {const_cast<phi::DenseTensor*>(bias_tensor)};
+    inputs["Scale"] = {const_cast<phi::DenseTensor*>(scale_tensor)};
+    inputs["Variance"] = {const_cast<phi::DenseTensor*>(var_tensor)};
 
-  return {out, mean, mean, var, var};
+    custom_kernel::GcuAttributeMap attrs;
+    attrs["groups"] = groups;
+    attrs["data_format"] = data_format;
+    attrs["padding_algorithm"] = padding_algorithm;
+    attrs["strides"] = strides;
+    attrs["paddings"] = paddings;
+    attrs["dilations"] = dilations;
+    attrs["is_test"] = is_test;
+    attrs["data_layout"] = data_layout;
+    attrs["momentum"] = momentum;
+    attrs["epsilon"] = epsilon;
+    attrs["trainable_statistics"] = trainable_statistics;
+    attrs["use_global_stats"] = use_global_stats;
+
+    custom_kernel::TensorNameMap output_names;
+    custom_kernel::TensorValueMap outputs;
+    output_names["Out"] = {"Out"};
+    outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
+
+    custom_kernel::GcuRunner(
+        input_names, inputs, output_names, outputs, attrs, "conv_bn", *dev_ctx);
+
+    return {out, mean, mean, var, var};
+  }
 }
 
 std::vector<paddle::Tensor> ConvBnSwishOp(const paddle::Tensor& x,

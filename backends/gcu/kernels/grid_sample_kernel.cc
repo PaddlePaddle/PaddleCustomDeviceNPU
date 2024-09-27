@@ -16,6 +16,36 @@
 #include "kernels/funcs/gcu_kernel_funcs.h"
 
 namespace custom_kernel {
+namespace {
+int64_t GridSampleInterpolationMode(const std::string& mode) {
+  const std::unordered_map<std::string, int64_t> kInterpolationModeMap = {
+      // aten  0:bilinear, 1:nearest, 2:bicubic
+      {"bilinear", 0},
+      {"nearest", 1},
+      {"bicubic", 2},
+  };
+  if (kInterpolationModeMap.count(mode) == 0) {
+    PADDLE_THROW(phi::errors::Unimplemented("Unsupported interpolation mode %s",
+                                            mode.c_str()));
+  }
+  return kInterpolationModeMap.at(mode);
+}
+
+int64_t GridSamplePaddingMode(const std::string& mode) {
+  const std::unordered_map<std::string, int64_t> kPaddingModeMap = {
+      // aten  0:zero, 1:border, 2:reflect
+      {"zeros", 0},
+      {"border", 1},
+      {"reflection", 2},
+  };
+  if (kPaddingModeMap.count(mode) == 0) {
+    PADDLE_THROW(phi::errors::Unimplemented("Unsupported padding mode %s",
+                                            mode.c_str()));
+  }
+  return kPaddingModeMap.at(mode);
+}
+}  // namespace
+
 template <typename T, typename Context>
 void GridSampleKernel(const Context& dev_ctx,
                       const phi::DenseTensor& x,
@@ -25,11 +55,24 @@ void GridSampleKernel(const Context& dev_ctx,
                       bool align_corners,
                       phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("grid_sample");
-  if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
-  } else {  // kernel impl base on JIT
-    dev_ctx.template Alloc<T>(out);
+  dev_ctx.template Alloc<T>(out);
 
+  if (LaunchAOTKernel()) {
+    // Aten's support for topsatenGridSampler is not yet complete.
+    THROW_AOT_UNIMPLEMENTED();
+
+    int64_t interpolation_mode = GridSampleInterpolationMode(mode);
+    int64_t outside_padding_mode = GridSamplePaddingMode(padding_mode);
+    LAUNCH_TOPSATENOP(topsatenGridSampler,
+                      dev_ctx,
+                      *out,
+                      x,
+                      grid,
+                      interpolation_mode,
+                      outside_padding_mode,
+                      align_corners);
+
+  } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
     input_names["Grid"] = {"grid"};

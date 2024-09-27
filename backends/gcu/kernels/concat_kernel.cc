@@ -26,31 +26,54 @@ void ConcatKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
+    bool use_nhwc = false;
     std::vector<phi::DenseTensor> input_tensors;
     for (const auto& in : ins) {
       input_tensors.emplace_back(MaybeCreateOrTrans64To32bits(dev_ctx, *in));
+      if (EnableTransposeOptimize() && (!use_nhwc) &&
+          in->layout() == common::DataLayout::kNHWC) {
+        use_nhwc = true;
+      }
     }
     phi::DenseTensor output =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
+    if (use_nhwc) {
+      PdCustomNHWCRepresentAsAtenNHWC(output, true);
+    }
 
     auto out_tensor = CreateTopsatenTensor(output);
 
     std::vector<topsatenTensor> in_tensors;
-    for (const auto& tensor : input_tensors) {
+    for (auto& tensor : input_tensors) {
+      if (use_nhwc) {
+        if (tensor.layout() == common::DataLayout::kNHWC) {
+          PdCustomNHWCRepresentAsAtenNHWC(tensor);
+        } else {
+          tensor = NCHWTransToAtenNHWC(dev_ctx, tensor);
+        }
+      }
       in_tensors.emplace_back(CreateTopsatenTensor(tensor));
     }
     int64_t dim = axis_scalar.to<int64_t>();
     if (dim < 0 && !ins.empty()) {
       dim += ins[0]->dims().size();
     }
-    auto stream = static_cast<topsStream_t>(dev_ctx.stream());
-    VLOG(3) << "ConcatKernel, use topsatenCat, input size:" << in_tensors.size()
-            << ", axis:" << dim << ", stream: " << stream;
 
-    ATEN_OP_CALL_MAYBE_SYNC(
-        topsaten::topsatenCat(out_tensor, in_tensors, dim, stream), dev_ctx);
+    std::string abstract_info = custom_kernel::GetAbstractInfo(
+        "topsatenCat", output, input_tensors, dim);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+        topsatenCat, dev_ctx, abstract_info, out_tensor, in_tensors, dim);
+
+    if (use_nhwc) {
+      AtenNHWCRepresentAsPdCustomNHWC(output);
+    }
 
     MaybeTransResult(dev_ctx, output, out);
+    if (use_nhwc) {
+      AtenNHWCRepresentAsPdCustomNHWC(output);
+    }
+    VLOG(6) << "Transpose debug, ConcatKernel output:"
+            << custom_kernel::TensorDetailsToString(*out);
 
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;

@@ -23,7 +23,8 @@ void IsinfKernel(const Context& dev_ctx,
   PADDLE_GCU_KERNEL_TRACE("isinf");
   dev_ctx.template Alloc<bool>(out);
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    LAUNCH_TOPSATENOP(topsatenIsInf, dev_ctx, *out, x);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
@@ -45,7 +46,11 @@ void IsinfKernel(const Context& dev_ctx,
 }
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(
-    isinf, gcu, ALL_LAYOUT, custom_kernel::IsinfKernel, float) {
+PD_REGISTER_PLUGIN_KERNEL(isinf,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::IsinfKernel,
+                          float,
+                          phi::dtype::float16) {
   kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
 }

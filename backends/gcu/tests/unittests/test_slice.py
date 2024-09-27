@@ -19,148 +19,35 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SLICE_CASE = [
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.float32,
-        "axes": [0, 1],
-        "starts": [1, 0],
-        "ends": [2, 3],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.float32,
-        "axes": [0, 1],
-        "starts": [0, 1],
-        "ends": [-1, 1000],
-    },
-    {
-        "x_shape": [4, 5, 6],
-        "x_dtype": np.float32,
-        "axes": [0, 1, 2],
-        "starts": [-3, 0, 2],
-        "ends": [3, 2, 4],
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.float32,
-        "axes": [0, 1, 2],
-        "starts": [0, 1, 2],
-        "ends": [3, 3, 4],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.float16,
-        "axes": [0, 1],
-        "starts": [1, 0],
-        "ends": [2, 3],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.float16,
-        "axes": [0, 1],
-        "starts": [0, 1],
-        "ends": [-1, 1000],
-    },
-    {
-        "x_shape": [4, 5, 6],
-        "x_dtype": np.float16,
-        "axes": [0, 1, 2],
-        "starts": [-3, 0, 2],
-        "ends": [3, 2, 4],
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.float16,
-        "axes": [0, 1, 2],
-        "starts": [0, 1, 2],
-        "ends": [3, 3, 4],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.float64,
-        "axes": [0, 1],
-        "starts": [1, 0],
-        "ends": [2, 3],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.float64,
-        "axes": [0, 1],
-        "starts": [0, 1],
-        "ends": [-1, 1000],
-    },
-    {
-        "x_shape": [4, 5, 6],
-        "x_dtype": np.float64,
-        "axes": [0, 1, 2],
-        "starts": [-3, 0, 2],
-        "ends": [3, 2, 4],
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.float64,
-        "axes": [0, 1, 2],
-        "starts": [0, 1, 2],
-        "ends": [3, 3, 4],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.int32,
-        "axes": [0, 1],
-        "starts": [1, 0],
-        "ends": [2, 3],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.int32,
-        "axes": [0, 1],
-        "starts": [0, 1],
-        "ends": [-1, 1000],
-    },
-    {
-        "x_shape": [4, 5, 6],
-        "x_dtype": np.int32,
-        "axes": [0, 1, 2],
-        "starts": [-3, 0, 2],
-        "ends": [3, 2, 4],
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.int32,
-        "axes": [0, 1, 2],
-        "starts": [0, 1, 2],
-        "ends": [3, 3, 4],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.int64,
-        "axes": [0, 1],
-        "starts": [1, 0],
-        "ends": [2, 3],
-    },
-    {
-        "x_shape": [2, 4],
-        "x_dtype": np.int64,
-        "axes": [0, 1],
-        "starts": [0, 1],
-        "ends": [-1, 1000],
-    },
-    {
-        "x_shape": [4, 5, 6],
-        "x_dtype": np.int64,
-        "axes": [0, 1, 2],
-        "starts": [-3, 0, 2],
-        "ends": [3, 2, 4],
-    },
-    {
-        "x_shape": [3, 4, 5, 6],
-        "x_dtype": np.int64,
-        "axes": [0, 1, 2],
-        "starts": [0, 1, 2],
-        "ends": [3, 3, 4],
-    },
+    {"x_shape": [2, 4], "x_dtype": np.float32, "axes": [0, 1], "starts": [1, 0], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.float32, "axes": [0, 1], "starts": [0, 1], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [-3, 0, 2], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [0, 1, 2], "ends": [3, 3, 4]},
+
+    {"x_shape": [2, 4], "x_dtype": np.float16, "axes": [0, 1], "starts": [1, 0], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.float16, "axes": [0, 1], "starts": [0, 1], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [-3, 0, 2], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [0, 1, 2], "ends": [3, 3, 4]},
+
+    {"x_shape": [2, 4], "x_dtype": np.float64, "axes": [0, 1], "starts": [1, 0], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.float64, "axes": [0, 1], "starts": [0, 1], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.float64, "axes": [0, 1, 2], "starts": [-3, 0, 2], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float64, "axes": [0, 1, 2], "starts": [0, 1, 2], "ends": [3, 3, 4]},
+
+    {"x_shape": [2, 4], "x_dtype": np.int32, "axes": [0, 1], "starts": [1, 0], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.int32, "axes": [0, 1], "starts": [0, 1], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [-3, 0, 2], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [0, 1, 2], "ends": [3, 3, 4]},
+
+    {"x_shape": [2, 4], "x_dtype": np.int64, "axes": [0, 1], "starts": [1, 0], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.int64, "axes": [0, 1], "starts": [0, 1], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.int64, "axes": [0, 1, 2], "starts": [-3, 0, 2], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.int64, "axes": [0, 1, 2], "starts": [0, 1, 2], "ends": [3, 3, 4]},
 ]
+# fmt: on
 
 
 @ddt
@@ -175,7 +62,7 @@ class TestSlice(TestAPIBase):
         self.starts = [1, 0]
         self.ends = [2, 3]
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

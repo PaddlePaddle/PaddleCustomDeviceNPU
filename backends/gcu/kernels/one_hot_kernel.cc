@@ -23,7 +23,7 @@ void OneHotKernel(const Context& dev_ctx,
                   const phi::Scalar& num_classes_s,
                   phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("one_hot");
-  int depth = num_classes_s.to<int>();
+  int64_t depth = num_classes_s.to<int>();
   auto out_dims = out->dims();
   if (out_dims.size() > 0 && out_dims[out_dims.size() - 1] == -1) {
     out_dims[out_dims.size() - 1] = depth;
@@ -32,7 +32,14 @@ void OneHotKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<float>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    phi::DenseTensor aten_out;
+    auto meta = out->meta();
+    meta.dtype = phi::DataType::INT32;
+    aten_out.set_meta(meta);
+    dev_ctx.template Alloc<int32_t>(&aten_out);
+    LAUNCH_TOPSATENOP(topsatenOneHot, dev_ctx, aten_out, x, depth);
+    custom_kernel::Cast(dev_ctx, aten_out, out->dtype(), out);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};

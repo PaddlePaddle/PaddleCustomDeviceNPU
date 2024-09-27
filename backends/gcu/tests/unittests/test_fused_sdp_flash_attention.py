@@ -26,70 +26,22 @@ for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
             lib
         )
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 ATTENTION_CASE = [
     # for llama2
     # topsvllmMemoryEfficientAttention only support float16
-    {
-        "batch_size": 4,
-        "q_seq_len": 512,
-        "kv_seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "head_dim": 128,
-        "dtype": np.float16,
-        "casual": False,
-    },
-    {
-        "batch_size": 4,
-        "q_seq_len": 512,
-        "kv_seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "head_dim": 128,
-        "dtype": np.float16,
-        "casual": True,
-    },
-    {
-        "batch_size": 4,
-        "q_seq_len": 512,
-        "kv_seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "head_dim": 512,
-        "dtype": np.float16,
-        "casual": False,
-    },
-    {
-        "batch_size": 4,
-        "q_seq_len": 512,
-        "kv_seq_len": 512,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "head_dim": 512,
-        "dtype": np.float16,
-        "casual": True,
-    },
-    {
-        "batch_size": 4,
-        "q_seq_len": 512,
-        "kv_seq_len": 256,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "head_dim": 128,
-        "dtype": np.float16,
-        "casual": False,
-    },
-    {
-        "batch_size": 4,
-        "q_seq_len": 512,
-        "kv_seq_len": 256,
-        "num_heads": 40,
-        "num_kv_heads": 40,
-        "head_dim": 128,
-        "dtype": np.float16,
-        "casual": True,
-    },
+    {"batch_size": 4, "q_seq_len": 512, "kv_seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "head_dim": 128, "dtype": np.float16, "casual": False},
+    {"batch_size": 4, "q_seq_len": 512, "kv_seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "head_dim": 128, "dtype": np.float16, "casual": True},
+
+    {"batch_size": 4, "q_seq_len": 512, "kv_seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "head_dim": 512, "dtype": np.float16, "casual": False},
+    {"batch_size": 4, "q_seq_len": 512, "kv_seq_len": 512, "num_heads": 40, "num_kv_heads": 40, "head_dim": 512, "dtype": np.float16, "casual": True},
+
+    {"batch_size": 4, "q_seq_len": 512, "kv_seq_len": 256, "num_heads": 40, "num_kv_heads": 40, "head_dim": 128, "dtype": np.float16, "casual": False},
+    {"batch_size": 4, "q_seq_len": 512, "kv_seq_len": 256, "num_heads": 40, "num_kv_heads": 40, "head_dim": 128, "dtype": np.float16, "casual": True},
+
 ]
+# fmt: on
 
 NATIVE_IMPL_DEV = "gcu"
 
@@ -122,7 +74,7 @@ class TestFusedSdpFlashAttention(TestAPIBase):
         self.dropout = 0.0
         self.is_test = True
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_q = self.generate_data(self.q_shape, self.dtype)
         self.data_k = self.generate_data(self.k_shape, self.dtype)
         self.data_v = self.generate_data(self.v_shape, self.dtype)

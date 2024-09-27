@@ -179,7 +179,15 @@ void StridedSliceKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    std::vector<int64_t> axes64(axes.begin(), axes.end());
+    LAUNCH_TOPSCLOP(strided_slice,
+                    dev_ctx,
+                    *out,
+                    x,
+                    axes64,
+                    starts.GetData(),
+                    ends.GetData(),
+                    strides.GetData());
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["Input"] = {"x"};

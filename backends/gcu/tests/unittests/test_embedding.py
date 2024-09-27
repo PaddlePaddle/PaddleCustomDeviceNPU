@@ -19,43 +19,13 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 EMBEDDING_CASE = [
-    {
-        "bsz": 6,
-        "seqlen": 8,
-        "vocab": 10,
-        "emb_size": 20,
-        "ids_dtype": np.int32,
-        "w_dtype": np.float32,
-        "padding_idx": None,
-    },
-    {
-        "bsz": 6,
-        "seqlen": 8,
-        "vocab": 10,
-        "emb_size": 20,
-        "ids_dtype": np.int64,
-        "w_dtype": np.float32,
-        "padding_idx": None,
-    },
-    {
-        "bsz": 6,
-        "seqlen": 8,
-        "vocab": 10,
-        "emb_size": 20,
-        "ids_dtype": np.int32,
-        "w_dtype": np.float16,
-        "padding_idx": None,
-    },
-    {
-        "bsz": 6,
-        "seqlen": 8,
-        "vocab": 10,
-        "emb_size": 20,
-        "ids_dtype": np.int64,
-        "w_dtype": np.float16,
-        "padding_idx": None,
-    },
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float32, "padding_idx": None},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float32, "padding_idx": None},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float16, "padding_idx": None},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": None},
     # Topsaten only support padding_idx-none now
     # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float32, "padding_idx": -1},
     # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float32, "padding_idx": -1},
@@ -64,6 +34,7 @@ EMBEDDING_CASE = [
     # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": 0},
     # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": 1},
 ]
+# fmt: on
 
 
 @ddt
@@ -80,7 +51,7 @@ class TestEmbedding(TestAPIBase):
         self.w_dtype = np.float32
         self.padding_idx = None
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.w = np.random.random([self.vocab, self.emb_size]).astype(self.w_dtype)
         self.x = np.random.randint(0, self.vocab, size=(self.bsz, self.seqlen)).astype(
             self.ids_dtype

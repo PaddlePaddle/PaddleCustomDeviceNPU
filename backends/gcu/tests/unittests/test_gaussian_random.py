@@ -18,6 +18,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 GAUSSIAN_RANDOM_CASE = [
     {"shape": [3, 2], "dtype": "float32", "mean": 0.0, "std": 1.0, "seed": 0},
     {"shape": [3, 2], "dtype": "float32", "mean": 1.0, "std": 1.0, "seed": 0},
@@ -46,6 +48,7 @@ GAUSSIAN_RANDOM_CASE = [
     {"shape": [2, 3, 2], "dtype": "float16", "mean": 0.0, "std": 1.0, "seed": 0},
     {"shape": [2, 2, 3, 2], "dtype": "float16", "mean": 0.0, "std": 1.0, "seed": 0},
 ]
+# fmt: on
 
 
 @ddt
@@ -60,7 +63,7 @@ class TestGaussian(TestAPIBase):
         self.std = 1.0
         self.seed = 0
 
-    def prepare_datas(self):
+    def prepare_data(self):
         pass
 
     def forward(self):

@@ -116,7 +116,11 @@ void LessEqualKernel(const Context& dev_ctx,
                      phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("less_equal");
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    dev_ctx.template Alloc<bool>(out);
+    phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
+    phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
+    LAUNCH_TOPSATENOP(topsatenLe, dev_ctx, *out, input_x, input_y);
+
   } else {  // kernel impl base on JIT
     CompareBaseKernel<T, Context>(dev_ctx, x, y, -1, out, "less_equal");
   }
@@ -151,6 +155,7 @@ void LessThanKernel(const Context& dev_ctx,
     phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
     phi::DenseTensor input_y = MaybeCreateOrTrans64To32bits(dev_ctx, y);
     LAUNCH_TOPSATENOP(topsatenLt, dev_ctx, *out, input_x, input_y);
+
   } else {  // kernel impl base on JIT
     CompareBaseKernel<T, Context>(dev_ctx, x, y, -1, out, "less_than");
   }

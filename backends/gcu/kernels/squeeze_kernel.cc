@@ -22,14 +22,20 @@ void SqueezeKernel(const Context& dev_ctx,
                    const phi::DenseTensor& x,
                    const phi::IntArray& axes_int_array,
                    phi::DenseTensor* out) {
-  PADDLE_GCU_KERNEL_TRACE("squeeze_infer");
-  VLOG(6) << "[HOST_KERNEL] Impl on host for squeeze_infer";
+  PADDLE_GCU_KERNEL_TRACE("squeeze");
+  VLOG(6) << "[HOST_KERNEL] Impl on host for squeeze";
   auto out_dims = out->dims();
   out->Resize(out_dims);
-  dev_ctx.template Alloc<T>(out);
 
-  TensorCopy(dev_ctx, x, false, out);
+  auto recovery = x;
+  if (DataPdCustomNHWC(x)) {
+    recovery = PdCustomNHWCTransToNCHW(dev_ctx, recovery);
+  }
+
+  dev_ctx.template Alloc<T>(out);
+  TensorCopy(dev_ctx, recovery, false, out);
   out->Resize(out_dims);
+  SetLayout(*out, common::DataLayout::kNCHW);
 }
 
 template <typename T, typename Context>
@@ -38,8 +44,8 @@ void SqueezeWithXShapeKernel(const Context& dev_ctx,
                              const phi::IntArray& axes_int_array,
                              phi::DenseTensor* out,
                              phi::DenseTensor* xshape) {
-  PADDLE_GCU_KERNEL_TRACE("squeeze");
-  VLOG(6) << "[HOST_KERNEL] Impl on host for squeeze";
+  PADDLE_GCU_KERNEL_TRACE("squeeze_with_xshape");
+  VLOG(6) << "[HOST_KERNEL] Impl on host for squeeze_with_xshape";
   custom_kernel::SqueezeKernel<T, Context>(dev_ctx, x, axes_int_array, out);
 }
 

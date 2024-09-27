@@ -29,37 +29,8 @@ void ContiguousKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    auto x_tensor = CreateTopsatenTensor(input);
-    auto out_tensor = CreateTopsatenTensor(*out);
-    topsatenMemoryFormat_t topsaten_format = TOPSATEN_MEMORY_CONTIGUOUS;
-    auto stream = static_cast<topsStream_t>(dev_ctx.stream());
-    VLOG(3) << "ContiguousKernel, use topsatenContiguous, stream: " << stream;
-    ATEN_OP_CALL_MAYBE_SYNC(topsaten::topsatenContiguous(
-                                out_tensor, x_tensor, topsaten_format, stream),
-                            dev_ctx);
+    LAUNCH_TOPSATENOP(topsatenCopy, dev_ctx, *out, input, false);
 
-    // const T* input_data = input.data<T>();
-    // auto* output_data = dev_ctx.template Alloc<T>(out);
-    // int rank = input.dims().size();
-    // auto dims = input.dims();
-    // auto input_stride = input.strides();
-    // auto numel = input.numel();
-
-    // for (int64_t i = 0; i < numel; i++) {
-    //   int64_t input_offset = 0;
-    //   int64_t index_tmp = i;
-    //   for (int dim = rank - 1; dim >= 0; --dim) {
-    //     int64_t mod = index_tmp % dims[dim];
-    //     index_tmp = index_tmp / dims[dim];
-    //     input_offset += mod * input_stride[dim];
-    //   }
-    //   C_Device_st device{input.place().GetDeviceId()};
-    //   C_Stream stream = static_cast<C_Stream>(dev_ctx.stream());
-    //   auto* dst_ptr = &output_data[i];
-    //   auto* src_ptr = &input_data[input_offset];
-    //   AsyncMemCpyD2D(&device, stream, dst_ptr, src_ptr,
-    //                  phi::SizeOf(input.dtype()));
-    // }
   } else {  // kernel impl base on JIT
     THROW_JIT_UNIMPLEMENTED();
   }
@@ -79,6 +50,4 @@ PD_REGISTER_PLUGIN_KERNEL(contiguous,
                           float,
                           double,
                           phi::dtype::float16,
-                          phi::dtype::bfloat16,
-                          phi::dtype::complex<float>,
-                          phi::dtype::complex<double>) {}
+                          phi::dtype::bfloat16) {}

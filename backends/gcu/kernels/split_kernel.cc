@@ -77,13 +77,6 @@ void SplitKernel(const Context& dev_ctx,
                           outs.size(),
                           sections.size()));
 
-    int64_t start = 0;
-    int64_t end = 0;
-    auto alpha = phi::Scalar(1.0f);
-    auto beta = phi::Scalar(0.0f);
-    std::vector<int64_t> axes = {axis};
-    std::vector<int64_t> steps = {1};
-
     phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
     std::vector<phi::DenseTensor> outputs;
     for (size_t i = 0; i < outs.size(); ++i) {
@@ -92,21 +85,12 @@ void SplitKernel(const Context& dev_ctx,
           MaybeCreateOrTrans64To32bits(dev_ctx, *(outs[i]), false));
     }
 
+    int64_t start = 0;
+    std::vector<int64_t> axes = {axis};
     for (size_t i = 0; i < sections.size(); ++i) {
       start += (i == 0) ? 0 : sections[i - 1];
-      end += sections[i];
       std::vector<int64_t> starts = {start};
-      std::vector<int64_t> ends = {end};
-      LAUNCH_TOPSOP(topsopSlice,
-                    dev_ctx,
-                    outputs[i],
-                    input_x,
-                    starts,
-                    ends,
-                    axes,
-                    steps,
-                    alpha,
-                    beta);
+      custom_kernel::SliceBase(dev_ctx, input_x, axes, starts, &(outputs[i]));
       MaybeTransResult(dev_ctx, outputs[i], outs[i]);
     }
 

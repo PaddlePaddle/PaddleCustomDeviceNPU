@@ -22,11 +22,14 @@ void MeanAllKernel(const Context& dev_ctx,
                    const phi::DenseTensor& x,
                    phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("mean_all");
+  dev_ctx.template Alloc<T>(out);
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    std::vector<int64_t> reduce_axis(x.dims().size(), 0);
+    std::iota(reduce_axis.begin(), reduce_axis.end(), 0);
+    bool keep_dim = false;
+    LAUNCH_TOPSATENOP(
+        topsatenMean, dev_ctx, *out, x, reduce_axis, keep_dim, out->dtype());
   } else {  // kernel impl base on JIT
-    dev_ctx.template Alloc<T>(out);
-
     TensorNameMap input_names;
     input_names["X"] = {"x"};
 
@@ -89,8 +92,7 @@ PD_REGISTER_PLUGIN_KERNEL(mean_all,
                           ALL_LAYOUT,
                           custom_kernel::MeanAllKernel,
                           float,
-                          phi::dtype::float16,
-                          double) {}
+                          phi::dtype::float16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(mean_all_grad,
                           gcu,

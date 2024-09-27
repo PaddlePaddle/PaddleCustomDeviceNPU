@@ -21,32 +21,6 @@ std::unordered_map<phi::DataType, phi::DataType> kDataTypeTrans64To32 = {
     {phi::DataType::FLOAT64, phi::DataType::FLOAT32},
 };
 
-inline bool IsValidPermutation(const std::vector<int64_t>& permutation) {
-  auto size = permutation.size();
-  std::vector<bool> flags(size, false);
-  for (size_t i = 0; i < size; ++i) {
-    auto k = permutation[i];
-    if (k >= 0 && k < size && !flags[k])
-      flags[k] = true;
-    else
-      return false;
-  }
-  return true;
-}
-
-inline std::vector<int64_t> ReorderVector(
-    const std::vector<int64_t>& src, const std::vector<int64_t>& permutation) {
-  PADDLE_ENFORCE(
-      permutation.size() == src.size() && IsValidPermutation(permutation),
-      phi::errors::InvalidArgument("Invalid permutation."));
-
-  std::vector<int64_t> dst(src.size());
-  for (size_t i = 0; i < src.size(); ++i) {
-    dst[i] = src[permutation[i]];
-  }
-  return dst;
-}
-
 std::vector<int64_t> InferBroadcastDimMap(
     const std::vector<int64_t>& src_dims,
     const std::vector<int64_t>& dst_dims) {
@@ -143,22 +117,25 @@ void Broadcast(const phi::CustomContext& dev_ctx,
             << ", will do nothing.";
     return;
   }
-  auto src_dims = phi::vectorize(src.dims());
-  auto dst_dims = phi::vectorize(dst->dims());
-  auto dims_map = InferBroadcastDimMap(src_dims, dst_dims);
-  auto alpha = phi::Scalar(1.0f);
-  auto beta = phi::Scalar(0.0f);
-  VLOG(3) << "Broadcast: dim map:" << VectorToStr<int64_t>(dims_map)
-          << ", dst:" << dst->dims();
-  static std::unordered_map<phi::DataType, phi::DataType> kDataTypeTransMap = {
-      {phi::DataType::INT64, phi::DataType::INT32},
-      {phi::DataType::FLOAT64, phi::DataType::FLOAT32},
-  };
-  phi::DenseTensor src_tmp = MaybeCreateOrTrans64To32bits(dev_ctx, src);
-  phi::DenseTensor dst_tmp = MaybeCreateOrTrans64To32bits(dev_ctx, *dst, false);
-  LAUNCH_TOPSOP(
-      topsopBroadcast, dev_ctx, dst_tmp, src_tmp, dims_map, alpha, beta);
-  MaybeTransResult(dev_ctx, dst_tmp, dst);
+  phi::DenseTensor as_strides_out;
+  auto src_tensor = CreateTopsatenTensor(src);
+  auto dst_tensor = CreateTopsatenTensor(*dst);
+  auto view_out_tensor = CreateTopsatenTensor(as_strides_out);
+
+  std::vector<int64_t> expand_shape(phi::vectorize(dst->dims()));
+  auto expand_size = IntArrayToTopsatenSize(expand_shape);
+  std::string abstract_info = custom_kernel::GetAbstractInfo(
+      "Broadcast_topsatenExpand", as_strides_out, src, expand_shape);
+  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenExpand,
+                                      dev_ctx,
+                                      abstract_info,
+                                      view_out_tensor,
+                                      src_tensor,
+                                      expand_size);
+  abstract_info = custom_kernel::GetAbstractInfo(
+      "Broadcast_topsatenCopy", *dst, as_strides_out, false);
+  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+      topsatenCopy, dev_ctx, abstract_info, dst_tensor, view_out_tensor, false);
 }
 
 phi::DenseTensor Broadcast(const phi::CustomContext& dev_ctx,
@@ -292,22 +269,17 @@ void CastImpl(const phi::CustomContext& dev_ctx,
   bool non_blocking = true;
   bool copy = true;
   topsatenMemoryFormat_t topsaten_format = TOPSATEN_MEMORY_PRESERVE;
-  auto stream = static_cast<topsStream_t>(dev_ctx.stream());
-  VLOG(3) << "CastImpl, use topsatenTo, convert "
-          << phi::DataTypeToString(x.dtype()) << " to "
-          << phi::DataTypeToString(dtype) << ", stream: " << stream;
-  ATEN_OP_CALL_MAYBE_SYNC(topsaten::topsatenTo(out_tensor,
-                                               x_tensor,
-                                               topsaten_dtype,
-                                               non_blocking,
-                                               copy,
-                                               topsaten_format,
-                                               stream),
-                          dev_ctx);
-  //   LAUNCH_TOPSOP(topsopConvert, dev_ctx, *out, x);
-  //   LAUNCH_TOPSATENOP(topsatenTo, dev_ctx, *out, x,
-  //                     dtype, non_blocking,
-  //                     copy, topsaten_format);
+  std::string abstract_info =
+      custom_kernel::GetAbstractInfo("topsatenTo", *out, x, x.dtype(), dtype);
+  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenTo,
+                                      dev_ctx,
+                                      abstract_info,
+                                      out_tensor,
+                                      x_tensor,
+                                      topsaten_dtype,
+                                      non_blocking,
+                                      copy,
+                                      topsaten_format);
 }
 
 #define FOR_EACH_DATA_TYPE(_)                   \
@@ -358,7 +330,7 @@ void CastCPUImpl(const phi::CustomContext& dev_ctx,
   }
 
   // 1. Copy x to CPU
-  ContextPinnedGuard ctx_pinned_guard(dev_ctx);
+  ContextPinnedGuard<phi::CustomContext> ctx_pinned_guard(dev_ctx);
   phi::DenseTensor x_cpu;
   x_cpu.set_meta(x.meta());
   TensorCopy(dev_ctx, x, false, &x_cpu, phi::CPUPlace());
@@ -422,6 +394,73 @@ phi::DenseTensor Cast(const phi::CustomContext& dev_ctx,
   return out;
 }
 
+phi::DenseTensor CastOrCopyToPinnedMemory(const phi::CustomContext& dev_ctx,
+                                          const phi::DenseTensor& x,
+                                          const phi::DataType& dtype) {
+  std::string key = "pinned_convert_" + GetDataTypePairKey(x.dtype(), dtype);
+  PADDLE_GCU_KERNEL_TRACE(key);
+  ContextPinnedGuard<phi::CustomContext> ctx_pinned_guard(dev_ctx);
+
+  //   phi::DenseTensor cast_out = x;
+  //   if (x.dtype() != dtype) {
+  //     cast_out = custom_kernel::Cast(dev_ctx, x, dtype);
+  //   }
+  //   phi::DenseTensor out;
+  //   out.set_meta(cast_out.meta());
+  //   dev_ctx.HostAlloc(&out, out.dtype());
+
+  //   C_Device_st device;
+  //   device.id = cast_out.place().GetDeviceId();
+  //   C_Stream stream = static_cast<C_Stream>(dev_ctx.stream());
+  //   auto size = out.numel() * phi::SizeOf(out.dtype());
+  //   VLOG(3) << "CastOrCopyToPinnedMemory, pinned addr:" << out.data()
+  //           << ", size:" << size;
+  //   (void)AsyncMemCpyD2D(&device, stream, out.data(), cast_out.data(), size);
+  //   return out;
+
+  if (x.dtype() == dtype) {
+    return x;
+  }
+
+  phi::DenseTensor out;
+  auto meta = x.meta();
+  meta.dtype = dtype;
+  out.set_meta(meta);
+  //   dev_ctx.HostAlloc(&out, out.dtype());
+  dev_ctx.Alloc(&out, out.dtype());
+
+  //   if (x.dtype() == dtype) {
+  //     VLOG(3) << "CastOrCopyToPinnedMemory, will copy D2D, dtype:"
+  //             << phi::DataTypeToString(dtype);
+  //     C_Device_st device;
+  //     device.id = x.place().GetDeviceId();
+  //     C_Stream stream = static_cast<C_Stream>(dev_ctx.stream());
+  //     auto size = x.numel() * phi::SizeOf(x.dtype());
+  //     (void)AsyncMemCpyD2D(&device, stream, out.data(), x.data(), size);
+  //     return out;
+  //   }
+
+  auto x_tensor = CreateTopsatenTensor(x, false);
+  auto out_tensor = CreateTopsatenTensor(out, true);
+
+  topsatenDataType_t topsaten_dtype = DataTypeToTopsatenDataType(dtype);
+  bool non_blocking = true;
+  bool copy = true;
+  topsatenMemoryFormat_t topsaten_format = TOPSATEN_MEMORY_PRESERVE;
+  std::string abstract_info =
+      custom_kernel::GetAbstractInfo("topsatenTo", out, x, x.dtype(), dtype);
+  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenTo,
+                                      dev_ctx,
+                                      abstract_info,
+                                      out_tensor,
+                                      x_tensor,
+                                      topsaten_dtype,
+                                      non_blocking,
+                                      copy,
+                                      topsaten_format);
+  return out;
+}
+
 phi::DenseTensor ReshapeWithoutCopy(const phi::DenseTensor& src,
                                     const std::vector<int64_t>& out_shapes) {
   PADDLE_ENFORCE_EQ(
@@ -432,45 +471,6 @@ phi::DenseTensor ReshapeWithoutCopy(const phi::DenseTensor& src,
   phi::DenseTensor dst(src);
   dst.Resize(phi::make_ddim(out_shapes));
   return dst;
-}
-
-void Transpose(const phi::CustomContext& dev_ctx,
-               const phi::DenseTensor& x,
-               const std::vector<int64_t>& axis,
-               phi::DenseTensor* out) {
-  // method 1: topsop impl
-  // auto alpha = phi::Scalar(1.0f);
-  // auto beta = phi::Scalar(0.0f);
-  // LAUNCH_TOPSOP(topsopTranspose,
-  //               dev_ctx,
-  //               *out, x, axis, alpha, beta);
-  // method 2: topsaten impl
-  auto aten_x = CreateTopsatenTensor(x);
-  auto aten_out = CreateTopsatenTensor(*out);
-  auto aten_tmp = aten_x;
-  auto perm = IntArrayToTopsatenSize(axis);
-  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
-      topsatenPermute, dev_ctx, aten_tmp, aten_x, perm);
-  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenContiguous,
-                                      dev_ctx,
-                                      aten_out,
-                                      aten_tmp,
-                                      TOPSATEN_MEMORY_CONTIGUOUS);
-}
-
-phi::DenseTensor Transpose(const phi::CustomContext& dev_ctx,
-                           const phi::DenseTensor& x,
-                           const std::vector<int64_t>& axis) {
-  // infer dst shape
-  std::vector<int64_t> src_dims = phi::vectorize(x.dims());
-  std::vector<int64_t> dst_dims = ReorderVector(src_dims, axis);
-
-  phi::DenseTensor dst_tensor;
-  phi::DenseTensorMeta meta(x.dtype(), phi::make_ddim(dst_dims));
-  dst_tensor.set_meta(meta);
-  dev_ctx.Alloc(&dst_tensor, dst_tensor.dtype());
-  Transpose(dev_ctx, x, axis, &dst_tensor);
-  return dst_tensor;
 }
 
 phi::DenseTensor TensorEmpty(const phi::CustomContext& dev_ctx,
@@ -495,5 +495,90 @@ phi::DenseTensor TensorZeros(const phi::CustomContext& dev_ctx,
   auto shape = phi::vectorize(meta.dims);
   LAUNCH_TOPSATENOP(topsatenZeros, dev_ctx, out, shape, meta.dtype);
   return out;
+}
+
+phi::DenseTensor Add(const phi::CustomContext& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::DenseTensor& y,
+                     const phi::DenseTensorMeta& out_meta) {
+  phi::DenseTensor out = TensorEmpty(dev_ctx, out_meta);
+  phi::Scalar scalar(1.0f);
+  LAUNCH_TOPSATENOP(topsatenAdd, dev_ctx, out, x, y, scalar);
+  return out;
+}
+
+phi::DenseTensor Add(const phi::CustomContext& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::DenseTensor& y) {
+  phi::DenseTensor out;
+  phi::MetaTensor meta_out(out);
+  phi::ElementwiseInferMeta(x, y, &meta_out);
+  out.Resize(meta_out.dims());
+  dev_ctx.Alloc(&out, x.dtype());
+  phi::Scalar scalar(1.0f);
+  LAUNCH_TOPSATENOP(topsatenAdd, dev_ctx, out, x, y, scalar);
+  return out;
+}
+
+phi::DenseTensor Subtract(const phi::CustomContext& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const phi::DenseTensor& y,
+                          const phi::DenseTensorMeta& out_meta) {
+  phi::DenseTensor out = TensorEmpty(dev_ctx, out_meta);
+  phi::Scalar scalar(1.0f);
+  LAUNCH_TOPSATENOP(topsatenSub, dev_ctx, out, x, y, scalar);
+  return out;
+}
+
+phi::DenseTensor Subtract(const phi::CustomContext& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const phi::DenseTensor& y) {
+  phi::DenseTensor out;
+  phi::MetaTensor meta_out(out);
+  phi::ElementwiseInferMeta(x, y, &meta_out);
+  out.Resize(meta_out.dims());
+  dev_ctx.Alloc(&out, x.dtype());
+  phi::Scalar scalar(1.0f);
+  LAUNCH_TOPSATENOP(topsatenSub, dev_ctx, out, x, y, scalar);
+  return out;
+}
+
+void SliceBase(const phi::CustomContext& dev_ctx,
+               const phi::DenseTensor& x,
+               const std::vector<int64_t>& axes,
+               const std::vector<int64_t>& starts,
+               phi::DenseTensor* out) {
+  std::vector<int64_t> sizes(phi::vectorize(out->dims()));
+  std::vector<int64_t> strides(phi::vectorize(x.strides()));
+  int64_t offset = 0;
+  for (size_t i = 0; i < axes.size(); ++i) {
+    int64_t axis = axes[i];
+    offset += (starts[i] * strides[axis]);
+  }
+  if (!(out->initialized())) {
+    dev_ctx.Alloc(out, out->dtype());
+  }
+
+  phi::DenseTensor as_strides_out;
+  auto x_tensor = CreateTopsatenTensor(x);
+  auto out_tensor = CreateTopsatenTensor(*out);
+  auto view_out_tensor = CreateTopsatenTensor(as_strides_out);
+  auto aten_sizes = IntArrayToTopsatenSize(sizes);
+  auto aten_strides = IntArrayToTopsatenSize(strides);
+
+  std::string abstract_info = custom_kernel::GetAbstractInfo(
+      "SliceBase_topsatenAsStrided", as_strides_out, x, sizes, strides, offset);
+  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenAsStrided,
+                                      dev_ctx,
+                                      abstract_info,
+                                      view_out_tensor,
+                                      x_tensor,
+                                      aten_sizes,
+                                      aten_strides,
+                                      offset);
+  abstract_info = custom_kernel::GetAbstractInfo(
+      "SliceBase_topsatenCopy", *out, as_strides_out, false);
+  LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+      topsatenCopy, dev_ctx, abstract_info, out_tensor, view_out_tensor, false);
 }
 }  // namespace custom_kernel

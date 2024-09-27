@@ -259,6 +259,7 @@ std::vector<paddle::Tensor> ConvBnReluOp(const paddle::Tensor& x,
   auto bias_tensor = static_cast<const phi::DenseTensor*>(bias.impl().get());
   auto scale_tensor = static_cast<const phi::DenseTensor*>(scale.impl().get());
   auto var_tensor = static_cast<const phi::DenseTensor*>(var.impl().get());
+
   // Infershape
   auto out_shapes = ConvBnReluOpInferShape(x.shape(),
                                            filter.shape(),
@@ -279,50 +280,131 @@ std::vector<paddle::Tensor> ConvBnReluOp(const paddle::Tensor& x,
                                            trainable_statistics,
                                            use_global_stats);
   paddle::Tensor out = paddle::empty(out_shapes[0], x.dtype(), x.place());
+  auto out_tensor = reinterpret_cast<phi::DenseTensor*>(out.impl().get());
+  if (custom_kernel::LaunchAOTKernel()) {
+    PADDLE_ENFORCE_EQ(
+        data_layout == "NCHW" || data_layout == "NCDHW",
+        true,
+        phi::errors::InvalidArgument(
+            "Only support NCHW/NCDHW layout in AOT mode, but received: %s.",
+            data_layout.c_str()));
+    paddle::Tensor conv_out =
+        paddle::empty(out_shapes[0], x.dtype(), x.place());
+    auto conv_out_tensor =
+        reinterpret_cast<phi::DenseTensor*>(conv_out.impl().get());
+    // adjust conv output to NHWC layout
+    auto dims = x.shape();
+    if (data_layout == "NCHW") {
+      std::vector<int64_t> nhwc_strides = {
+          dims[1] * dims[2] * dims[3], 1, dims[1] * dims[3], dims[1]};
+      conv_out_tensor->set_strides(phi::make_ddim(nhwc_strides));
+    } else {
+      std::vector<int64_t> ndhwc_strides = {
+          dims[1] * dims[2] * dims[3] * dims[4],
+          1,
+          dims[3] * dims[4] * dims[1],
+          dims[4] * dims[1],
+          dims[1]};
+      conv_out_tensor->set_strides(phi::make_ddim(ndhwc_strides));
+    }
 
-  custom_kernel::TensorNameMap input_names;
-  custom_kernel::TensorValueMap inputs;
-  input_names["X"] = {"x"};
-  input_names["Filter"] = {"filter"};
-  input_names["Mean"] = {"mean"};
-  input_names["Bias"] = {"bias"};
-  input_names["Scale"] = {"scale"};
-  input_names["Variance"] = {"variance"};
-  inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
-  inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
-  inputs["Mean"] = {const_cast<phi::DenseTensor*>(mean_tensor)};
-  inputs["Bias"] = {const_cast<phi::DenseTensor*>(bias_tensor)};
-  inputs["Scale"] = {const_cast<phi::DenseTensor*>(scale_tensor)};
-  inputs["Variance"] = {const_cast<phi::DenseTensor*>(var_tensor)};
+    // call aten conv2d(in:nchw out:nhwc)
+    auto meta = phi::DenseTensorMeta(filter.dtype(),
+                                     phi::make_ddim({filter.dims().at(0)}));
+    phi::DenseTensor conv_bias = custom_kernel::TensorEmpty(*dev_ctx, meta);
+    auto shape = phi::vectorize(conv_bias.dims());
+    LAUNCH_TOPSATENOP(topsatenZeros, (*dev_ctx), conv_bias, shape, meta.dtype);
 
-  custom_kernel::GcuAttributeMap attrs;
-  attrs["groups"] = groups;
-  attrs["data_format"] = data_format;
-  attrs["padding_algorithm"] = padding_algorithm;
-  attrs["strides"] = strides;
-  attrs["paddings"] = paddings;
-  attrs["dilations"] = dilations;
-  attrs["is_test"] = is_test;
-  attrs["data_layout"] = data_layout;
-  attrs["momentum"] = momentum;
-  attrs["epsilon"] = epsilon;
-  attrs["trainable_statistics"] = trainable_statistics;
-  attrs["use_global_stats"] = use_global_stats;
+    std::vector<int64_t> strides_v;
+    strides_v.insert(strides_v.begin(), strides.begin(), strides.end());
+    std::vector<int64_t> paddings_v;
+    paddings_v.insert(paddings_v.begin(), paddings.begin(), paddings.end());
+    std::vector<int64_t> dilations_v;
+    dilations_v.insert(dilations_v.begin(), dilations.begin(), dilations.end());
+    int64_t groups_64 = groups;
 
-  custom_kernel::TensorNameMap output_names;
-  custom_kernel::TensorValueMap outputs;
-  output_names["Out"] = {"Out"};
-  outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
+    LAUNCH_TOPSATENOP(topsatenConv2d,
+                      (*dev_ctx),
+                      *conv_out_tensor,
+                      *x_tensor,
+                      *filter_tensor,
+                      conv_bias,
+                      strides_v,
+                      paddings_v,
+                      dilations_v,
+                      groups_64);
+    // call batchnorm (in:nhwc out:nchw)
+    auto running_mean_meta = mean_tensor->meta();
+    auto running_var_meta = var_tensor->meta();
+    phi::DenseTensor running_mean =
+        custom_kernel::TensorEmpty(*dev_ctx, running_mean_meta);
+    phi::DenseTensor running_var =
+        custom_kernel::TensorEmpty(*dev_ctx, running_var_meta);
 
-  custom_kernel::GcuRunner(input_names,
-                           inputs,
-                           output_names,
-                           outputs,
-                           attrs,
-                           "conv_bn_relu",
-                           *dev_ctx);
+    double momentum_d = momentum;
+    double epsilon_d = epsilon;
 
-  return {out, mean, mean, var, var};
+    LAUNCH_TOPSATENOP(topsatenNativeBatchNorm,
+                      (*dev_ctx),
+                      *out_tensor,
+                      running_mean,
+                      running_var,
+                      *conv_out_tensor,
+                      *(const_cast<phi::DenseTensor*>(scale_tensor)),
+                      *(const_cast<phi::DenseTensor*>(bias_tensor)),
+                      *(const_cast<phi::DenseTensor*>(mean_tensor)),
+                      *(const_cast<phi::DenseTensor*>(var_tensor)),
+                      false,
+                      momentum_d,
+                      epsilon_d);
+    // call relu
+    LAUNCH_TOPSATENOP(topsatenRelu, (*dev_ctx), *out_tensor, *out_tensor);
+    return {out, mean, mean, var, var};
+  } else {
+    custom_kernel::TensorNameMap input_names;
+    custom_kernel::TensorValueMap inputs;
+    input_names["X"] = {"x"};
+    input_names["Filter"] = {"filter"};
+    input_names["Mean"] = {"mean"};
+    input_names["Bias"] = {"bias"};
+    input_names["Scale"] = {"scale"};
+    input_names["Variance"] = {"variance"};
+    inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
+    inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
+    inputs["Mean"] = {const_cast<phi::DenseTensor*>(mean_tensor)};
+    inputs["Bias"] = {const_cast<phi::DenseTensor*>(bias_tensor)};
+    inputs["Scale"] = {const_cast<phi::DenseTensor*>(scale_tensor)};
+    inputs["Variance"] = {const_cast<phi::DenseTensor*>(var_tensor)};
+
+    custom_kernel::GcuAttributeMap attrs;
+    attrs["groups"] = groups;
+    attrs["data_format"] = data_format;
+    attrs["padding_algorithm"] = padding_algorithm;
+    attrs["strides"] = strides;
+    attrs["paddings"] = paddings;
+    attrs["dilations"] = dilations;
+    attrs["is_test"] = is_test;
+    attrs["data_layout"] = data_layout;
+    attrs["momentum"] = momentum;
+    attrs["epsilon"] = epsilon;
+    attrs["trainable_statistics"] = trainable_statistics;
+    attrs["use_global_stats"] = use_global_stats;
+
+    custom_kernel::TensorNameMap output_names;
+    custom_kernel::TensorValueMap outputs;
+    output_names["Out"] = {"Out"};
+    outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
+
+    custom_kernel::GcuRunner(input_names,
+                             inputs,
+                             output_names,
+                             outputs,
+                             attrs,
+                             "conv_bn_relu",
+                             *dev_ctx);
+
+    return {out, mean, mean, var, var};
+  }
 }
 
 PD_BUILD_OP(GCUConvBnRelu)

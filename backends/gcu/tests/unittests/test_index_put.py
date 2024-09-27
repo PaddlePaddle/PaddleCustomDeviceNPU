@@ -19,170 +19,33 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 INDEX_PUT_CASE = [
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index1": [1, 2],
-        "index2": [1, 0],
-        "index_dtype": np.int32,
-        "value_shape": [2],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index1": [1, 2, 1],
-        "index2": [2, 1, 0],
-        "index_dtype": np.int32,
-        "value_shape": [3],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [6],
-        "x_dtype": np.float32,
-        "index1": [5, 0, 3, 4, 1, 2],
-        "index2": None,
-        "index_dtype": np.int32,
-        "value_shape": [6],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index1": [1, 2],
-        "index2": [1, 0],
-        "index_dtype": np.int32,
-        "value_shape": [2],
-        "accumulate": True,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index1": [1, 2, 1],
-        "index2": [2, 1, 0],
-        "index_dtype": np.int32,
-        "value_shape": [3],
-        "accumulate": True,
-    },
-    {
-        "x_shape": [6],
-        "x_dtype": np.float32,
-        "index1": [5, 0, 3, 4, 1, 2],
-        "index2": None,
-        "index_dtype": np.int32,
-        "value_shape": [6],
-        "accumulate": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float32,
-        "index1": [1, 2],
-        "index2": [1, 0],
-        "index_dtype": np.int64,
-        "value_shape": [2],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float32,
-        "index1": [1, 2, 1],
-        "index2": [2, 1, 0],
-        "index_dtype": np.int64,
-        "value_shape": [3],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [6],
-        "x_dtype": np.float32,
-        "index1": [5, 0, 3, 4, 1, 2],
-        "index2": None,
-        "index_dtype": np.int64,
-        "value_shape": [6],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.int64,
-        "index1": [1, 2],
-        "index2": [1, 0],
-        "index_dtype": np.int32,
-        "value_shape": [2],
-        "accumulate": True,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.int64,
-        "index1": [1, 2, 1],
-        "index2": [2, 1, 0],
-        "index_dtype": np.int32,
-        "value_shape": [3],
-        "accumulate": True,
-    },
-    {
-        "x_shape": [6],
-        "x_dtype": np.int64,
-        "index1": [5, 0, 3, 4, 1, 2],
-        "index2": None,
-        "index_dtype": np.int32,
-        "value_shape": [6],
-        "accumulate": True,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.int64,
-        "index1": [1, 2],
-        "index2": [1, 0],
-        "index_dtype": np.int64,
-        "value_shape": [2],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.int64,
-        "index1": [1, 2, 1],
-        "index2": [2, 1, 0],
-        "index_dtype": np.int64,
-        "value_shape": [3],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [6],
-        "x_dtype": np.int64,
-        "index1": [5, 0, 3, 4, 1, 2],
-        "index2": None,
-        "index_dtype": np.int64,
-        "value_shape": [6],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 2],
-        "x_dtype": np.float16,
-        "index1": [1, 2],
-        "index2": [1, 0],
-        "index_dtype": np.int64,
-        "value_shape": [2],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [3, 3],
-        "x_dtype": np.float16,
-        "index1": [1, 2, 1],
-        "index2": [2, 1, 0],
-        "index_dtype": np.int64,
-        "value_shape": [3],
-        "accumulate": False,
-    },
-    {
-        "x_shape": [6],
-        "x_dtype": np.float16,
-        "index1": [5, 0, 3, 4, 1, 2],
-        "index2": None,
-        "index_dtype": np.int64,
-        "value_shape": [6],
-        "accumulate": False,
-    },
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index1": [1, 2], "index2": [1, 0], "index_dtype": np.int32, "value_shape": [2], "accumulate": False},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index1": [1, 2, 1], "index2": [2, 1, 0], "index_dtype": np.int32, "value_shape": [3], "accumulate": False},
+    {"x_shape": [6], "x_dtype": np.float32, "index1": [5, 0, 3, 4, 1, 2], "index2": None, "index_dtype": np.int32, "value_shape": [6], "accumulate": False},
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index1": [1, 2], "index2": [1, 0], "index_dtype": np.int32, "value_shape": [2], "accumulate": True},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index1": [1, 2, 1], "index2": [2, 1, 0], "index_dtype": np.int32, "value_shape": [3], "accumulate": True},
+    {"x_shape": [6], "x_dtype": np.float32, "index1": [5, 0, 3, 4, 1, 2], "index2": None, "index_dtype": np.int32, "value_shape": [6], "accumulate": True},
+
+    {"x_shape": [3, 2], "x_dtype": np.float32, "index1": [1, 2], "index2": [1, 0], "index_dtype": np.int64, "value_shape": [2], "accumulate": False},
+    {"x_shape": [3, 3], "x_dtype": np.float32, "index1": [1, 2, 1], "index2": [2, 1, 0], "index_dtype": np.int64, "value_shape": [3], "accumulate": False},
+    {"x_shape": [6], "x_dtype": np.float32, "index1": [5, 0, 3, 4, 1, 2], "index2": None, "index_dtype": np.int64, "value_shape": [6], "accumulate": False},
+
+    {"x_shape": [3, 2], "x_dtype": np.int64, "index1": [1, 2], "index2": [1, 0], "index_dtype": np.int32, "value_shape": [2], "accumulate": True},
+    {"x_shape": [3, 3], "x_dtype": np.int64, "index1": [1, 2, 1], "index2": [2, 1, 0], "index_dtype": np.int32, "value_shape": [3], "accumulate": True},
+    {"x_shape": [6], "x_dtype": np.int64, "index1": [5, 0, 3, 4, 1, 2], "index2": None, "index_dtype": np.int32, "value_shape": [6], "accumulate": True},
+
+    {"x_shape": [3, 2], "x_dtype": np.int64, "index1": [1, 2], "index2": [1, 0], "index_dtype": np.int64, "value_shape": [2], "accumulate": False},
+    {"x_shape": [3, 3], "x_dtype": np.int64, "index1": [1, 2, 1], "index2": [2, 1, 0], "index_dtype": np.int64, "value_shape": [3], "accumulate": False},
+    {"x_shape": [6], "x_dtype": np.int64, "index1": [5, 0, 3, 4, 1, 2], "index2": None, "index_dtype": np.int64, "value_shape": [6], "accumulate": False},
+
+    {"x_shape": [3, 2], "x_dtype": np.float16, "index1": [1, 2], "index2": [1, 0], "index_dtype": np.int64, "value_shape": [2], "accumulate": False},
+    {"x_shape": [3, 3], "x_dtype": np.float16, "index1": [1, 2, 1], "index2": [2, 1, 0], "index_dtype": np.int64, "value_shape": [3], "accumulate": False},
+    {"x_shape": [6], "x_dtype": np.float16, "index1": [5, 0, 3, 4, 1, 2], "index2": None, "index_dtype": np.int64, "value_shape": [6], "accumulate": False},
 ]
+# fmt: on
 
 
 @ddt
@@ -199,7 +62,7 @@ class TestIndexPut(TestAPIBase):
         self.value_shape = [2]
         self.accumulate = False
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
         self.values = self.generate_data(self.value_shape, self.x_dtype)
         if self.x_dtype == np.int64:

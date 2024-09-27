@@ -42,7 +42,7 @@ void GaussianKernel(const Context& ctx,
     LAUNCH_TOPSATENOP(topsatenNormal, ctx, *out, d_mean, d_std, seed_offset);
 
   } else {  // kernel impl base on JIT
-    ContextPinnedGuard ctx_pinned_guard(ctx);
+    ContextPinnedGuard<Context> ctx_pinned_guard(ctx);
     VLOG(6) << "[HOST_KERNEL] Impl on host for gaussian";
     VLOG(6) << "Enter GaussianKernel with mean:" << mean << ", std:" << std
             << ", seed:" << seed << ", dtype:" << phi::DataTypeToString(dtype);

@@ -19,83 +19,29 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 FLATTEN_CASE = [
     # float32
-    {
-        "x_shape": [6],
-        "x_dtype": np.float32,
-        "start_axis": 0,
-        "stop_axis": -1,
-    },
-    {
-        "x_shape": [3, 6],
-        "x_dtype": np.float32,
-        "start_axis": 0,
-        "stop_axis": -1,
-    },
-    {
-        "x_shape": [2, 3, 6],
-        "x_dtype": np.float32,
-        "start_axis": 1,
-        "stop_axis": 2,
-    },
-    {
-        "x_shape": [3, 2, 3, 6],
-        "x_dtype": np.float32,
-        "start_axis": 0,
-        "stop_axis": 2,
-    },
+    {"x_shape": [6], "x_dtype": np.float32, "start_axis": 0, "stop_axis": -1},
+    {"x_shape": [3, 6], "x_dtype": np.float32, "start_axis": 0, "stop_axis": -1},
+    {"x_shape": [2, 3, 6], "x_dtype": np.float32, "start_axis": 1, "stop_axis": 2},
+    {"x_shape": [3, 2, 3, 6], "x_dtype": np.float32, "start_axis": 0, "stop_axis": 2},
+
     # int32
-    {
-        "x_shape": [6],
-        "x_dtype": np.int32,
-        "start_axis": 0,
-        "stop_axis": -1,
-    },
-    {
-        "x_shape": [3, 6],
-        "x_dtype": np.int32,
-        "start_axis": 0,
-        "stop_axis": -1,
-    },
-    {
-        "x_shape": [2, 3, 6],
-        "x_dtype": np.int32,
-        "start_axis": 1,
-        "stop_axis": 2,
-    },
-    {
-        "x_shape": [3, 2, 3, 6],
-        "x_dtype": np.int32,
-        "start_axis": 0,
-        "stop_axis": 2,
-    },
+    {"x_shape": [6], "x_dtype": np.int32, "start_axis": 0, "stop_axis": -1},
+    {"x_shape": [3, 6], "x_dtype": np.int32, "start_axis": 0, "stop_axis": -1},
+    {"x_shape": [2, 3, 6], "x_dtype": np.int32, "start_axis": 1, "stop_axis": 2},
+    {"x_shape": [3, 2, 3, 6], "x_dtype": np.int32, "start_axis": 0, "stop_axis": 2},
+
     # float16
-    {
-        "x_shape": [6],
-        "x_dtype": np.float16,
-        "start_axis": 0,
-        "stop_axis": -1,
-    },
-    {
-        "x_shape": [3, 6],
-        "x_dtype": np.float16,
-        "start_axis": 0,
-        "stop_axis": -1,
-    },
-    {
-        "x_shape": [2, 3, 6],
-        "x_dtype": np.float16,
-        "start_axis": 1,
-        "stop_axis": 2,
-    },
-    {
-        "x_shape": [3, 2, 3, 6],
-        "x_dtype": np.float16,
-        "start_axis": 0,
-        "stop_axis": 2,
-    },
+    {"x_shape": [6], "x_dtype": np.float16, "start_axis": 0, "stop_axis": -1},
+    {"x_shape": [3, 6], "x_dtype": np.float16, "start_axis": 0, "stop_axis": -1},
+    {"x_shape": [2, 3, 6], "x_dtype": np.float16, "start_axis": 1, "stop_axis": 2},
+    {"x_shape": [3, 2, 3, 6], "x_dtype": np.float16, "start_axis": 0, "stop_axis": 2},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -109,7 +55,7 @@ class TestFlatten(TestAPIBase):
         self.start_axis = 0
         self.stop_axis = -1
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward_with_dtype(self, dtype):

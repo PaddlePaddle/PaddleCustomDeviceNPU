@@ -19,68 +19,27 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 EXPAND_CASE = [
     {"x_shape": [6], "x_dtype": np.float32, "expand_shape": [1, 6], "reps": [1, 1]},
     {"x_shape": [1, 6], "x_dtype": np.float32, "expand_shape": [3, 6], "reps": [3, 1]},
-    {
-        "x_shape": [2, 3, 1],
-        "x_dtype": np.float32,
-        "expand_shape": [2, 3, 6],
-        "reps": [1, 1, 6],
-    },
-    {
-        "x_shape": [2, 10, 5],
-        "x_dtype": np.float32,
-        "expand_shape": [2, 10, 5],
-        "reps": [1, 1, 1],
-    },
-    {
-        "x_shape": [2, 4, 1, 15],
-        "x_dtype": np.float32,
-        "expand_shape": [2, 4, 4, 15],
-        "reps": [1, 1, 4, 1],
-    },
-    {
-        "x_shape": [2, 4, 1, 15],
-        "x_dtype": np.float32,
-        "expand_shape": [2, -1, 4, -1],
-        "reps": [1, 1, 4, 1],
-    },
+    {"x_shape": [2, 3, 1], "x_dtype": np.float32, "expand_shape": [2, 3, 6], "reps": [1, 1, 6]},
+    {"x_shape": [2, 10, 5], "x_dtype": np.float32, "expand_shape": [2, 10, 5], "reps": [1, 1, 1]},
+    {"x_shape": [2, 4, 1, 15], "x_dtype": np.float32, "expand_shape": [2, 4, 4, 15], "reps": [1, 1, 4, 1]},
+    {"x_shape": [2, 4, 1, 15], "x_dtype": np.float32, "expand_shape": [2, -1, 4, -1], "reps": [1, 1, 4, 1]},
     {"x_shape": [6], "x_dtype": np.float16, "expand_shape": [1, 6], "reps": [1, 1]},
     {"x_shape": [1, 6], "x_dtype": np.float16, "expand_shape": [3, 6], "reps": [3, 1]},
-    {
-        "x_shape": [2, 3, 1],
-        "x_dtype": np.float16,
-        "expand_shape": [2, 3, 6],
-        "reps": [1, 1, 6],
-    },
-    {
-        "x_shape": [2, 10, 5],
-        "x_dtype": np.float16,
-        "expand_shape": [2, 10, 5],
-        "reps": [1, 1, 1],
-    },
-    {
-        "x_shape": [2, 4, 1, 15],
-        "x_dtype": np.float16,
-        "expand_shape": [2, 4, 4, 15],
-        "reps": [1, 1, 4, 1],
-    },
-    {
-        "x_shape": [2, 4, 1, 15],
-        "x_dtype": np.float16,
-        "expand_shape": [2, -1, 4, -1],
-        "reps": [1, 1, 4, 1],
-    },
+    {"x_shape": [2, 3, 1], "x_dtype": np.float16, "expand_shape": [2, 3, 6], "reps": [1, 1, 6]},
+    {"x_shape": [2, 10, 5], "x_dtype": np.float16, "expand_shape": [2, 10, 5], "reps": [1, 1, 1]},
+    {"x_shape": [2, 4, 1, 15], "x_dtype": np.float16, "expand_shape": [2, 4, 4, 15], "reps": [1, 1, 4, 1]},
+    {"x_shape": [2, 4, 1, 15], "x_dtype": np.float16, "expand_shape": [2, -1, 4, -1], "reps": [1, 1, 4, 1]},
     {"x_shape": [6], "x_dtype": np.int32, "expand_shape": [1, 6], "reps": [1, 1]},
     {"x_shape": [6], "x_dtype": np.int64, "expand_shape": [1, 6], "reps": [1, 1]},
-    {
-        "x_shape": [2, 4, 1, 15],
-        "x_dtype": np.int64,
-        "expand_shape": [2, -1, 4, -1],
-        "reps": [1, 1, 4, 1],
-    },
+    {"x_shape": [2, 4, 1, 15], "x_dtype": np.int64, "expand_shape": [2, -1, 4, -1], "reps": [1, 1, 4, 1]},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -94,7 +53,7 @@ class TestExpand(TestAPIBase):
         self.expand_shape = [2, 3]
         self.reps = [2, 1]
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

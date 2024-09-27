@@ -49,6 +49,7 @@ void DropoutKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<uint8_t>(mask);
 
   if (LaunchAOTKernel()) {
+    // TODO(xuelei.wan): Implement mode mode='downscale_in_infer'
     if (mode != "upscale_in_train") {
       PADDLE_THROW(phi::errors::Unimplemented(
           "Only support mode='upscale_in_train' in dropout so far as now."));

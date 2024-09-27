@@ -21,6 +21,17 @@ paddle::Tensor CreateTensorFromDenseTensor(const phi::DenseTensor &x) {
   return paddle::Tensor(impl);
 }
 
+paddle::optional<paddle::Tensor> CreateOptionalTensorFromOptionalDense(
+    const paddle::optional<phi::DenseTensor> &x) {
+  if (x) {
+    std::shared_ptr<phi::DenseTensor> impl =
+        std::make_shared<phi::DenseTensor>(x.get());
+    return paddle::make_optional<paddle::Tensor>(paddle::Tensor(impl));
+  } else {
+    return paddle::optional<paddle::Tensor>();
+  }
+}
+
 phi::DenseTensor CreateDenseTensorFromTernsor(const paddle::Tensor &x) {
   auto impl_dense = static_cast<const phi::DenseTensor *>(x.impl().get());
   return *impl_dense;

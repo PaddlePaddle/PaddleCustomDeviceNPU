@@ -127,6 +127,31 @@ void MatmulGradKernel(const Context& dev_ctx,
               dev_ctx);
   }
 }
+
+template <typename T, typename Context>
+void MatmulWithFlattenKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::DenseTensor& y,
+                             int x_num_col_dims,
+                             int y_num_col_dims,
+                             phi::DenseTensor* out) {
+  const phi::DenseTensor x_matrix =
+      x.dims().size() > 2 ? phi::ReshapeToMatrix(x, x_num_col_dims) : x;
+  const phi::DenseTensor y_matrix =
+      y.dims().size() > 2 ? phi::ReshapeToMatrix(y, y_num_col_dims) : y;
+
+  dev_ctx.template Alloc<T>(out);
+  auto z_dim = out->dims();
+  if (z_dim.size() != 2) {
+    out->Resize({x_matrix.dims()[0], y_matrix.dims()[1]});
+  }
+
+  LAUNCH_TOPSATENOP(topsatenMatmul, dev_ctx, *out, x_matrix, y_matrix);
+  if (z_dim.size() != 2) {
+    out->Resize(z_dim);
+  }
+}
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(matmul,
@@ -143,3 +168,10 @@ PD_REGISTER_PLUGIN_KERNEL(matmul_grad,
                           float,
                           phi::dtype::float16,
                           double) {}
+
+PD_REGISTER_PLUGIN_KERNEL(matmul_with_flatten,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::MatmulWithFlattenKernel,
+                          float,
+                          phi::dtype::float16) {}

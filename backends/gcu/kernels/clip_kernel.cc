@@ -27,7 +27,8 @@ void ClipKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    LAUNCH_TOPSATENOP(topsatenClip, dev_ctx, *out, x, min, max);
+
   } else {  // kernel impl base on JIT
     auto max_ = max.to<T>();
     auto min_ = min.to<T>();
@@ -111,10 +112,8 @@ PD_REGISTER_PLUGIN_KERNEL(clip,
                           ALL_LAYOUT,
                           custom_kernel::ClipKernel,
                           int,
-                          int64_t,
                           float,
-                          phi::dtype::float16,
-                          double) {}
+                          phi::dtype::float16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(clip_grad,
                           gcu,

@@ -22,15 +22,42 @@ void MaskedSelectKernel(const Context& dev_ctx,
                         const phi::DenseTensor& x,
                         const phi::DenseTensor& mask,
                         phi::DenseTensor* out) {
-  //   dev_ctx.template Alloc<T>(out);
-
-  //   const phi::DenseTensorMeta meta(phi::CppTypeToDataType<T>::Type(),
-  //                                   out->dims());
-  //   out->set_meta(meta);
-
   PADDLE_GCU_KERNEL_TRACE("masked_select");
   if (LaunchAOTKernel()) {
+    // topsatenMaskedSelect does not refresh the meta information of output.
     THROW_AOT_UNIMPLEMENTED();
+
+    auto x_tensor = CreateTopsatenTensor(x);
+    auto mask_tensor = CreateTopsatenTensor(mask);
+    auto out_tensor = CreateTopsatenTensorWithoutInitialized(*out);
+    std::vector<int64_t> tensor_strides = {1};
+    auto strides = topsatenSize_t{tensor_strides.data(), 1};
+    out_tensor.SetTensorStrides(strides);
+    std::string abstract_info =
+        custom_kernel::GetAbstractInfo("topsatenMaskedSelect", *out, x, mask);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenMaskedSelect,
+                                        dev_ctx,
+                                        abstract_info,
+                                        out_tensor,
+                                        x_tensor,
+                                        mask_tensor);
+    topsatenSize_t aten_out_shape = out_tensor.GetTensorShape();
+    std::vector<int64_t> out_shape(aten_out_shape.data,
+                                   aten_out_shape.data + aten_out_shape.len);
+    out->Resize(common::make_ddim(out_shape));
+
+    VLOG(6) << "MaskedSelectKernel, out tensor shape:" << out->dims();
+    dev_ctx.template Alloc<T>(out);
+    C_Device_st device;
+    device.id = out->place().GetDeviceId();
+    C_Stream stream = static_cast<C_Stream>(dev_ctx.stream());
+    auto bytes_size = out->numel() * phi::SizeOf(out->dtype());
+    AsyncMemCpyD2D(&device,
+                   stream,
+                   out->data(),
+                   static_cast<void*>(out_tensor.GetTensorData()),
+                   bytes_size);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
@@ -96,17 +123,15 @@ void MaskedSelectGradKernel(const Context& dev_ctx,
 
 }  // namespace custom_kernel
 
-// PD_REGISTER_PLUGIN_KERNEL(masked_select,
-//                           gcu,
-//                           ALL_LAYOUT,
-//                           custom_kernel::MaskedSelectKernel,
-//                           phi::dtype::float16,
-//                           float,
-//                           int,
-//                           int64_t) {
-//   kernel->InputAt(1).SetDataType(phi::DataType::BOOL);
-//   kernel->OutputAt(0).SetDataType(phi::dtype::ToReal(kernel_key.dtype()));
-// }
+PD_REGISTER_PLUGIN_KERNEL(masked_select,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::MaskedSelectKernel,
+                          phi::dtype::float16,
+                          float,
+                          int) {
+  kernel->InputAt(1).SetDataType(phi::DataType::BOOL);
+}
 
 // PD_REGISTER_PLUGIN_KERNEL(masked_select_grad,
 //                           gcu,

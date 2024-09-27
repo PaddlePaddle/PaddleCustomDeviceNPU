@@ -250,33 +250,40 @@ std::vector<paddle::Tensor> ConvBiasOp(const paddle::Tensor& x,
                                          paddings,
                                          dilations);
   paddle::Tensor out = paddle::empty(out_shapes[0], x.dtype(), x.place());
+  if (custom_kernel::LaunchAOTKernel()) {
+    THROW_AOT_UNIMPLEMENTED();
+  } else {
+    custom_kernel::TensorNameMap input_names;
+    custom_kernel::TensorValueMap inputs;
+    input_names["X"] = {"x"};
+    input_names["Filter"] = {"filter"};
+    input_names["Y"] = {"y"};
+    inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
+    inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
+    inputs["Y"] = {const_cast<phi::DenseTensor*>(y_tensor)};
 
-  custom_kernel::TensorNameMap input_names;
-  custom_kernel::TensorValueMap inputs;
-  input_names["X"] = {"x"};
-  input_names["Filter"] = {"filter"};
-  input_names["Y"] = {"y"};
-  inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
-  inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
-  inputs["Y"] = {const_cast<phi::DenseTensor*>(y_tensor)};
+    custom_kernel::GcuAttributeMap attrs;
+    attrs["groups"] = groups;
+    attrs["data_format"] = data_format;
+    attrs["padding_algorithm"] = padding_algorithm;
+    attrs["strides"] = strides;
+    attrs["paddings"] = paddings;
+    attrs["dilations"] = dilations;
+    attrs["axis"] = axis;
 
-  custom_kernel::GcuAttributeMap attrs;
-  attrs["groups"] = groups;
-  attrs["data_format"] = data_format;
-  attrs["padding_algorithm"] = padding_algorithm;
-  attrs["strides"] = strides;
-  attrs["paddings"] = paddings;
-  attrs["dilations"] = dilations;
-  attrs["axis"] = axis;
+    custom_kernel::TensorNameMap output_names;
+    custom_kernel::TensorValueMap outputs;
+    output_names["Out"] = {"Out"};
+    outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
 
-  custom_kernel::TensorNameMap output_names;
-  custom_kernel::TensorValueMap outputs;
-  output_names["Out"] = {"Out"};
-  outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
-
-  custom_kernel::GcuRunner(
-      input_names, inputs, output_names, outputs, attrs, "conv_bias", *dev_ctx);
-
+    custom_kernel::GcuRunner(input_names,
+                             inputs,
+                             output_names,
+                             outputs,
+                             attrs,
+                             "conv_bias",
+                             *dev_ctx);
+  }
   return {out};
 }
 
@@ -308,38 +315,40 @@ std::vector<paddle::Tensor> ConvBiasReluOp(const paddle::Tensor& x,
                                          paddings,
                                          dilations);
   paddle::Tensor out = paddle::empty(out_shapes[0], x.dtype(), x.place());
+  if (custom_kernel::LaunchAOTKernel()) {
+    THROW_AOT_UNIMPLEMENTED();
+  } else {
+    custom_kernel::TensorNameMap input_names;
+    custom_kernel::TensorValueMap inputs;
+    input_names["X"] = {"x"};
+    input_names["Filter"] = {"filter"};
+    input_names["Y"] = {"y"};
+    inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
+    inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
+    inputs["Y"] = {const_cast<phi::DenseTensor*>(y_tensor)};
 
-  custom_kernel::TensorNameMap input_names;
-  custom_kernel::TensorValueMap inputs;
-  input_names["X"] = {"x"};
-  input_names["Filter"] = {"filter"};
-  input_names["Y"] = {"y"};
-  inputs["X"] = {const_cast<phi::DenseTensor*>(x_tensor)};
-  inputs["Filter"] = {const_cast<phi::DenseTensor*>(filter_tensor)};
-  inputs["Y"] = {const_cast<phi::DenseTensor*>(y_tensor)};
+    custom_kernel::GcuAttributeMap attrs;
+    attrs["groups"] = groups;
+    attrs["data_format"] = data_format;
+    attrs["padding_algorithm"] = padding_algorithm;
+    attrs["strides"] = strides;
+    attrs["paddings"] = paddings;
+    attrs["dilations"] = dilations;
+    attrs["axis"] = axis;
 
-  custom_kernel::GcuAttributeMap attrs;
-  attrs["groups"] = groups;
-  attrs["data_format"] = data_format;
-  attrs["padding_algorithm"] = padding_algorithm;
-  attrs["strides"] = strides;
-  attrs["paddings"] = paddings;
-  attrs["dilations"] = dilations;
-  attrs["axis"] = axis;
+    custom_kernel::TensorNameMap output_names;
+    custom_kernel::TensorValueMap outputs;
+    output_names["Out"] = {"Out"};
+    outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
 
-  custom_kernel::TensorNameMap output_names;
-  custom_kernel::TensorValueMap outputs;
-  output_names["Out"] = {"Out"};
-  outputs["Out"] = {static_cast<phi::DenseTensor*>(out.impl().get())};
-
-  custom_kernel::GcuRunner(input_names,
-                           inputs,
-                           output_names,
-                           outputs,
-                           attrs,
-                           "conv_bias_relu",
-                           *dev_ctx);
-
+    custom_kernel::GcuRunner(input_names,
+                             inputs,
+                             output_names,
+                             outputs,
+                             attrs,
+                             "conv_bias_relu",
+                             *dev_ctx);
+  }
   return {out};
 }
 

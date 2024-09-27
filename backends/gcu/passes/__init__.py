@@ -42,4 +42,37 @@ from .gcu_mul_add_fuse import (
     gcu_fuse_mul_add,
 )
 
+from .gcu_sdp_attn_fuse import (
+    fused_sdp_attention,
+)
+
+from .gcu_multi_head_attn_fuse import (
+    fused_multi_head_attention_pass,
+)
+
+from .gcu_linear_fuse import (
+    fused_linear_pass,
+)
+
+from .gcu_conv_transpose_elementwise_add_act_fuse_pass import (
+    conv2d_transpose_elementwise_add_relu_fuse_pass,
+    conv2d_transpose_elementwise_add_sigmoid_fuse_pass,
+)
+
+from .gcu_conv_transpose_elementwise_add_fuse_pass import (
+    conv2d_transpose_elementwise_add_fuse_pass,
+)
+
+from .gcu_conv_depthwise_elementwise_add_fuse_pass import (
+    conv2d_depthwise_elementwise_add_fuse_pass,
+)
+
+from .gcu_conv_elementwise_add_fuse_pass import (
+    conv2d_elementwise_add_fuse_pass,
+)
+
+from .gcu_netoutput_pass import (
+    add_netoutput_op_pass,
+)
+
 from .common import register_pass

@@ -19,26 +19,21 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SQUEEZE_CASE = [
     {"x_shape": [1, 3, 1, 6], "x_dtype": np.float32, "axis": None, "new_shape": None},
     {"x_shape": [1, 3, 1, 6], "x_dtype": np.float32, "axis": 0, "new_shape": None},
     {"x_shape": [1, 3, 1, 6], "x_dtype": np.float32, "axis": [0, 2], "new_shape": None},
     {"x_shape": [1, 3, 1, 6], "x_dtype": np.float32, "axis": [-2], "new_shape": None},
+
     {"x_shape": [1, 3, 1, 6], "x_dtype": np.float16, "axis": None, "new_shape": [3, 6]},
     {"x_shape": [1, 3, 1, 6], "x_dtype": np.float16, "axis": 0, "new_shape": [3, 1, 6]},
-    {
-        "x_shape": [1, 3, 1, 6],
-        "x_dtype": np.float16,
-        "axis": [0, 2],
-        "new_shape": [3, 6],
-    },
-    {
-        "x_shape": [1, 3, 1, 6],
-        "x_dtype": np.float16,
-        "axis": [-2],
-        "new_shape": [1, 3, 6],
-    },
+    {"x_shape": [1, 3, 1, 6], "x_dtype": np.float16, "axis": [0, 2], "new_shape": [3, 6]},
+    {"x_shape": [1, 3, 1, 6], "x_dtype": np.float16, "axis": [-2], "new_shape": [1, 3, 6]},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -52,7 +47,7 @@ class TestSqueeze(TestAPIBase):
         self.new_shape = [3, 6]
         self.axis = None
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

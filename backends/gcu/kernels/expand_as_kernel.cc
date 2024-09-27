@@ -20,62 +20,83 @@ namespace custom_kernel {
 #define MAX_RANK_SUPPORTED 6
 
 template <typename T, typename Context>
+extern void ExpandKernel(const Context& dev_ctx,
+                         const phi::DenseTensor& x,
+                         const phi::IntArray& shape,
+                         phi::DenseTensor* out);
+
+template <typename T, typename Context>
 void ExpandAsKernel(const Context& dev_ctx,
                     const phi::DenseTensor& x,
                     const paddle::optional<phi::DenseTensor>& y,
                     const std::vector<int>& target_shape,
                     phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("expand_as");
-  auto rank = x.dims().size();
-  auto target_rank = target_shape.size();
-  PADDLE_ENFORCE_GE(target_rank,
-                    rank,
-                    phi::errors::InvalidArgument(
-                        "The rank (%d) of the input 'target_tensor' for "
-                        "expand_as_v2 op must be greater than or equal to "
-                        "the rank (%d) of the input 'x'.",
-                        target_rank,
-                        rank));
-  PADDLE_ENFORCE_GE(
-      rank,
-      0,
-      phi::errors::InvalidArgument("The rank (%d) of the input 'x' for "
-                                   "expand_as_v2 op must be positive.",
-                                   rank));
-  PADDLE_ENFORCE_LE(target_rank,
-                    MAX_RANK_SUPPORTED,
-                    phi::errors::InvalidArgument(
-                        "The rank (%d) of the input 'target_tensor' for "
-                        "expand_as_v2 op must be less than or equal to %d.",
-                        target_rank,
-                        MAX_RANK_SUPPORTED));
-
-  auto in_dims = x.dims();
-  auto vec_in_dims = phi::vectorize<int>(in_dims);
-  auto diff = target_shape.size() - vec_in_dims.size();
-  vec_in_dims.insert(vec_in_dims.begin(), diff, 1);
-
-  for (size_t i = 0; i < vec_in_dims.size(); ++i) {
-    PADDLE_ENFORCE_NE(target_shape[i],
-                      0,
-                      phi::errors::InvalidArgument(
-                          "The value of target shape cannot be zero."));
-    if (vec_in_dims[i] != 1) {
-      PADDLE_ENFORCE_EQ(
-          vec_in_dims[i],
-          target_shape[i],
-          phi::errors::InvalidArgument(
-              "The value (%d) of the non-singleton dimension does not match"
-              " the corresponding value (%d) in "
-              "target tensor for expand_as_v2 op.",
-              vec_in_dims[i],
-              target_shape[i]));
+  std::vector<int> real_target_shape = target_shape;
+  for (size_t i = 0; i < target_shape.size(); ++i) {
+    if (target_shape[i] == -1) {
+      if (y) {
+        if (y->initialized()) {
+          real_target_shape = common::vectorize<int>(y->dims());
+        }
+      }
+      break;
     }
   }
+
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    phi::IntArray shape(real_target_shape);
+    custom_kernel::ExpandKernel<T, Context>(dev_ctx, x, shape, out);
+
   } else {  // kernel impl base on JIT
-    phi::DDim out_dims = phi::make_ddim(target_shape);
+    auto rank = x.dims().size();
+    auto target_rank = real_target_shape.size();
+    PADDLE_ENFORCE_GE(target_rank,
+                      rank,
+                      phi::errors::InvalidArgument(
+                          "The rank (%d) of the input 'target_tensor' for "
+                          "expand_as_v2 op must be greater than or equal to "
+                          "the rank (%d) of the input 'x'.",
+                          target_rank,
+                          rank));
+    PADDLE_ENFORCE_GE(
+        rank,
+        0,
+        phi::errors::InvalidArgument("The rank (%d) of the input 'x' for "
+                                     "expand_as_v2 op must be positive.",
+                                     rank));
+    PADDLE_ENFORCE_LE(target_rank,
+                      MAX_RANK_SUPPORTED,
+                      phi::errors::InvalidArgument(
+                          "The rank (%d) of the input 'target_tensor' for "
+                          "expand_as_v2 op must be less than or equal to %d.",
+                          target_rank,
+                          MAX_RANK_SUPPORTED));
+
+    auto in_dims = x.dims();
+    auto vec_in_dims = phi::vectorize<int>(in_dims);
+    auto diff = real_target_shape.size() - vec_in_dims.size();
+    vec_in_dims.insert(vec_in_dims.begin(), diff, 1);
+
+    for (size_t i = 0; i < vec_in_dims.size(); ++i) {
+      PADDLE_ENFORCE_NE(real_target_shape[i],
+                        0,
+                        phi::errors::InvalidArgument(
+                            "The value of target shape cannot be zero."));
+      if (vec_in_dims[i] != 1) {
+        PADDLE_ENFORCE_EQ(
+            vec_in_dims[i],
+            real_target_shape[i],
+            phi::errors::InvalidArgument(
+                "The value (%d) of the non-singleton dimension does not match"
+                " the corresponding value (%d) in "
+                "target tensor for expand_as_v2 op.",
+                vec_in_dims[i],
+                real_target_shape[i]));
+      }
+    }
+
+    phi::DDim out_dims = phi::make_ddim(real_target_shape);
 
     out->Resize(out_dims);
 
@@ -94,7 +115,7 @@ void ExpandAsKernel(const Context& dev_ctx,
     outputs["Out"] = {out};
 
     GcuAttributeMap attrs;
-    attrs["target_shape"] = target_shape;
+    attrs["target_shape"] = real_target_shape;
 
     GcuRunner(input_names,
               inputs,

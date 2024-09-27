@@ -19,115 +19,54 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SPLIT_CASE = [
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float32, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float32, "axis": 0},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float32, "axis": 1},
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, 2, 3],
-        "dtype": np.float32,
-        "axis": 2,
-    },
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.float32,
-        "axis": 2,
-    },
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.float32,
-        "axis": -2,
-    },
-    {
-        "x_shape": [6, 2, 3],
-        "num_or_sections": [1, -1, 3],
-        "dtype": np.float32,
-        "axis": 0,
-    },
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, 2, 3], "dtype": np.float32, "axis": 2},
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.float32, "axis": 2},
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.float32, "axis": -2},
+    {"x_shape": [6, 2, 3], "num_or_sections": [1, -1, 3], "dtype": np.float32, "axis": 0},
+
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float64, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float64, "axis": 0},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float64, "axis": 1},
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, 2, 3],
-        "dtype": np.float64,
-        "axis": 2,
-    },
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.float64,
-        "axis": 2,
-    },
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.float64,
-        "axis": -2,
-    },
-    {
-        "x_shape": [6, 2, 3],
-        "num_or_sections": [1, -1, 3],
-        "dtype": np.float64,
-        "axis": 0,
-    },
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, 2, 3], "dtype": np.float64, "axis": 2},
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.float64, "axis": 2},
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.float64, "axis": -2},
+    {"x_shape": [6, 2, 3], "num_or_sections": [1, -1, 3], "dtype": np.float64, "axis": 0},
+
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float16, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float16, "axis": 0},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.float16, "axis": 1},
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, 2, 3],
-        "dtype": np.float16,
-        "axis": 2,
-    },
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.float16,
-        "axis": 2,
-    },
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.float16,
-        "axis": -2,
-    },
-    {
-        "x_shape": [6, 2, 3],
-        "num_or_sections": [1, -1, 3],
-        "dtype": np.float16,
-        "axis": 0,
-    },
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, 2, 3], "dtype": np.float16, "axis": 2},
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.float16, "axis": 2},
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.float16, "axis": -2},
+    {"x_shape": [6, 2, 3], "num_or_sections": [1, -1, 3], "dtype": np.float16, "axis": 0},
+
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.int32, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.int32, "axis": 0},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.int32, "axis": 1},
     {"x_shape": [2, 6, 6], "num_or_sections": [1, 2, 3], "dtype": np.int32, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.int32, "axis": 2},
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.int32,
-        "axis": -2,
-    },
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.int32, "axis": -2},
     {"x_shape": [6, 2, 3], "num_or_sections": [1, -1, 3], "dtype": np.int32, "axis": 0},
+
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.int64, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.int64, "axis": 0},
     {"x_shape": [2, 6, 6], "num_or_sections": 2, "dtype": np.int64, "axis": 1},
     {"x_shape": [2, 6, 6], "num_or_sections": [1, 2, 3], "dtype": np.int64, "axis": 2},
     {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.int64, "axis": 2},
-    {
-        "x_shape": [2, 6, 6],
-        "num_or_sections": [1, -1, 2],
-        "dtype": np.int64,
-        "axis": -2,
-    },
+    {"x_shape": [2, 6, 6], "num_or_sections": [1, -1, 2], "dtype": np.int64, "axis": -2},
     {"x_shape": [6, 2, 3], "num_or_sections": [1, -1, 3], "dtype": np.int64, "axis": 0},
+
     # llama2
     {"x_shape": [4, 512, 27648], "num_or_sections": 2, "dtype": np.float16, "axis": -1},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -141,7 +80,7 @@ class TestSplit(TestAPIBase):
         self.axis = 2
         self.dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
 
     def forward(self):

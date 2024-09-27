@@ -92,12 +92,44 @@ void StridedCopyKernel(const Context& dev_ctx,
     THROW_JIT_UNIMPLEMENTED();
   }
 }
+
+template <typename T, typename Context>
+void AsStridedKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& input,
+                     const std::vector<int64_t>& dims,
+                     const std::vector<int64_t>& stride,
+                     int64_t offset,
+                     phi::DenseTensor* out) {
+  *out = input;
+  auto meta = out->meta();
+  meta.dims = common::make_ddim(dims);
+  meta.strides = common::make_ddim(stride);
+  meta.offset = offset;
+  out->set_meta(meta);
+}
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(strided_copy,
                           gcu,
                           ALL_LAYOUT,
                           custom_kernel::StridedCopyKernel,
+                          bool,
+                          uint8_t,
+                          int8_t,
+                          int16_t,
+                          int32_t,
+                          int64_t,
+                          float,
+                          double,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16,
+                          phi::dtype::complex<float>,
+                          phi::dtype::complex<double>) {}
+
+PD_REGISTER_PLUGIN_KERNEL(as_strided,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::AsStridedKernel,
                           bool,
                           uint8_t,
                           int8_t,

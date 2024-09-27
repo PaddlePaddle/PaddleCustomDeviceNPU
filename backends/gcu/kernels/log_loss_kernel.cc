@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "common/gcu_op_runner.h"
+#include "custom_op/custom_op_common.h"
 #include "kernels/funcs/gcu_kernel_funcs.h"
 
 namespace custom_kernel {
@@ -29,7 +30,23 @@ void LogLossKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    auto input_t = custom_op_common::CreateTensorFromDenseTensor(input);
+    auto label_t = custom_op_common::CreateTensorFromDenseTensor(label);
+    auto one_t = paddle::experimental::ones(
+        phi::IntArray({1}), input_t.dtype(), input_t.place());
+    auto epsilon_t = paddle::experimental::full(phi::IntArray({1}),
+                                                phi::Scalar(epsilon),
+                                                input_t.dtype(),
+                                                input_t.place());
+
+    // Out = -label * log(input + epsilon) -
+    //       (1 - label) * log(1 - input + epsilon)
+    auto log_loss_out =
+        -label_t * paddle::experimental::log(input_t + epsilon_t) -
+        (one_t - label_t) *
+            paddle::experimental::log(one_t - input_t + epsilon_t);
+    *out = custom_op_common::CreateDenseTensorFromTernsor(log_loss_out);
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["Predicted"] = {"input"};
@@ -97,7 +114,16 @@ void LogLossGradKernel(const Context& dev_ctx,
 
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(
-    log_loss, gcu, ALL_LAYOUT, custom_kernel::LogLossKernel, float) {}
-PD_REGISTER_PLUGIN_KERNEL(
-    log_loss_grad, gcu, ALL_LAYOUT, custom_kernel::LogLossGradKernel, float) {}
+PD_REGISTER_PLUGIN_KERNEL(log_loss,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::LogLossKernel,
+                          float,
+                          phi::dtype::float16) {}
+
+PD_REGISTER_PLUGIN_KERNEL(log_loss_grad,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::LogLossGradKernel,
+                          float,
+                          phi::dtype::float16) {}

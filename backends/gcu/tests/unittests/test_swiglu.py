@@ -19,19 +19,25 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SWIGLU_CASE = [
     {"x_shape": [6, 30], "x_dtype": np.float32, "has_y": True},
     {"x_shape": [5, 6, 30], "x_dtype": np.float32, "has_y": True},
     {"x_shape": [6, 30], "x_dtype": np.float32, "has_y": False},
     {"x_shape": [5, 6, 30], "x_dtype": np.float32, "has_y": False},
+
     {"x_shape": [6, 30], "x_dtype": np.float16, "has_y": True},
     {"x_shape": [5, 6, 30], "x_dtype": np.float16, "has_y": True},
     {"x_shape": [6, 30], "x_dtype": np.float16, "has_y": False},
     {"x_shape": [5, 6, 30], "x_dtype": np.float16, "has_y": False},
+
     # for llama2
     {"x_shape": [4, 512, 13824], "x_dtype": np.float16, "has_y": True},
     {"x_shape": [4, 512, 27648], "x_dtype": np.float16, "has_y": False},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -44,7 +50,7 @@ class TestSwiglu(TestAPIBase):
         self.x_dtype = np.float32
         self.has_y = True
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
         if self.has_y:
             self.data_y = self.generate_data(self.x_shape, self.x_dtype)

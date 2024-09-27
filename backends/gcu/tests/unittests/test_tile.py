@@ -19,24 +19,30 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 TILE_CASE = [
     {"x_shape": [3, 2], "x_dtype": np.float32, "repeat_times": [2, 2]},
     {"x_shape": [3, 2], "x_dtype": np.float32, "repeat_times": [1, 2]},
     {"x_shape": [3, 2], "x_dtype": np.float32, "repeat_times": [3]},
     {"x_shape": [3, 2], "x_dtype": np.float32, "repeat_times": [2, 2, 2]},
+
     {"x_shape": [3, 2], "x_dtype": np.int32, "repeat_times": [2, 2]},
     {"x_shape": [3, 2], "x_dtype": np.int32, "repeat_times": [1, 2]},
     {"x_shape": [3, 2], "x_dtype": np.int32, "repeat_times": [3]},
     {"x_shape": [3, 2], "x_dtype": np.int32, "repeat_times": [2, 2, 2]},
+
     {"x_shape": [3, 2], "x_dtype": np.int64, "repeat_times": [2, 2]},
     {"x_shape": [3, 2], "x_dtype": np.int64, "repeat_times": [1, 2]},
     {"x_shape": [3, 2], "x_dtype": np.int64, "repeat_times": [3]},
     {"x_shape": [3, 2], "x_dtype": np.int64, "repeat_times": [2, 2, 2]},
+
     {"x_shape": [3, 2], "x_dtype": np.float16, "repeat_times": [2, 2]},
     {"x_shape": [3, 2], "x_dtype": np.float16, "repeat_times": [1, 2]},
     {"x_shape": [3, 2], "x_dtype": np.float16, "repeat_times": [3]},
     {"x_shape": [3, 2], "x_dtype": np.float16, "repeat_times": [2, 2, 2]},
 ]
+# fmt: on
 
 
 @ddt
@@ -49,7 +55,7 @@ class TestIndexPut(TestAPIBase):
         self.x_dtype = np.float32
         self.repeat_times = [2, 2]
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward_with_dtype(self, dtype):

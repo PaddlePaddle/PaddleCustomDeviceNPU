@@ -24,7 +24,18 @@ void SquaredL2NormKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    THROW_AOT_UNIMPLEMENTED();
+    auto square = TensorEmpty(dev_ctx, x.meta());
+    LAUNCH_TOPSATENOP(topsatenSquare, dev_ctx, square, x);
+    std::vector<int64_t> reduce_axis(x.dims().size(), 0);
+    std::iota(reduce_axis.begin(), reduce_axis.end(), 0);
+    bool keep_dim = false;
+    LAUNCH_TOPSATENOP(topsatenSum,
+                      dev_ctx,
+                      *out,
+                      square,
+                      reduce_axis,
+                      keep_dim,
+                      out->dtype());
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
@@ -55,4 +66,5 @@ PD_REGISTER_PLUGIN_KERNEL(squared_l2_norm,
                           gcu,
                           ALL_LAYOUT,
                           custom_kernel::SquaredL2NormKernel,
-                          float) {}
+                          float,
+                          phi::dtype::float16) {}

@@ -27,6 +27,8 @@ void GatherKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
+    VLOG(6) << "GatherKernel, x dims:" << x.dims()
+            << ", out dims:" << out->dims();
     phi::DenseTensor input_x = MaybeCreateOrTrans64To32bits(dev_ctx, x);
     phi::DenseTensor output =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
@@ -105,10 +107,18 @@ void GatherKernel(const Context& dev_ctx,
     // //                          by the caller.
     // bool unique_indices = false;
 
-    // LAUNCH_TOPSOP(topsopGather, dev_ctx, output, input_x, input_index,
-    //               offset_dims, slice_sizes, collapsed_slice_dims,
-    //               start_index_map, index_vector_dim, indices_are_sorted,
-    //               unique_indices);
+    // LAUNCH_TOPSATENOP(topsxlaGather,
+    //                   dev_ctx,
+    //                   output,
+    //                   input_x,
+    //                   input_index,
+    //                   offset_dims,
+    //                   slice_sizes,
+    //                   collapsed_slice_dims,
+    //                   start_index_map,
+    //                   index_vector_dim,
+    //                   indices_are_sorted,
+    //                   unique_indices);
 
     // if (out->dtype() == phi::DataType::INT64) {
     //   custom_kernel::Cast(dev_ctx, output, phi::DataType::INT64, out);

@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 STACK_CASE = [
     {"x_shape": [3, 6], "x_dtype": np.float32, "num_inputs": 2, "axis": 0},
     {"x_shape": [5, 6, 7], "x_dtype": np.float32, "num_inputs": 4, "axis": 0},
@@ -26,13 +28,37 @@ STACK_CASE = [
     {"x_shape": [5, 6, 7], "x_dtype": np.float32, "num_inputs": 6, "axis": -1},
     {"x_shape": [5, 6, 7], "x_dtype": np.float32, "num_inputs": 6, "axis": 1},
     {"x_shape": [5, 6, 7], "x_dtype": np.float32, "num_inputs": 6, "axis": 2},
+
+    {"x_shape": [3, 6], "x_dtype": np.int32, "num_inputs": 2, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int32, "num_inputs": 4, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int32, "num_inputs": 6, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int32, "num_inputs": 6, "axis": -1},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int32, "num_inputs": 6, "axis": 1},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int32, "num_inputs": 6, "axis": 2},
+
+    {"x_shape": [3, 6], "x_dtype": np.int64, "num_inputs": 2, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int64, "num_inputs": 4, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int64, "num_inputs": 6, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int64, "num_inputs": 6, "axis": -1},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int64, "num_inputs": 6, "axis": 1},
+    {"x_shape": [5, 6, 7], "x_dtype": np.int64, "num_inputs": 6, "axis": 2},
+
+    {"x_shape": [3, 6], "x_dtype": np.float64, "num_inputs": 2, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.float64, "num_inputs": 4, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.float64, "num_inputs": 6, "axis": 0},
+    {"x_shape": [5, 6, 7], "x_dtype": np.float64, "num_inputs": 6, "axis": -1},
+    {"x_shape": [5, 6, 7], "x_dtype": np.float64, "num_inputs": 6, "axis": 1},
+    {"x_shape": [5, 6, 7], "x_dtype": np.float64, "num_inputs": 6, "axis": 2},
+
     {"x_shape": [3, 6], "x_dtype": np.float16, "num_inputs": 2, "axis": 0},
     {"x_shape": [5, 6, 7], "x_dtype": np.float16, "num_inputs": 4, "axis": 0},
     {"x_shape": [5, 6, 7], "x_dtype": np.float16, "num_inputs": 6, "axis": 0},
     {"x_shape": [5, 6, 7], "x_dtype": np.float16, "num_inputs": 6, "axis": -1},
     {"x_shape": [5, 6, 7], "x_dtype": np.float16, "num_inputs": 6, "axis": 1},
     {"x_shape": [5, 6, 7], "x_dtype": np.float16, "num_inputs": 6, "axis": 2},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -46,10 +72,20 @@ class TestStack(TestAPIBase):
         self.num_inputs = 1
         self.axis = 0
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = []
         for i in range(self.num_inputs):
-            self.data_x.append(self.generate_data(self.x_shape, self.x_dtype))
+            if self.x_dtype == np.int64:
+                data = self.generate_integer_data(
+                    self.x_shape, self.x_dtype, -32768, 32767
+                )
+            elif self.x_dtype == np.float64:
+                data = self.generate_float_data(self.x_shape, np.float32).astype(
+                    self.x_dtype
+                )
+            else:
+                data = self.generate_data(self.x_shape, self.x_dtype)
+            self.data_x.append(data)
 
     def forward(self):
         x = []

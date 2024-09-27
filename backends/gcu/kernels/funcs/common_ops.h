@@ -15,8 +15,8 @@
 #pragma once
 
 #include "common/gcu_funcs.h"
-#include "kernels/funcs/tops_op_launch.h"
 #include "kernels/funcs/topsaten_op_launch.h"
+#include "kernels/funcs/topscl_op_launch.h"
 
 namespace custom_kernel {
 
@@ -55,17 +55,12 @@ phi::DenseTensor Cast(const phi::CustomContext& dev_ctx,
                       const phi::DenseTensor& x,
                       const phi::DataType& dtype);
 
+phi::DenseTensor CastOrCopyToPinnedMemory(const phi::CustomContext& dev_ctx,
+                                          const phi::DenseTensor& x,
+                                          const phi::DataType& dtype);
+
 phi::DenseTensor ReshapeWithoutCopy(const phi::DenseTensor& src,
                                     const std::vector<int64_t>& out_shapes);
-
-void Transpose(const phi::CustomContext& dev_ctx,
-               const phi::DenseTensor& x,
-               const std::vector<int64_t>& axis,
-               phi::DenseTensor* out);
-
-phi::DenseTensor Transpose(const phi::CustomContext& dev_ctx,
-                           const phi::DenseTensor& x,
-                           const std::vector<int64_t>& axis);
 
 phi::DenseTensor TensorEmpty(const phi::CustomContext& dev_ctx,
                              const phi::DenseTensorMeta& meta);
@@ -75,4 +70,30 @@ phi::DenseTensor TensorOnes(const phi::CustomContext& dev_ctx,
 
 phi::DenseTensor TensorZeros(const phi::CustomContext& dev_ctx,
                              const phi::DenseTensorMeta& meta);
+
+// meta reuse ops
+phi::DenseTensor Add(const phi::CustomContext& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::DenseTensor& y,
+                     const phi::DenseTensorMeta& out_meta);
+
+phi::DenseTensor Add(const phi::CustomContext& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::DenseTensor& y);
+
+phi::DenseTensor Subtract(const phi::CustomContext& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const phi::DenseTensor& y,
+                          const phi::DenseTensorMeta& out_meta);
+
+phi::DenseTensor Subtract(const phi::CustomContext& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const phi::DenseTensor& y);
+
+void SliceBase(const phi::CustomContext& dev_ctx,
+               const phi::DenseTensor& x,
+               const std::vector<int64_t>& axes,
+               const std::vector<int64_t>& starts,
+               phi::DenseTensor* out);
+
 }  // namespace custom_kernel

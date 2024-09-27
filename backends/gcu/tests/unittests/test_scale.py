@@ -19,113 +19,27 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 SCALE_CASE = [
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.float32,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.float32,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": True,
-    },
-    {
-        "x_shape": [2, 2, 6],
-        "x_dtype": np.float32,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.float64,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.float64,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": True,
-    },
-    {
-        "x_shape": [2, 2, 6],
-        "x_dtype": np.float64,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.int32,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.int32,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": True,
-    },
-    {
-        "x_shape": [2, 2, 6],
-        "x_dtype": np.int32,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.int64,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.int64,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": True,
-    },
-    {
-        "x_shape": [2, 2, 6],
-        "x_dtype": np.int64,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.float16,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
-    {
-        "x_shape": [2, 6],
-        "x_dtype": np.float16,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": True,
-    },
-    {
-        "x_shape": [2, 2, 6],
-        "x_dtype": np.float16,
-        "scale": 2.0,
-        "bias": 1.0,
-        "bias_after_scale": False,
-    },
+    {"x_shape": [2, 6], "x_dtype": np.float32, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.float32, "scale": 2.0, "bias": 1.0, "bias_after_scale": True},
+    {"x_shape": [2, 2, 6], "x_dtype": np.float32, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.float64, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.float64, "scale": 2.0, "bias": 1.0, "bias_after_scale": True},
+    {"x_shape": [2, 2, 6], "x_dtype": np.float64, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.int32, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.int32, "scale": 2.0, "bias": 1.0, "bias_after_scale": True},
+    {"x_shape": [2, 2, 6], "x_dtype": np.int32, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.int64, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.int64, "scale": 2.0, "bias": 1.0, "bias_after_scale": True},
+    {"x_shape": [2, 2, 6], "x_dtype": np.int64, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.float16, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+    {"x_shape": [2, 6], "x_dtype": np.float16, "scale": 2.0, "bias": 1.0, "bias_after_scale": True},
+    {"x_shape": [2, 2, 6], "x_dtype": np.float16, "scale": 2.0, "bias": 1.0, "bias_after_scale": False},
+
 ]
+# fmt: on
 
 
 @ddt
@@ -140,7 +54,7 @@ class TestScale(TestAPIBase):
         self.bias = 0.0
         self.bias_after_scale = True
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = np.random.uniform(-10, 10, self.x_shape).astype(self.x_dtype)
 
     def forward(self):

@@ -34,7 +34,10 @@ std::vector<paddle::Tensor> MyAddNOp(const paddle::Tensor& x,
       std::make_shared<phi::DenseTensor>();
   out_tensor->Resize(x_tensor->dims());
   dev_ctx->Alloc(out_tensor.get(), x_tensor->dtype());
-
+  // for demo to show how to call custom topscc kernel
+  //   extern void vec_add_cpp(int *from, int *to, size_t N);
+  //   vec_add_cpp(static_cast<int*>(const_cast<void*>(x_tensor->data())),
+  //               static_cast<int*>(out_tensor->data()), 1);
   custom_kernel::TensorNameMap input_names;
   custom_kernel::TensorValueMap inputs;
   input_names["X"] = {"x", "y", "z"};

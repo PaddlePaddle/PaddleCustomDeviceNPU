@@ -19,6 +19,8 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 ASSIGN_CASE = [
     {"x_shape": [2, 3], "x_dtype": np.float32},
     {"x_shape": [2, 3], "x_dtype": np.int32},
@@ -26,6 +28,7 @@ ASSIGN_CASE = [
     {"x_shape": [2, 3, 4], "x_dtype": np.float32},
     {"x_shape": [2, 3, 4, 5], "x_dtype": np.float32},
 ]
+# fmt: on
 
 
 @ddt
@@ -37,7 +40,7 @@ class TestAssign(TestAPIBase):
         self.x_shape = [2, 3]
         self.x_dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):

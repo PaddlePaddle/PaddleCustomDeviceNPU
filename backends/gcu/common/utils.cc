@@ -142,4 +142,36 @@ bool LaunchAOTKernel(const phi::DataType& dtype,
   }
   return (supported_types.count(dtype) > 0);
 }
+
+#define FOR_EACH_DATA_TYPE_TO_PRINT(_)      \
+  _(bool, phi::DataType::BOOL)              \
+  _(int8_t, phi::DataType::INT8)            \
+  _(uint8_t, phi::DataType::UINT8)          \
+  _(int16_t, phi::DataType::INT16)          \
+  _(uint16_t, phi::DataType::UINT16)        \
+  _(int32_t, phi::DataType::INT32)          \
+  _(uint32_t, phi::DataType::UINT32)        \
+  _(int64_t, phi::DataType::INT64)          \
+  _(uint64_t, phi::DataType::UINT64)        \
+  _(phi::bfloat16, phi::DataType::BFLOAT16) \
+  _(phi::float16, phi::DataType::FLOAT16)   \
+  _(float, phi::DataType::FLOAT32)          \
+  _(double, phi::DataType::FLOAT64)
+
+#define CALL_PRINT_TENSOR(cpp_type, data_type) \
+  case data_type:                              \
+    PrintTensor<cpp_type>(os, t);              \
+    break;
+
+std::ostream& operator<<(std::ostream& os, const phi::DenseTensor& t) {
+  switch (t.dtype()) {
+    FOR_EACH_DATA_TYPE_TO_PRINT(CALL_PRINT_TENSOR)
+    default:
+      VLOG(1) << "PrintTensor unrecognized data type:" << t.dtype();
+  }
+  return os;
+}
+#undef FOR_EACH_DATA_TYPE_TO_PRINT
+#undef CALL_PRINT_TENSOR
+
 }  // namespace custom_kernel

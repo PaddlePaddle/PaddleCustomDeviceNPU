@@ -19,58 +19,21 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 CONCAT_CASE = [
-    {
-        "x_shape": [2, 3, 224, 224],
-        "y_shape": [2, 4, 224, 224],
-        "dtype": np.float32,
-        "axis": 1,
-    },
-    {
-        "x_shape": [2, 3, 224, 224],
-        "y_shape": [2, 4, 224, 224],
-        "dtype": np.float16,
-        "axis": 1,
-    },
-    {
-        "x_shape": [2, 3, 224, 224],
-        "y_shape": [2, 4, 224, 224],
-        "dtype": np.int32,
-        "axis": 1,
-    },
-    {
-        "x_shape": [2, 3, 224, 224],
-        "y_shape": [2, 4, 224, 224],
-        "dtype": np.int64,
-        "axis": 1,
-    },
-    {
-        "x_shape": [2, 3, 224, 224],
-        "y_shape": [2, 4, 224, 224],
-        "dtype": np.uint8,
-        "axis": 1,
-    },
-    {
-        "x_shape": [2, 3, 224, 224],
-        "y_shape": [2, 4, 224, 224],
-        "dtype": bool,
-        "axis": 1,
-    },
-    {
-        "x_shape": [3, 224, 224],
-        "y_shape": [4, 224, 224],
-        "dtype": np.float32,
-        "axis": 0,
-    },
-    {
-        "x_shape": [224, 224, 3],
-        "y_shape": [224, 224, 4],
-        "dtype": np.float32,
-        "axis": -1,
-    },
+    {"x_shape": [2, 3, 224, 224], "y_shape": [2, 4, 224, 224], "dtype": np.float32, "axis": 1},
+    {"x_shape": [2, 3, 224, 224], "y_shape": [2, 4, 224, 224], "dtype": np.float16, "axis": 1},
+    {"x_shape": [2, 3, 224, 224], "y_shape": [2, 4, 224, 224], "dtype": np.int32, "axis": 1},
+    {"x_shape": [2, 3, 224, 224], "y_shape": [2, 4, 224, 224], "dtype": np.int64, "axis": 1},
+    {"x_shape": [2, 3, 224, 224], "y_shape": [2, 4, 224, 224], "dtype": np.uint8, "axis": 1},
+    {"x_shape": [2, 3, 224, 224], "y_shape": [2, 4, 224, 224], "dtype": bool, "axis": 1},
+    {"x_shape": [3, 224, 224], "y_shape": [4, 224, 224], "dtype": np.float32, "axis": 0},
+    {"x_shape": [224, 224, 3], "y_shape": [224, 224, 4], "dtype": np.float32, "axis": -1},
     {"x_shape": [3, 224], "y_shape": [4, 224], "dtype": np.float32, "axis": 0},
     {"x_shape": [224, 224, 3], "y_shape": [224, 224, 4], "dtype": np.int64, "axis": -1},
 ]
+# fmt: on
 
 
 @ddt
@@ -84,7 +47,7 @@ class TestConcat(TestAPIBase):
         self.axis = 1
         self.dtype = np.float32
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
         self.data_y = self.generate_data(self.y_shape, self.dtype)
 

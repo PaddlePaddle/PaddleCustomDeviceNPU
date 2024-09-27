@@ -99,14 +99,8 @@ C_Status Finalize() {
   return C_SUCCESS;
 }
 
-void OpsInitialize() {
-  TOPSATEN_CHECK(topsatenInit());
-  TOPSOP_CHECK(topsopInit());
-}
-void OpsFinalize() {
-  TOPSATEN_CHECK(topsatenFinalize());
-  TOPSOP_CHECK(topsopFinalize());
-}
+void OpsInitialize() { TOPSATEN_CHECK(topsatenInit()); }
+void OpsFinalize() { TOPSATEN_CHECK(topsatenFinalize()); }
 
 C_Status InitDevice(const C_Device device) {
   RT_CHECK(topsSetDevice(device->id));

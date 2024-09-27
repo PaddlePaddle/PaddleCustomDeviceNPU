@@ -17,6 +17,7 @@
 #include "common/gcu_funcs.h"
 #include "common/utils.h"
 #include "kernels/funcs/common_ops.h"
+#include "kernels/funcs/gcu_layout_funcs.h"
 #include "paddle/phi/common/data_type.h"
 
 #define THROW_AOT_UNIMPLEMENTED()                                            \

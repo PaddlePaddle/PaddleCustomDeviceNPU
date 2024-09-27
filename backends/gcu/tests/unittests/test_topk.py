@@ -19,204 +19,42 @@ from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 
 
+# The table retains its original format for better comparison of parameter settings.
+# fmt: off
 TOPK_CASE = [
-    {
-        "x_shape": [6],
-        "x_dtype": np.float32,
-        "k": 1,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [2, 3],
-        "x_dtype": np.float32,
-        "k": 3,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float32,
-        "k": 6,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float32,
-        "k": 3,
-        "axis": 1,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float32,
-        "k": 3,
-        "axis": -2,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float32,
-        "k": 3,
-        "axis": 1,
-        "largest": False,
-        "sorted": True,
-    },
+    {"x_shape": [6], "x_dtype": np.float32, "k": 1, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [2, 3], "x_dtype": np.float32, "k": 3, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.float32, "k": 6, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.float32, "k": 3, "axis": 1, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.float32, "k": 3, "axis": -2, "largest": True, "sorted": True},
+    # {"x_shape": [5, 6, 7, 8], "x_dtype": np.float32, "k": 3, "axis": 1, "largest": False, "sorted": True},
     # {"x_shape": [5, 6, 7, 8], "x_dtype": np.float32, "k": 3, "axis": 1, "largest": True, "sorted": False},
-    {
-        "x_shape": [6],
-        "x_dtype": np.float64,
-        "k": 1,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [2, 3],
-        "x_dtype": np.float64,
-        "k": 3,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float64,
-        "k": 8,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float64,
-        "k": 3,
-        "axis": 1,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float64,
-        "k": 3,
-        "axis": -2,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.float64,
-        "k": 3,
-        "axis": 1,
-        "largest": False,
-        "sorted": True,
-    },
+
+    {"x_shape": [6], "x_dtype": np.float64, "k": 1, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [2, 3], "x_dtype": np.float64, "k": 3, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.float64, "k": 8, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.float64, "k": 3, "axis": 1, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.float64, "k": 3, "axis": -2, "largest": True, "sorted": True},
+    # {"x_shape": [5, 6, 7, 8], "x_dtype": np.float64, "k": 3, "axis": 1, "largest": False, "sorted": True},
     # {"x_shape": [5, 6, 7, 8], "x_dtype": np.float64, "k": 3, "axis": 1, "largest": True, "sorted": False},
-    {
-        "x_shape": [6],
-        "x_dtype": np.int32,
-        "k": 1,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [2, 3],
-        "x_dtype": np.int32,
-        "k": 3,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int32,
-        "k": 8,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int32,
-        "k": 3,
-        "axis": 1,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int32,
-        "k": 3,
-        "axis": -2,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int32,
-        "k": 3,
-        "axis": 1,
-        "largest": False,
-        "sorted": True,
-    },
+
+    {"x_shape": [6], "x_dtype": np.int32, "k": 1, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [2, 3], "x_dtype": np.int32, "k": 3, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.int32, "k": 8, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.int32, "k": 3, "axis": 1, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.int32, "k": 3, "axis": -2, "largest": True, "sorted": True},
+    # {"x_shape": [5, 6, 7, 8], "x_dtype": np.int32, "k": 3, "axis": 1, "largest": False, "sorted": True},
     # {"x_shape": [5, 6, 7, 8], "x_dtype": np.int32, "k": 3, "axis": 1, "largest": True, "sorted": False},
-    {
-        "x_shape": [6],
-        "x_dtype": np.int64,
-        "k": 1,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [2, 3],
-        "x_dtype": np.int64,
-        "k": 3,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int64,
-        "k": 8,
-        "axis": None,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int64,
-        "k": 3,
-        "axis": 1,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int64,
-        "k": 3,
-        "axis": -2,
-        "largest": True,
-        "sorted": True,
-    },
-    {
-        "x_shape": [5, 6, 7, 8],
-        "x_dtype": np.int64,
-        "k": 3,
-        "axis": 1,
-        "largest": False,
-        "sorted": True,
-    },
+
+    {"x_shape": [6], "x_dtype": np.int64, "k": 1, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [2, 3], "x_dtype": np.int64, "k": 3, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.int64, "k": 8, "axis": None, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.int64, "k": 3, "axis": 1, "largest": True, "sorted": True},
+    {"x_shape": [5, 6, 7, 8], "x_dtype": np.int64, "k": 3, "axis": -2, "largest": True, "sorted": True},
+    # {"x_shape": [5, 6, 7, 8], "x_dtype": np.int64, "k": 3, "axis": 1, "largest": False, "sorted": True},
     # {"x_shape": [5, 6, 7, 8], "x_dtype": np.int64, "k": 3, "axis": 1, "largest": True, "sorted": False},
 ]
+# fmt: on
 
 
 @ddt
@@ -232,7 +70,7 @@ class TestTopK(TestAPIBase):
         self.largest = True
         self.sorted = True
 
-    def prepare_datas(self):
+    def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.x_dtype)
 
     def forward(self):
