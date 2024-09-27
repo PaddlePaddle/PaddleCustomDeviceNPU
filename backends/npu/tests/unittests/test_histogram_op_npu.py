@@ -18,7 +18,6 @@ import numpy as np
 
 import paddle
 from paddle import base
-from paddle.pir_utils import test_with_pir_api
 
 
 class TestHistogram(unittest.TestCase):
@@ -41,8 +40,8 @@ class TestHistogram(unittest.TestCase):
         self.density = False
         self.is_weight = False
 
-    @test_with_pir_api
     def test_static_graph(self):
+        paddle.enable_static()
         startup_program = paddle.static.Program()
         train_program = paddle.static.Program()
         with paddle.static.program_guard(train_program, startup_program):
@@ -93,6 +92,7 @@ class TestHistogram(unittest.TestCase):
                 weights=self.weight_np if self.is_weight else None,
             )
             np.testing.assert_allclose(actual, Out, rtol=1e-58, atol=1e-5)
+        paddle.disable_static()
 
     def test_dygraph(self):
         with base.dygraph.guard():

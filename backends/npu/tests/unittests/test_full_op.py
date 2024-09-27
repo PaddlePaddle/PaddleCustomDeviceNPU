@@ -19,14 +19,12 @@ import numpy as np
 import paddle
 from paddle import base
 from paddle.base import Program, program_guard
-from paddle.pir_utils import test_with_pir_api
 
 paddle.enable_static()
 
 
 # Test python API
 class TestFullAPI(unittest.TestCase):
-    @test_with_pir_api
     def test_api(self):
         with paddle.static.program_guard(paddle.static.Program()):
             positive_2_int32 = paddle.tensor.fill_constant([1], "int32", 2)

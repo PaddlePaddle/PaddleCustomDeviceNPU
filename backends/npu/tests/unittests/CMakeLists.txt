@@ -76,3 +76,5 @@ set_tests_properties(test_einsum_op_npu PROPERTIES ENVIRONMENT
                                                    FLAGS_npu_storage_format=0)
 set_tests_properties(test_matmulv2_op_npu PROPERTIES ENVIRONMENT
                                                      FLAGS_npu_storage_format=0)
+set_tests_properties(test_pad3d_op_npu PROPERTIES ENVIRONMENT
+                                                  FLAGS_enable_pir_api=1)

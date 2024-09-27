@@ -17,7 +17,6 @@ import numpy as np
 from tests.op_test import OpTest
 import paddle.base as base
 from paddle.framework import in_pir_mode
-from paddle.pir_utils import test_with_pir_api
 import paddle
 
 paddle.enable_static()
@@ -218,7 +217,6 @@ class TestExpandV2OpInt64_t(OpTest):
 
 
 class TestExpandV2Error(unittest.TestCase):
-    @test_with_pir_api
     def test_errors(self):
         with paddle.static.program_guard(
             paddle.static.Program(), paddle.static.Program()
