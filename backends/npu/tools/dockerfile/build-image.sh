@@ -20,7 +20,8 @@ set -ex
 # export CANN_VERSION=8.0.RC1
 # bash build-image.sh ${CANN_VERSION}
 
-CANN_VERSION=${1:-8.0.T13} # default 8.0.T13
+CANN_VERSION=${1:-8.0.RC2} # default 8.0.RC2
+SYSTEM=${2:-x86_64} # default 8.0.RC2
 
 # DOCKER_VERSION=${CANN_VERSION//[^0-9]/} # 801i3
 DOCKER_VERSION=${CANN_VERSION//[^0-9A-Z]/} # 80T13
@@ -33,48 +34,22 @@ if [ ! -f Ascend-cann-toolkit_${CANN_VERSION}_linux-$(uname -m).run ]; then
 fi
 
 # copy file to current directory
-cp /etc/ascend_install.info ./
-cp /usr/local/Ascend/driver/version.info ./
-
+#cp /etc/ascend_install.info ./
+#cp /usr/local/Ascend/driver/version.info ./
+#ubuntu20-npu-base-x86_64-gcc84
 # ubuntu20-$(uname -m)-gcc84-py38
-sed "s#<baseimg>#registry.baidubce.com/device/paddle-cpu:ubuntu20-$(uname -m)-gcc84-py38#g" Dockerfile.npu.ubuntu20.gcc84 > Dockerfile.npu.ubuntu20.gcc84.py38
-docker pull registry.baidubce.com/device/paddle-cpu:ubuntu20-$(uname -m)-gcc84-py38
-docker build --network=host -f Dockerfile.npu.ubuntu20.gcc84.py38 \
+sed "s#<baseimg>#registry.baidubce.com/device/paddle-cpu:ubuntu20-npu-base-$(uname -m)-gcc84#g" Dockerfile.npu.ubuntu20.gcc84 > Dockerfile.npu.ubuntu20.gcc84.test
+#docker pull registry.baidubce.com/device/paddle-cpu:ubuntu20-npu-base-$(uname -m)-gcc84
+docker build --network=host -f Dockerfile.npu.ubuntu20.gcc84.test \
   --build-arg CANN_VERSION=${CANN_VERSION} \
+  --build-arg SYSTEM=${SYSTEM} \
   --build-arg http_proxy=${proxy} \
   --build-arg https_proxy=${proxy} \
   --build-arg ftp_proxy=${proxy} \
   --build-arg no_proxy=bcebos.com \
-  -t registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-$(uname -m)-gcc84-py38 .
-docker push registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-$(uname -m)-gcc84-py38
-rm -rf Dockerfile.npu.ubuntu20.gcc84.py38
-
-# ubuntu20-$(uname -m)-gcc84-py39
-sed "s#<baseimg>#registry.baidubce.com/device/paddle-cpu:ubuntu20-$(uname -m)-gcc84-py39#g" Dockerfile.npu.ubuntu20.gcc84 > Dockerfile.npu.ubuntu20.gcc84.py39
-docker pull registry.baidubce.com/device/paddle-cpu:ubuntu20-$(uname -m)-gcc84-py39
-docker build --network=host -f Dockerfile.npu.ubuntu20.gcc84.py39 \
-  --build-arg CANN_VERSION=${CANN_VERSION} \
-  --build-arg http_proxy=${proxy} \
-  --build-arg https_proxy=${proxy} \
-  --build-arg ftp_proxy=${proxy} \
-  --build-arg no_proxy=bcebos.com \
-  -t registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-$(uname -m)-gcc84-py39 .
-docker push registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-$(uname -m)-gcc84-py39
-rm -rf Dockerfile.npu.ubuntu20.gcc84.py39
-
-# ubuntu20-$(uname -m)-gcc84-py310
-sed "s#<baseimg>#registry.baidubce.com/device/paddle-cpu:ubuntu20-$(uname -m)-gcc84-py310#g" Dockerfile.npu.ubuntu20.gcc84 > Dockerfile.npu.ubuntu20.gcc84.py310
-docker pull registry.baidubce.com/device/paddle-cpu:ubuntu20-$(uname -m)-gcc84-py310
-docker build --network=host -f Dockerfile.npu.ubuntu20.gcc84.py310 \
-  --build-arg CANN_VERSION=${CANN_VERSION} \
-  --build-arg http_proxy=${proxy} \
-  --build-arg https_proxy=${proxy} \
-  --build-arg ftp_proxy=${proxy} \
-  --build-arg no_proxy=bcebos.com \
-  -t registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-$(uname -m)-gcc84-py310 .
-docker push registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-$(uname -m)-gcc84-py310
-rm -rf Dockerfile.npu.ubuntu20.gcc84.py310
-
+  -t registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-npu-base-$(uname -m)-gcc84 .
+docker push registry.baidubce.com/device/paddle-npu:cann${DOCKER_VERSION}-ubuntu20-npu-base-$(uname -m)-gcc84
+rm -rf Dockerfile.npu.ubuntu20.gcc84.test
 
 # clean driver info
-rm -rf *.info
+#rm -rf *.info
