@@ -86,6 +86,7 @@ void RmsNormKernel(const Context& dev_ctx,
   std::vector<int64_t> inv_var_dim = phi::vectorize<int64_t>(inv_var->dims());
 
   ns_LayerNormKernel::Params params;
+  memset( (void *)&params, 0x00, sizeof(ns_LayerNormKernel::Params ));
   params.epsValid = true;
   params.eps = epsilon;
 
