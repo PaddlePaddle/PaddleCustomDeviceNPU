@@ -431,12 +431,18 @@ void AclopPool2dGradKernel(const Context& dev_ctx,
       cast_out_tensor = out_tensor;
     }
 
+    if (!FLAGS_npu_jit_compile) {
+      aclSetCompileopt(ACL_OP_JIT_COMPILE, "enable");
+    }
     const auto& runner =
         NpuOpRunner("MaxPoolV3Grad",
                     {cast_in_x_tensor, cast_out_tensor, out_grad_cast_tensor},
                     {in_x_grad_tmp_tensor},
                     attrs);  // 0: floor, 1: ceil
     runner.Run(dev_ctx.stream());
+    if (!FLAGS_npu_jit_compile) {
+      aclSetCompileopt(ACL_OP_JIT_COMPILE, "disable");
+    }
   } else if (pooling_type == "avg") {
     NpuOpRunner runner;
     runner.SetType("AvgPoolV2Grad");
