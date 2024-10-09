@@ -117,11 +117,6 @@ class BinaryOperator : public HpuOperator {
     custom_kernel::kernel_func##RawKernel<T>(dev_ctx, x, y, axis, out); \
   }
 
-// #define PRINT_MACRO_HELPER(args...) #args
-// #define PRINT_MACRO(x) #x "=" PRINT_MACRO_HELPER(x)
-// #pragma message(PRINT_MACRO(BINARY_RAW_KERNEL(Add, add)))
-// #pragma message(PRINT_MACRO(BINARY_KERNEL(Add)))
-
 BINARY_RAW_KERNEL(Add, add);
 BINARY_KERNEL(Add);
 

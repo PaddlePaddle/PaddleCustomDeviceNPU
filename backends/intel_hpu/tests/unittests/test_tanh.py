@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -17,13 +17,10 @@ from __future__ import print_function
 import unittest
 
 import numpy as np
-from scipy.special import erf, expit
 
 import paddle
-import paddle.base as base
 import paddle.nn.functional as F
-from tests.op_test import OpTest, convert_float_to_uint16, convert_uint16_to_float
-from tests.utils import static_guard
+from tests.op_test import OpTest
 
 
 paddle.enable_static()

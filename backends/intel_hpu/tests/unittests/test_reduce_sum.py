@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -71,6 +71,7 @@ class TestReduceSum(OpTest):
     def test_check_grad(self):
         pass
 
+
 @skip_check_grad_ci(
     reason="reduce_max is discontinuous non-derivable function,"
     " its gradient check is not supported by unittest framework."
@@ -78,7 +79,6 @@ class TestReduceSum(OpTest):
 class TestReduceSumFP16(TestReduceSum):
     def init_dtype(self):
         self.dtype = np.float16
-
 
 
 # class TestReduceSumOp5D(TestReduceSum):

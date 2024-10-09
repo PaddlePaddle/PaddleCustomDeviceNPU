@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -36,7 +36,9 @@ def gather_nd_grad(x, index):
 
 
 def test_class1(op_type, typename):
-    @skip_check_grad_ci(reason="reduce_max is discontinuous non-derivable function, its gradient check is not supported by unittest framework.")
+    @skip_check_grad_ci(
+        reason="reduce_max is discontinuous non-derivable function, its gradient check is not supported by unittest framework."
+    )
     class TestGatherNdOpWithEmptyIndex(OpTest):
         # Index has empty element, which means copy entire tensor
 
@@ -90,7 +92,9 @@ def test_class2(op_type, typename):
 
 
 def test_class3(op_type, typename):
-    @skip_check_grad_ci(reason="reduce_max is discontinuous non-derivable function, its gradient check is not supported by unittest framework.")
+    @skip_check_grad_ci(
+        reason="reduce_max is discontinuous non-derivable function, its gradient check is not supported by unittest framework."
+    )
     class TestGatherNdOpWithLowIndex(OpTest):
         # Index has low rank, X has high rank
 

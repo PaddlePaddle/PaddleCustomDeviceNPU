@@ -70,28 +70,6 @@ void GaussianKernel(const Context& dev_ctx,
                     phi::DenseTensor* out) {
   dev_ctx.template Alloc<T>(out);
 
-  // phi::DenseTensor cpu_tensor;
-  // phi::DenseTensorMeta cpu_meta = {out->dtype(), out->dims()};
-  // cpu_tensor.set_meta(cpu_meta);
-  // T* cpu_data = ctx.template HostAlloc<T>(&cpu_tensor);
-  // std::normal_distribution<typename phi::dtype::MPTypeTrait<T>::Type>
-  // dist(mean,
-  //                                                                          std);
-
-  // int64_t size = out->numel();
-
-  // std::shared_ptr<std::mt19937_64> engine;
-  // if (seed) {
-  //   engine = std::make_shared<std::mt19937_64>();
-  //   engine->seed(seed);
-  // } else {
-  //   engine = ctx.GetGenerator()->GetCPUEngine();
-  // }
-
-  // for (int64_t i = 0; i < size; ++i) {
-  //   cpu_data[i] = static_cast<T>(dist(*engine));
-  // }
-  // TensorCopy(ctx, cpu_tensor, false, out);
   ConvertTensors ct;
   ct.Add(out, false);
 

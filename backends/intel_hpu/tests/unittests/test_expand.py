@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -18,10 +18,11 @@ import unittest
 
 import numpy as np
 import paddle
-from tests.op_test import OpTest, skip_check_grad_ci
+from tests.op_test import OpTest
 
 paddle.enable_static()
 SEED = 2021
+
 
 class TestExpandV2HPUOp(OpTest):
     def setUp(self):
@@ -51,41 +52,48 @@ class TestExpandV2HPUOp(OpTest):
     def test_check_output(self):
         self.check_output_with_place(self.place)
 
+
 class TestExpandV2Op_2(TestExpandV2HPUOp):
     def init_data(self):
         self.ori_shape = [1, 12]
         self.shape = [4, 12]
         self.expand_times = [4, 1]
-        
+
+
 class TestExpandV2Op_3(TestExpandV2HPUOp):
     def init_data(self):
         self.ori_shape = (2, 4, 5, 7)
         self.shape = (-1, -1, -1, -1)
         self.expand_times = (1, 1, 1, 1)
-        
+
+
 class TestExpandV2Op_4(TestExpandV2HPUOp):
     def init_data(self):
         self.ori_shape = (2, 4, 1, 15)
         self.shape = (2, -1, 4, -1)
         self.expand_times = (1, 1, 4, 1)
-        
+
+
 class TestExpandV2Op_5(TestExpandV2HPUOp):
     def init_data(self):
         self.ori_shape = (4, 1, 30)
         self.shape = (2, -1, 4, 30)
         self.expand_times = (2, 1, 4, 1)
-        
+
+
 class TestExpandV2Op_6(TestExpandV2HPUOp):
     def init_data(self):
         self.ori_shape = [12]
         self.shape = [2, 12]
         self.expand_times = [2, 1]
 
+
 class TestExpandV2Op_7(TestExpandV2HPUOp):
     def init_data(self):
         self.ori_shape = (4, 1, 15)
         self.shape = (2, -1, 4, -1)
         self.expand_times = (2, 1, 4, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

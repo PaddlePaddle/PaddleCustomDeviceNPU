@@ -37,8 +37,9 @@ class ROPE : public HpuOperator {
     inputs.push_back(sin);
     auto cos = createTensor(ins[2].size(), dtype_, ins[2], true, "cos");
     inputs.push_back(cos);
-    if(ins.size() == 4) {
-      auto position_ids = createTensor(ins[3].size(), syn_type_int32, ins[3], true, "position_ids");
+    if (ins.size() == 4) {
+      auto position_ids = createTensor(
+          ins[3].size(), syn_type_int32, ins[3], true, "position_ids");
       inputs.push_back(position_ids);
     }
 
@@ -81,21 +82,25 @@ void FusedRopeKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out_q);
 
   if (!sin.get_ptr() || !cos.get_ptr() || k || v) {
-      PADDLE_THROW("FusedRopeKernel supports (p, sin, cos, [position_ids]) only.");
+    PADDLE_THROW(
+        "FusedRopeKernel supports (p, sin, cos, [position_ids]) only.");
   }
   std::vector<int64_t> q_dims = phi::vectorize<int64_t>(q.dims());
-  std::vector<int64_t> sin_dims = phi::vectorize<int64_t>(sin.get_ptr()->dims());
-  std::vector<int64_t> cos_dims = phi::vectorize<int64_t>(cos.get_ptr()->dims());
+  std::vector<int64_t> sin_dims =
+      phi::vectorize<int64_t>(sin.get_ptr()->dims());
+  std::vector<int64_t> cos_dims =
+      phi::vectorize<int64_t>(cos.get_ptr()->dims());
   std::vector<int64_t> out_q_dim = phi::vectorize<int64_t>(out_q->dims());
 
   ns_RoPESt2::ParamsV2 params;
   params.offset = 0;
   params.mode = ROTARY_POS_EMBEDDING_MODE_BLOCKWISE;
-  
+
   std::vector<DIMS> inputs = {q_dims, sin_dims, cos_dims};
 
   if (position_ids.get_ptr()) {
-    std::vector<int64_t> position_ids_dims = phi::vectorize<int64_t>(position_ids.get_ptr()->dims());
+    std::vector<int64_t> position_ids_dims =
+        phi::vectorize<int64_t>(position_ids.get_ptr()->dims());
     inputs.push_back(position_ids_dims);
   }
 
@@ -103,7 +108,7 @@ void FusedRopeKernel(const Context& dev_ctx,
   op_info.prepareOpInfo<T, ns_RoPESt2::ParamsV2>(
       "rotary_pos_embedding_fwd", inputs, &params);
   auto recipe = op_info.GetRecipe();
-  
+
   if (recipe == nullptr) {
     ROPE op(op_info.guid_, op_info.datatype_);
     op.AddNode(inputs, {out_q_dim}, params);
@@ -114,13 +119,14 @@ void FusedRopeKernel(const Context& dev_ctx,
   }
 
   std::map<std::string, uint64_t> tensors;
-  tensors["q"]            = reinterpret_cast<uint64_t>(q.data<T>());
-  tensors["sin"]          = reinterpret_cast<uint64_t>(sin.get_ptr()->data<T>());
-  tensors["cos"]          = reinterpret_cast<uint64_t>(cos.get_ptr()->data<T>());
+  tensors["q"] = reinterpret_cast<uint64_t>(q.data<T>());
+  tensors["sin"] = reinterpret_cast<uint64_t>(sin.get_ptr()->data<T>());
+  tensors["cos"] = reinterpret_cast<uint64_t>(cos.get_ptr()->data<T>());
   if (position_ids.get_ptr()) {
-    tensors["position_ids"] = reinterpret_cast<uint64_t>(position_ids.get_ptr()->data<int64_t>());
+    tensors["position_ids"] =
+        reinterpret_cast<uint64_t>(position_ids.get_ptr()->data<int64_t>());
   }
-  tensors["out"]        = reinterpret_cast<uint64_t>(out_q->data<T>());
+  tensors["out"] = reinterpret_cast<uint64_t>(out_q->data<T>());
 
   RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);

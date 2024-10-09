@@ -1,7 +1,7 @@
 #  Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -18,10 +18,11 @@ import unittest
 
 import numpy as np
 import paddle
-import paddle.base as base
 from tests.op_test import OpTest
 from tests.op_test import skip_check_grad_ci
+
 SEED = 2021
+
 
 @skip_check_grad_ci(
     reason="reduce_max is discontinuous non-derivable function,"
@@ -65,6 +66,7 @@ class TestConcatOp(OpTest):
         self.x2 = np.random.random((3, 4, 50)).astype(self.dtype)
         self.axis = 0
 
+
 @skip_check_grad_ci(
     reason="reduce_max is discontinuous non-derivable function,"
     " its gradient check is not supported by unittest framework."
@@ -75,6 +77,7 @@ class TestConcatOp2(TestConcatOp):
         self.x1 = np.random.random((2, 3, 4, 5)).astype(self.dtype)
         self.x2 = np.random.random((2, 3, 4, 5)).astype(self.dtype)
         self.axis = 1
+
 
 @skip_check_grad_ci(
     reason="reduce_max is discontinuous non-derivable function,"
@@ -89,6 +92,8 @@ class TestConcatOp3(TestConcatOp):
 
     def test_check_grad(self):
         pass
+
+
 @skip_check_grad_ci(
     reason="reduce_max is discontinuous non-derivable function,"
     " its gradient check is not supported by unittest framework."
@@ -102,6 +107,7 @@ class TestConcatOp5(TestConcatOp):
 
 
 # ----------------Concat Fp16----------------
+
 
 def create_test_fp16(parent):
     class TestConcatFp16(parent):

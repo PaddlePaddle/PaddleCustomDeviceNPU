@@ -1,7 +1,7 @@
 // Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -23,10 +23,8 @@ namespace custom_kernel {
 
 class FSDPA : public HpuOperator {
  public:
-  explicit FSDPA(std::string guid_prefix)
-      : HpuOperator(guid_prefix) {}
-  void AddNode(ConvertTensors& ct,
-               ns_Sdpa::ParamsV2 params) {
+  explicit FSDPA(std::string guid_prefix) : HpuOperator(guid_prefix) {}
+  void AddNode(ConvertTensors &ct, ns_Sdpa::ParamsV2 params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
@@ -54,7 +52,7 @@ class FSDPA : public HpuOperator {
                                          false,
                                          outputs[i].name));
     }
-    
+
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
                                      syn_outputs.data(),
@@ -69,33 +67,36 @@ class FSDPA : public HpuOperator {
     PD_CHECK(
         status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
   }
-
 };
 
 template <typename T, typename Context>
-void FusedDotProductAttentionKernel(const Context& dev_ctx,
-                     const phi::DenseTensor &q,
-                     const phi::DenseTensor &k,
-                     const phi::DenseTensor &v,
-                     const phi::DenseTensor &mask,  //const paddle::optional<phi::DenseTensor> &attention_mask,
-                                                    //const paddle::optional<phi::DenseTensor> &cu_seqlen_q,
-                                                    //const paddle::optional<phi::DenseTensor> &cu_seqlen_kv,
-                     float scaling_factor,
-                     float dropout_probability,
-                     bool is_training,
-                     bool is_causal_masking,
-                                                    //const std::string &mask_type_str,
-                                                    //const std::string &bias_type_str,
-                     phi::DenseTensor *out,
-                     phi::DenseTensor *softmax_out,
-                     phi::DenseTensor *rng_state) {
+void FusedDotProductAttentionKernel(
+    const Context &dev_ctx,
+    const phi::DenseTensor &q,
+    const phi::DenseTensor &k,
+    const phi::DenseTensor &v,
+    const phi::DenseTensor &mask,
+    // const paddle::optional<phi::DenseTensor> &attention_mask,
+    // const paddle::optional<phi::DenseTensor> &cu_seqlen_q,
+    // const paddle::optional<phi::DenseTensor> &cu_seqlen_kv,
+    float scaling_factor,
+    float dropout_probability,
+    bool is_training,
+    bool is_causal_masking,
+    // const std::string &mask_type_str,
+    // const std::string &bias_type_str,
+    phi::DenseTensor *out,
+    phi::DenseTensor *softmax_out,
+    phi::DenseTensor *rng_state) {
   dev_ctx.template Alloc<T>(out);
-  
+
   std::vector<int64_t> q_dims = phi::vectorize<int64_t>(q.dims());
   std::vector<int64_t> k_dims = phi::vectorize<int64_t>(k.dims());
   std::vector<int64_t> v_dims = phi::vectorize<int64_t>(v.dims());
+  std::vector<int64_t> m_dims = phi::vectorize<int64_t>(mask.dims());
   std::vector<int64_t> output_dims = phi::vectorize<int64_t>(out->dims());
-  std::vector<int64_t> softmax_out_dims = phi::vectorize<int64_t>(softmax_out->dims());
+  std::vector<int64_t> softmax_out_dims =
+      phi::vectorize<int64_t>(softmax_out->dims());
   std::vector<int64_t> transposed_shape;
   transposed_shape.push_back(k_dims[0]);
   transposed_shape.push_back(k_dims[1]);
@@ -121,24 +122,23 @@ void FusedDotProductAttentionKernel(const Context& dev_ctx,
   in_out_dims.insert(in_out_dims.end(), out_dims.begin(), out_dims.end());
 
   ns_Sdpa::ParamsV2 params;
-  memset( (void *)&params, 0x00, sizeof(ns_Sdpa::ParamsV2 ));
+  memset(reinterpret_cast<void *>(&params), 0x00, sizeof(ns_Sdpa::ParamsV2));
   params.scale = scaling_factor;
   params.is_causal = is_causal_masking;
-  //params.is_causal = (mask_type_str == "causal");
+  // params.is_causal = (mask_type_str == "causal");
   params.dropout.ratio = dropout_probability;
   params.dropout.disableMaskOut = false;
   params.is_inference = !is_training;
   params.softmax_mode = SDPA_DEFAULT_SOFTMAX;
-  
+
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, ns_Sdpa::ParamsV2>(
-      "sdpa_fwd", in_out_dims, &params);
-  
+  op_info.prepareOpInfo<T, ns_Sdpa::ParamsV2>("sdpa_fwd", in_out_dims, &params);
+
   auto recipe = op_info.GetRecipe();
-  
+
   if (recipe == nullptr) {
     FSDPA op(op_info.guid_);
-    
+
     op.AddNode(ct, params);
     op.Compile();
     op_info.setOp(op);

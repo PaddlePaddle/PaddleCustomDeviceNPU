@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -20,6 +20,7 @@ import numpy as np
 import paddle
 from tests.op_test import OpTest, convert_float_to_uint16, convert_uint16_to_float
 from tests.op_test import OpTest, skip_check_grad_ci
+
 paddle.enable_static()
 
 
@@ -97,10 +98,8 @@ class TestMeanOpBF16(OpTest):
         self.x = convert_float_to_uint16(np.random.random((5, 6, 10)).astype("float32"))
         self.out = convert_uint16_to_float(self.x).mean(axis=0)
 
-
     def test_check_output(self):
         self.check_output_with_place(paddle.CustomPlace("intel_hpu", 0), atol=0.004)
-
 
     def test_check_grad(self):
         pass
@@ -117,6 +116,7 @@ class TestMeanOp5DBF16(TestMeanOpBF16):
         )
         self.out = convert_uint16_to_float(self.x).mean(axis=0)
 
+
 @skip_check_grad_ci(
     reason="reduce_min is discontinuous non-derivable function,"
     " its gradient check is not supported by unittest framework."
@@ -129,6 +129,7 @@ class TestReduceAllBF16(TestMeanOpBF16):
         self.attrs = {"reduce_all": True}
         self.out = convert_uint16_to_float(self.x).mean()
 
+
 # @skip_check_grad_ci(
 #     reason="reduce_min is discontinuous non-derivable function,"
 #     " its gradient check is not supported by unittest framework."
@@ -137,6 +138,7 @@ class TestReduceAllBF16(TestMeanOpBF16):
 #     def init_data(self):
 #         self.x = convert_float_to_uint16(np.random.random((120)).astype("float32"))
 #         self.out = convert_uint16_to_float(self.x).mean(axis=0)
+
 
 @skip_check_grad_ci(
     reason="reduce_min is discontinuous non-derivable function,"

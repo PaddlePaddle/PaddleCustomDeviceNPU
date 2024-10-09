@@ -69,7 +69,7 @@ void doArgMaxMinTensor(const Context& dev_ctx,
                        bool arg_max,
                        phi::DataType out_datatype,
                        phi::DenseTensor* out) {
-  VLOG(4) << "call tecodnn argmax/argmin kernel";
+  VLOG(4) << "call intel_hpu argmax/argmin kernel";
 
   std::vector<int64_t> x_dims = phi::vectorize<int64_t>(x.dims());
   std::vector<int64_t> out_dims = phi::vectorize<int64_t>(out->dims());
@@ -92,11 +92,6 @@ void doArgMaxMinTensor(const Context& dev_ctx,
   params.params.reductionDimension = axis;
   params.type = out_datatype;
   op_info.prepareOpInfo<T, ArgMinMaxParams>(guid_prefix, {x_dims}, &params);
-
-  // const int siz_ar = op_info.key_creator_.GetKey().size();
-  // for (int i = 0; i < siz_ar; ++i)
-  //   printf("%d ", op_info.key_creator_.GetKey()[i]);
-  // std::cout << std::endl;
 
   auto recipe = op_info.GetRecipe();
   if (recipe == nullptr) {

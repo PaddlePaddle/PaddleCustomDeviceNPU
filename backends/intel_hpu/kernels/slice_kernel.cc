@@ -145,20 +145,7 @@ void SliceRawKernel(const Context& dev_ctx,
     params.starts[in_dims.size() - 1 - axes[i]] = starts[i];
     params.ends[in_dims.size() - 1 - axes[i]] = ends[i];
   }
-  /*
-    for (size_t i = 0; i < in_dims.size(); i++)
-    {
-      std::cout << "**************************    " << std::endl;
-      std::cout << i << ": " << params.axes[i] << ", " << params.starts[i] << ",
-    " << params.ends[i] << ", " << params.steps[i] << std::endl;
-    }
-      params.axes  [0] = 0;    params.axes  [1] = 1;    params.axes  [2] = 2;
-    params.axes  [3] = 3; params.starts[0] = 0;    params.starts[1] = 2;
-    params.starts[2] = 0;    params.starts[3] = 1; params.ends  [0] = 6;
-    params.ends  [1] = 4;    params.ends  [2] = 3;    params.ends  [3] = 3;
-      params.steps [0] = 1;    params.steps [1] = 1;    params.steps [2] = 1;
-    params.steps [3] = 1;
-  */
+
   std::vector<int64_t> inputs_dim = phi::vectorize<int64_t>(x.dims());
   std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
 

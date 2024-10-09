@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -19,8 +19,6 @@ import numpy as np
 
 from tests.op_test import OpTest
 import paddle
-import paddle.base.core as core
-import paddle.base as base
 
 
 class TestHPUCumSumOp(OpTest):
@@ -36,8 +34,10 @@ class TestHPUCumSumOp(OpTest):
     def set_hpu(self):
         self.__class__.use_custom_device = True
         self.place = paddle.CustomPlace("intel_hpu", 0)
+
     def init_dtype(self):
         self.dtype = np.int32
+
     def init_testcase(self):
         self.attrs = {"axis": 0}
         self.inputs = {"X": np.random.random((5, 6, 10)).astype(self.dtype)}
@@ -173,7 +173,6 @@ class TestHPUCumSumWithFlatten2(TestHPUCumSumOp):
         self.attrs = {"flatten": True}
         self.inputs = {"X": np.random.random((5, 6, 10)).astype(self.dtype)}
         self.outputs = {"Out": self.inputs["X"].cumsum()}
-
 
 
 if __name__ == "__main__":

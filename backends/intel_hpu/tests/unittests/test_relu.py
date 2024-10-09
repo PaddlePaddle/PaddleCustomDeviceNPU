@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -19,10 +19,8 @@ import unittest
 import numpy as np
 
 import paddle
-import paddle.base as base
 import paddle.nn.functional as F
 from tests.op_test import OpTest
-
 
 
 paddle.enable_static()
@@ -68,6 +66,7 @@ class TestActivation(OpTest):
     def init_kernel_type(self):
         pass
 
+
 class TestRelu(TestActivation):
     def setUp(self):
         self.set_npu()
@@ -86,7 +85,6 @@ class TestRelu(TestActivation):
 
     def test_check_grad(self):
         pass
-
 
 
 class TestReluAPI(unittest.TestCase):
@@ -123,6 +121,7 @@ class TestReluAPI(unittest.TestCase):
         for r in [out1, out2]:
             np.testing.assert_allclose(out_ref, r.numpy(), rtol=1e-05)
         paddle.enable_static()
+
 
 if __name__ == "__main__":
     unittest.main()

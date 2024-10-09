@@ -1,7 +1,7 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -45,7 +45,6 @@ class TestNPUAbsBF16(OpTest):
         self.__class__.use_custom_device = True
         self.__class__.no_need_check_grad = True
         self.place = paddle.CustomPlace("intel_hpu", 0)
-
 
     def test_check_output(self):
         self.check_output_with_place(self.place)

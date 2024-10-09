@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -18,10 +18,10 @@ import unittest
 
 import numpy as np
 import paddle
-import paddle.base as base
-from tests.op_test import OpTest, skip_check_grad_ci
+from tests.op_test import OpTest
 
 paddle.enable_static()
+
 
 class TestElementwiseAddOp(OpTest):
     def setUp(self):
@@ -47,13 +47,13 @@ class TestElementwiseAddOp(OpTest):
         self.x = np.random.uniform(-1, 1, [13, 17]).astype(self.dtype)
         self.y = np.random.uniform(-1, 1, [13, 17]).astype(self.dtype)
         self.out = np.add(self.x, self.y)
-        
+
     def init_dtype(self):
         self.dtype = np.float32
 
     def init_axis(self):
         self.axis = -1
-        
+
     def test_check_output(self):
         self.check_output_with_place(self.place)
 
@@ -64,13 +64,16 @@ class TestElementwiseAddOp_broadcast(TestElementwiseAddOp):
         self.y = np.random.uniform(-1, 1, [17]).astype(self.dtype)
         self.out = self.x + self.y
 
+
 class TestFP16ElementwiseAddOp(TestElementwiseAddOp):
     def init_dtype(self):
         self.dtype = np.float16
 
+
 class TestFP16ElementwiseAddOp_1(TestElementwiseAddOp_broadcast):
     def init_dtype(self):
         self.dtype = np.float16
+
 
 class TestElementwiseAddOp_2(TestElementwiseAddOp):
     def setUp(self):
@@ -85,9 +88,11 @@ class TestElementwiseAddOp_2(TestElementwiseAddOp):
             "Y": OpTest.np_dtype_to_base_dtype(self.x),
         }
         self.outputs = {"Out": self.out}
+
     def init_input_output(self):
         self.x = np.random.uniform(-1, 1, [13, 17]).astype(self.dtype)
         self.out = self.x + self.x
+
 
 class TestElementwiseAddOp_scalar(TestElementwiseAddOp):
     def init_input_output(self):

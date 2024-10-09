@@ -1,7 +1,7 @@
 #  Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -13,8 +13,6 @@
 # limitations under the License.
 
 from __future__ import print_function
-
-import os
 
 
 import paddle
@@ -42,7 +40,6 @@ class TestContiguous(unittest.TestCase):
         z = y.contiguous()
         assert z.is_contiguous()
         return x.strides, y, y.strides, z, z.strides
-
 
     def test_contiguous(self):
         (

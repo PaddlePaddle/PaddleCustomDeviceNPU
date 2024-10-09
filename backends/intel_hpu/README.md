@@ -7,7 +7,7 @@ Please refer to the following steps to compile, install and verify the custom de
 ## Get Sources
 
 ```bash
-# clone source 
+# clone source
 git clone --recursive https://github.com/PaddlePaddle/PaddleCustomDevice
 cd PaddleCustomDevice
 
@@ -47,7 +47,7 @@ python -c "import paddle; print(paddle.device.get_all_custom_device_type())"
 # run a simple model
 python ../tests/test_MNIST_model.py
 
-# expected similar output 
+# expected similar output
 ... ...
 Epoch 0 step 0, Loss = [2.2956038], Accuracy = 0.15625
 Epoch 0 step 100, Loss = [2.1552896], Accuracy = 0.3125
@@ -99,11 +99,11 @@ Using PaddleInference
 pushd Paddle-Inference-Demo/c++/resnet50
 
 # Modify resnet50_test.cc, use config.EnableCustomDevice("intel_hpu", 0) to replace config.EnableUseGpu(100, 0)
-  
+
 bash run.sh
 ```
 
-expected similar output 
+Expected similar output
 
 ```bash
 I0713 09:02:38.808723 24792 resnet50_test.cc:74] run avg time is 297.75 ms

@@ -1,7 +1,7 @@
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -61,10 +61,8 @@ class TestCastBF16(OpTest):
         self.in_dtype = int(core.VarDesc.VarType.FP16)
         self.out_dtype = int(core.VarDesc.VarType.FP32)
 
-    
     def test_check_output(self):
         self.check_output_with_place(self.place)
-
 
 
 class TestCastBF16_1(TestCastBF16):

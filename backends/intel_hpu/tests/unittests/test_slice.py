@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -46,9 +46,9 @@ class TestSliceOp(OpTest):
         self.axes = [0, 1, 2]
         self.infer_flags = [1, 1, 1]
         self.out = self.input[1:3, 0:3, 2:4, :]
-        #np.set_printoptions(precision=10, linewidth=300, floatmode='fixed')
-        #print(self.input)
-        #print(self.out)
+        # np.set_printoptions(precision=10, linewidth=300, floatmode='fixed')
+        # print(self.input)
+        # print(self.out)
 
     def set_hpu(self):
         self.__class__.use_custom_device = True
@@ -59,6 +59,7 @@ class TestSliceOp(OpTest):
     def test_check_output(self):
         self.check_output_with_place(self.place)
 
+
 class TestSliceMultiDim(TestSliceOp):
     def config(self):
         self.input = np.random.random([3, 2, 5, 4, 8]).astype(self.dtype)
@@ -67,6 +68,7 @@ class TestSliceMultiDim(TestSliceOp):
         self.axes = [4]
         self.infer_flags = [1]
         self.out = self.input[:, :, :, :, 0:1]
-        
+
+
 if __name__ == "__main__":
     unittest.main()

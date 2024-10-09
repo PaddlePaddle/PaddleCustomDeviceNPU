@@ -75,7 +75,7 @@ inline std::string SynDataTypeToStr(synDataType s) {
 }
 
 /**
- * CPU -> INTEL_HPU
+ * CPU       -> INTEL_HPU
  * INTEL_HPU -> CPU
  * INTEL_HPU -> INTEL_HPU
  */

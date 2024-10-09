@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #    http://www.apache.org/licenses/LICENSE-2.0
@@ -17,12 +17,11 @@ from __future__ import print_function
 import unittest
 
 import numpy as np
-from scipy.special import erf, expit
 
 import paddle
 import paddle.base as base
 import paddle.nn.functional as F
-from tests.op_test import OpTest, convert_float_to_uint16, convert_uint16_to_float
+from tests.op_test import OpTest
 from tests.utils import static_guard
 
 
@@ -125,6 +124,7 @@ class TestCos(TestActivation):
 
     def test_check_grad(self):
         pass
+
 
 def ref_leaky_relu(x, alpha=0.01):
     out = np.copy(x)
@@ -336,7 +336,6 @@ def ref_leaky_relu(x, alpha=0.01):
 #         pass
 
 
-
 # class TestCELUAPI(unittest.TestCase):
 #     # test paddle.nn.CELU, paddle.nn.functional.celu
 #     def setUp(self):
@@ -456,7 +455,6 @@ class TestLog(TestActivation):
 #         np.testing.assert_allclose(np_z, z_expected, rtol=rtol)
 
 
-
 # class TestPow(TestActivation):
 #     def setUp(self):
 #         self.set_npu()
@@ -507,6 +505,7 @@ class TestLog(TestActivation):
 #     def test_check_grad(self):
 #         pass
 
+
 class TestRelu(TestActivation):
     def setUp(self):
         self.set_npu()
@@ -525,7 +524,6 @@ class TestRelu(TestActivation):
 
     def test_check_grad(self):
         pass
-
 
 
 class TestReluAPI(unittest.TestCase):
@@ -595,7 +593,6 @@ class TestReluAPI(unittest.TestCase):
 #         pass
 
 
-
 # class TestRelu6API(unittest.TestCase):
 #     # test paddle.nn.ReLU6, paddle.nn.functional.relu6
 #     def setUp(self):
@@ -661,7 +658,6 @@ class TestReluAPI(unittest.TestCase):
 #         self.check_output_with_place(self.place, check_dygraph=True)
 
 
-
 class TestSqrt(TestActivation):
     def setUp(self):
         self.set_npu()
@@ -682,7 +678,6 @@ class TestSqrt(TestActivation):
 
     def test_check_output(self):
         self.check_output_with_place(self.place, check_dygraph=True)
-
 
 
 # class TestSqrtBF16(OpTest):
@@ -711,8 +706,6 @@ class TestSqrt(TestActivation):
 #         pass
 
 
-
-
 # class TestRsqrtBF16(OpTest):
 #     def set_npu(self):
 #         self.__class__.use_custom_device = True
@@ -737,7 +730,6 @@ class TestSqrt(TestActivation):
 
 #     def test_check_grad(self):
 #         pass
-
 
 
 class TestSigmoid(TestActivation):
@@ -838,7 +830,6 @@ class TestFloor(TestActivation):
     # The same reason with TestFloor
     def test_check_grad(self):
         pass
-
 
 
 # def ref_softshrink(x, threshold=0.5):
@@ -1241,9 +1232,6 @@ class TestSiluAPI(unittest.TestCase):
 
 #     def test_check_grad(self):
 #         pass
-
-
-
 
 
 class TestLogSigmoid(TestActivation):

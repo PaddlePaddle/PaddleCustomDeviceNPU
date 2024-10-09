@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -77,7 +77,6 @@ class TestNPUReduceMaxOpRank(OpTest):
         self.dtype = np.float32
 
 
-
 class TestReduceMaxOpMultiAxises(TestNPUReduceMaxOp):
     """Remove Max with subgradient from gradient check to confirm the success of CI."""
 
@@ -91,7 +90,6 @@ class TestReduceMaxOpMultiAxises(TestNPUReduceMaxOp):
         self.outputs = {"Out": self.inputs["X"].max(axis=tuple(self.attrs["dim"]))}
 
 
-
 # class TestReduceAll(TestNPUReduceMaxOp):
 #     """Remove Max with subgradient from gradient check to confirm the success of CI."""
 
@@ -103,7 +101,6 @@ class TestReduceMaxOpMultiAxises(TestNPUReduceMaxOp):
 #         self.inputs = {"X": np.random.random((5, 6, 10)).astype(self.dtype)}
 #         self.attrs = {"reduce_all": True}
 #         self.outputs = {"Out": self.inputs["X"].max()}
-
 
 
 @skip_check_grad_ci(

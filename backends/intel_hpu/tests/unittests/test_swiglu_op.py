@@ -1,7 +1,7 @@
 #   Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -82,6 +82,7 @@ class TestSwigluFP16OnlyX(unittest.TestCase):
         x = np.random.randn(self.shape[0], self.shape[1])
         return x
 
+
 #  X，Y都为空
 class TestSwigluFP16BothXY(TestSwigluFP16OnlyX):
     def check_result(self, golden_res, fused_res):
@@ -111,7 +112,6 @@ class TestSwigluFP16BothXY(TestSwigluFP16OnlyX):
         x = np.random.randn(self.shape[0], self.shape[1])
         y = np.random.randn(self.shape[0], self.shape[1])
         return x, y
-
 
     def fused_swiglu(self, x, y):
         res = swigluimpl(x, y)
@@ -154,6 +154,7 @@ class TestSwigluBF16BothXY(TestSwigluFP16BothXY):
 class TestSwigluFP32BothXY(TestSwigluFP16BothXY):
     def init_dtype(self):
         self.dtype = "float32"
+
 
 class TestSwigluFP16BothXY3D(TestSwigluFP16BothXY):
     def setUp(self):

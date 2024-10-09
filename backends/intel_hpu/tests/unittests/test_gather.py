@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -39,7 +39,10 @@ class TestGatherOp(OpTest):
         self.op_type = "gather"
         self.config()
         xnp = np.random.random(self.x_shape).astype(self.x_type)
-        self.iintel_hputs = {"X": xnp, "Index": np.array(self.index).astype(self.index_type)}
+        self.iintel_hputs = {
+            "X": xnp,
+            "Index": np.array(self.index).astype(self.index_type),
+        }
         self.outputs = {"Out": self.iintel_hputs["X"][self.iintel_hputs["Index"]]}
 
     def set_intel_hpu(self):

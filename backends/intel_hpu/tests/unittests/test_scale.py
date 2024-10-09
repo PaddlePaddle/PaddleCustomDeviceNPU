@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -16,9 +16,8 @@ from __future__ import print_function
 
 import unittest
 import numpy as np
-from tests.op_test import OpTest, skip_check_grad_ci
+from tests.op_test import OpTest
 import paddle
-import paddle.base.core as core
 
 paddle.enable_static()
 
@@ -46,14 +45,17 @@ class TestHpuScaleOp(OpTest):
 
     def init_dtype(self):
         self.dtype = np.float16
-        
+
     def init_input(self):
         self.scale = 2.8
         self.bias = 3.2
         self.bias_after_scale = False
         np.random.seed(1024)
         self.x = np.random.random((2, 3, 4)).astype(self.dtype)
-        self.out = self.x * self.scale + (self.bias if self.bias_after_scale else self.scale * self.bias)
-            
+        self.out = self.x * self.scale + (
+            self.bias if self.bias_after_scale else self.scale * self.bias
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

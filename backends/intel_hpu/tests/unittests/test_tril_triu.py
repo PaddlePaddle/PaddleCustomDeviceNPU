@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -18,10 +18,10 @@ import unittest
 
 import numpy as np
 import paddle
-import paddle.base as base
-from tests.op_test import OpTest, skip_check_grad_ci
+from tests.op_test import OpTest
 
 paddle.enable_static()
+
 
 class TestTrilTriu(OpTest):
     def setUp(self):
@@ -49,16 +49,16 @@ class TestTrilTriu(OpTest):
 
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
-        #self.x = np.arange(1, 101, dtype=self.dtype).reshape([10, -1])
-        #self.real_op_type = np.random.choice(["triu", "tril"])
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
+        # self.x = np.arange(1, 101, dtype=self.dtype).reshape([10, -1])
+        # self.real_op_type = np.random.choice(["triu", "tril"])
         self.real_op_type = "triu"
-        #self.diagonal = None
+        # self.diagonal = None
         self.diagonal = -3
-        
+
     def init_dtype(self):
         self.dtype = np.float32
-        
+
     def test_check_output(self):
         self.check_output_with_place(self.place)
 
@@ -66,58 +66,66 @@ class TestTrilTriu(OpTest):
 class TestTrilNone(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "tril"
         self.diagonal = None
-        
+
+
 class TestTril0(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "tril"
         self.diagonal = 0
+
 
 class TestTrilp(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "tril"
         self.diagonal = 4
+
 
 class TestTriln(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "tril"
         self.diagonal = -4
+
 
 class TestTriuNone(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "triu"
         self.diagonal = None
-        
+
+
 class TestTriu0(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "triu"
         self.diagonal = 0
+
 
 class TestTriup(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "triu"
         self.diagonal = 4
+
 
 class TestTriun(TestTrilTriu):
     def initTestCase(self):
         np.random.seed(1024)
-        self.x = np.random.uniform(1, 2, [8,8]).astype(self.dtype)
+        self.x = np.random.uniform(1, 2, [8, 8]).astype(self.dtype)
         self.real_op_type = "triu"
         self.diagonal = -4
+
 
 if __name__ == "__main__":
     unittest.main()

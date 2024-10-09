@@ -1,7 +1,7 @@
 // Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -33,13 +33,14 @@ class RMS : public HpuOperator {
 
     auto x = createTensor(ins[0].size(), dtype_, ins[0], true, "x");
     inputs.push_back(x);
-    auto w = createTensor(ins[1].size(), dtype_, ins[1], true, "w");  // syn_type_single
+    // syn_type_single
+    auto w = createTensor(ins[1].size(), dtype_, ins[1], true, "w");
     inputs.push_back(w);
 
     auto out = createTensor(outs[0].size(), dtype_, outs[0], true, "out");
     outputs.push_back(out);
-    auto mean_square = createTensor(
-        outs[1].size(), dtype_, outs[1], false, "inv_var");
+    auto mean_square =
+        createTensor(outs[1].size(), dtype_, outs[1], false, "inv_var");
     outputs.push_back(mean_square);
 
     synStatus status = synNodeCreate(graphHandle_,
@@ -95,7 +96,7 @@ void RmsNormKernel(const Context& dev_ctx,
   op_info.prepareOpInfo<T, ns_LayerNormKernel::Params>(
       "rms_norm_ex_fwd", {x_dims, w_dims}, &params);
   auto recipe = op_info.GetRecipe();
-  
+
   if (recipe == nullptr) {
     RMS op(op_info.guid_, op_info.datatype_);
     op.AddNode({x_dims, w_dims}, {outputs_dim, inv_var_dim}, params);

@@ -97,7 +97,7 @@ popd
 pushd Paddle-Inference-Demo/c++/resnet50
 
 # 修改 resnet50_test.cc，使用 config.EnableCustomDevice("intel_hpu", 0) 接口替换 config.EnableUseGpu(100, 0)
-  
+
 bash run.sh
 ```
 

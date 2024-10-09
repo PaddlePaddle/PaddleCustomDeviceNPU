@@ -155,11 +155,6 @@ void ExpandKernel(const Context& dev_ctx,
   op_info.prepareOpInfo<T, nullptr_t>("broadcast", in_out_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
-  // const int siz_ar = op_info.key_creator_.GetKey().size();
-  // for (int i = 0; i < siz_ar; ++i)
-  //   printf("%d ", op_info.key_creator_.GetKey()[i]);
-  // std::cout << std::endl;
-
   if (recipe == nullptr) {
     Expand op;
 

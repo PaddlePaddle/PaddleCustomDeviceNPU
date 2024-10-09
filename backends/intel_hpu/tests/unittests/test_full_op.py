@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -22,6 +22,7 @@ from paddle.base.framework import convert_np_dtype_to_dtype_
 
 paddle.enable_static()
 
+
 class TestHPU(OpTest):
     def setUp(self):
         self.op_type = "fill_constant"
@@ -38,7 +39,6 @@ class TestHPU(OpTest):
             "dtype": convert_np_dtype_to_dtype_(self.dtype),
         }
         self.outputs = {"Out": np.full(self.shape, self.fill_value, self.dtype)}
-        
 
     def set_npu(self):
         self.__class__.use_custom_device = True
@@ -68,7 +68,6 @@ class TestHPU_BOOL(OpTest):
             "dtype": convert_np_dtype_to_dtype_(self.dtype),
         }
         self.outputs = {"Out": np.full(self.shape, self.fill_value, self.dtype)}
-        
 
     def set_npu(self):
         self.__class__.use_custom_device = True
@@ -80,6 +79,7 @@ class TestHPU_BOOL(OpTest):
 
     def test_check_output(self):
         self.check_output_with_place(self.place)
-        
+
+
 if __name__ == "__main__":
     unittest.main()

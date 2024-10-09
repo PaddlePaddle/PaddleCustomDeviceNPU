@@ -1,7 +1,7 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
+# Licensed under the Apache License, Version 2.0 (the "License"); you may
+# not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
@@ -18,10 +18,10 @@ import unittest
 
 import numpy as np
 import paddle
-import paddle.base as base
-from tests.op_test import OpTest, skip_check_grad_ci
+from tests.op_test import OpTest
 
 paddle.enable_static()
+
 
 class TestElementwiseMaxOp(OpTest):
     def setUp(self):
@@ -47,16 +47,16 @@ class TestElementwiseMaxOp(OpTest):
         np.random.seed(1024)
         self.x = np.random.uniform(-100, 100, [13, 17]).astype(self.dtype)
         self.y = np.random.uniform(-100, 100, [13, 17]).astype(self.dtype)
-        
+
     def init_output(self):
         self.out = np.maximum(self.x, self.y)
-        
+
     def init_dtype(self):
         self.dtype = np.float32
 
     def init_axis(self):
         self.axis = -1
-        
+
     def test_check_output(self):
         self.check_output_with_place(self.place)
 
@@ -66,9 +66,11 @@ class TestElementwiseMaxOp_broadcast(TestElementwiseMaxOp):
         self.x = np.random.uniform(-100, 100, [13, 17]).astype(self.dtype)
         self.y = np.random.uniform(-100, 100, [17]).astype(self.dtype)
 
+
 class TestFP16ElementwiseMaxOp(TestElementwiseMaxOp):
     def init_dtype(self):
         self.dtype = np.float16
+
 
 class TestFP16ElementwiseMaxOp_1(TestElementwiseMaxOp_broadcast):
     def init_dtype(self):
