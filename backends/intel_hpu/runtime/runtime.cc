@@ -1,7 +1,7 @@
 // Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 //
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
+// Licensed under the Apache License, Version 2.0 (the "License"); you may
+// not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
 //     http://www.apache.org/licenses/LICENSE-2.0
@@ -411,23 +411,27 @@ class RuntimeManager {
   }
 
   void GetUniqueIdSize(size_t *sz) {
-    if (uid.length == 0) {
-      CHECK_HCCL_STATUS(hcclGetUniqueId(&uid));
-    }
-    *sz = uid.length;
+    *sz = HCCL_UNIQUE_ID_MAX_BYTES;
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "uid size = " << *sz;
   }
 
   C_Status GetUniqueId(C_CCLRootId *unique_id) {
-    if (uid.length == 0) {
-      CHECK_HCCL_STATUS(hcclGetUniqueId(&uid));
-    }
+    hcclUniqueId uid{};
+    CHECK_HCCL_STATUS(hcclGetUniqueId(&uid));
+
     unique_id->sz = uid.length;
     memcpy(reinterpret_cast<void *>(unique_id->data),
            reinterpret_cast<void *>(uid.internal),
            uid.length);
-    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-        << "uid size = " << unique_id->sz;
+    if (FLAGS_intel_hpu_runtime_debug) {
+      const uint8_t *bytes = reinterpret_cast<uint8_t *>(unique_id);
+      std::ostringstream oss;
+      for (size_t i = 0; i < unique_id->sz; ++i) {
+        oss << std::hex << static_cast<int>(bytes[i]);
+      }
+      LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+          << "unique_id =" << oss.str() << "uid size = " << unique_id->sz;
+    }
     return C_SUCCESS;
   }
 
@@ -435,8 +439,18 @@ class RuntimeManager {
                         C_CCLRootId *unique_id,
                         size_t rank,
                         C_CCLComm *comm) {
-    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-        << "uid size = " << unique_id->sz << ", rank = " << rank;
+    if (FLAGS_intel_hpu_runtime_debug) {
+      const uint8_t *bytes = reinterpret_cast<uint8_t *>(unique_id);
+      std::ostringstream oss;
+      for (size_t i = 0; i < unique_id->sz; ++i) {
+        oss << std::hex << static_cast<int>(bytes[i]);
+      }
+      LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+          << "unique_id =" << oss.str() << "uid size = " << unique_id->sz
+          << ", rank = " << rank;
+    }
+
+    hcclUniqueId uid{};
     uid.length = unique_id->sz;
     memcpy(reinterpret_cast<void *>(uid.internal),
            reinterpret_cast<void *>(unique_id->data),
@@ -452,9 +466,6 @@ class RuntimeManager {
   synDeviceId deviceId = 0;
   uint32_t Status = 0;  // 1 acquire, 0 not acquire
   uint32_t count = 0;
-
-  // hccl
-  hcclUniqueId uid = hcclUniqueId{.length = 0};
 
   // user streams
   std::set<synStreamHandle> streams;
