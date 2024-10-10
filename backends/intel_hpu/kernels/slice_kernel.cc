@@ -19,7 +19,7 @@
 #include "kernels/hpu_operator.h"
 #include "paddle/phi/extension.h"
 #include "paddle/phi/kernels/funcs/slice_utils.h"
-#include "utils/utills.h"
+#include "utils/utils.h"
 
 namespace custom_kernel {
 

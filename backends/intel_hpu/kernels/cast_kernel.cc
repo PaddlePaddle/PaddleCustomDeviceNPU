@@ -16,7 +16,7 @@
 #include "habanalabs/synapse_common_types.h"
 #include "kernels/funcs.h"
 #include "kernels/hpu_operator.h"
-#include "utils/utills.h"
+#include "utils/utils.h"
 namespace custom_kernel {
 
 struct CastParams {
