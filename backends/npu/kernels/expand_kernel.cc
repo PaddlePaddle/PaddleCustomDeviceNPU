@@ -274,11 +274,22 @@ void ExpandKernel(const Context& dev_ctx,
 
   phi::DDim out_dims = phi::make_ddim(final_expand_shape);
   out->Resize(out_dims);
-  dev_ctx.template Alloc<T>(out);
 
-  if (x.dtype() == phi::DataType::FLOAT64) {
+  if (out_dims.size() == 0) {
+    out->Resize(phi::make_ddim({1}));
+    final_expand_shape = {1};
+  }
+
+  phi::DenseTensor x_trans(x);
+  if (x.dims().size() == 0) {
+    phi::DenseTensorMeta meta_1 = {x.dtype(), phi::make_ddim({1})};
+    x_trans.set_meta(meta_1);
+  }
+
+  dev_ctx.template Alloc<T>(out);
+  if (x_trans.dtype() == phi::DataType::FLOAT64) {
     phi::DenseTensor cast_x;
-    phi::DenseTensorMeta cast_x_meta = {phi::DataType::FLOAT32, x.dims()};
+    phi::DenseTensorMeta cast_x_meta = {phi::DataType::FLOAT32, x_trans.dims()};
     cast_x.set_meta(cast_x_meta);
     dev_ctx.template Alloc<float>(&cast_x);
 
@@ -288,12 +299,16 @@ void ExpandKernel(const Context& dev_ctx,
     dev_ctx.template Alloc<float>(&cast_out);
 
     custom_kernel::CastKernel<T, Context>(
-        dev_ctx, x, phi::DataType::FLOAT32, &cast_x);
+        dev_ctx, x_trans, phi::DataType::FLOAT32, &cast_x);
     EXEC_NPU_CMD(aclnnExpand, dev_ctx, cast_x, final_expand_shape, cast_out);
     custom_kernel::CastKernel<T, Context>(
         dev_ctx, cast_out, phi::DataType::FLOAT64, out);
   } else {
-    EXEC_NPU_CMD(aclnnExpand, dev_ctx, x, final_expand_shape, *out);
+    EXEC_NPU_CMD(aclnnExpand, dev_ctx, x_trans, final_expand_shape, *out);
+  }
+
+  if (out_dims.size() == 0) {
+    out->Resize(out_dims);
   }
 }
 

@@ -56,7 +56,23 @@ void SoftmaxKernel(const Context& dev_ctx,
       (custom_kernel::AclopSoftmaxKernel<T, Context>(dev_ctx, x, axis, out)));
   dev_ctx.template Alloc<T>(out);
   int64_t dim = static_cast<int64_t>(axis);
-  EXEC_NPU_CMD(aclnnSoftmax, dev_ctx, x, dim, *out);
+
+  phi::DenseTensor x_trans(x);
+  if (x.dims().size() == 0) {
+    phi::DenseTensorMeta meta_1 = {x.dtype(), phi::make_ddim({1})};
+    x_trans.set_meta(meta_1);
+  }
+
+  auto out_dims = out->dims();
+  if (out_dims.size() == 0) {
+    out->Resize(phi::make_ddim({1}));
+  }
+
+  EXEC_NPU_CMD(aclnnSoftmax, dev_ctx, x_trans, dim, *out);
+
+  if (out_dims.size() == 0) {
+    out->Resize(out_dims);
+  }
 }
 
 template <typename T, typename Context>
@@ -148,31 +164,52 @@ void SoftmaxGradKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(x_grad);
   int64_t dim = static_cast<int64_t>(axis);
 
+  phi::DenseTensor x_trans(out_grad);
+  if (out_grad.dims().size() == 0) {
+    phi::DenseTensorMeta meta_1 = {out_grad.dtype(), phi::make_ddim({1})};
+    x_trans.set_meta(meta_1);
+  }
+
   phi::DenseTensor cast_x;
-  if (out_grad.dtype() == phi::DataType::FLOAT64) {
-    phi::DenseTensorMeta meta(out_grad.meta());
+  if (x_trans.dtype() == phi::DataType::FLOAT64) {
+    phi::DenseTensorMeta meta(x_trans.meta());
     meta.dtype = phi::DataType::FLOAT32;
     cast_x.set_meta(meta);
 
     custom_kernel::CastKernel<T, Context>(
-        dev_ctx, out_grad, phi::DataType::FLOAT32, &cast_x);
+        dev_ctx, x_trans, phi::DataType::FLOAT32, &cast_x);
   } else {
-    cast_x = out_grad;
+    cast_x = x_trans;
+  }
+
+  phi::DenseTensor y_trans(out);
+  if (out.dims().size() == 0) {
+    phi::DenseTensorMeta meta_1 = {out.dtype(), phi::make_ddim({1})};
+    y_trans.set_meta(meta_1);
   }
 
   phi::DenseTensor cast_y;
-  if (out.dtype() == phi::DataType::FLOAT64) {
-    phi::DenseTensorMeta meta(out.meta());
+  if (y_trans.dtype() == phi::DataType::FLOAT64) {
+    phi::DenseTensorMeta meta(y_trans.meta());
     meta.dtype = phi::DataType::FLOAT32;
     cast_y.set_meta(meta);
 
     custom_kernel::CastKernel<T, Context>(
-        dev_ctx, out, phi::DataType::FLOAT32, &cast_y);
+        dev_ctx, y_trans, phi::DataType::FLOAT32, &cast_y);
   } else {
-    cast_y = out;
+    cast_y = y_trans;
+  }
+
+  auto x_grad_dims = x_grad->dims();
+  if (x_grad_dims.size() == 0) {
+    x_grad->Resize(phi::make_ddim({1}));
   }
 
   EXEC_NPU_CMD(aclnnSoftmaxBackward, dev_ctx, cast_x, cast_y, dim, *x_grad);
+
+  if (x_grad_dims.size() == 0) {
+    x_grad->Resize(x_grad_dims);
+  }
 }
 
 }  // namespace custom_kernel

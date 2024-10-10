@@ -1,6 +1,4 @@
 disable_ut_npu
 test_check_nan_inf_op_npu
 test_conv3d_op_npu
-test_fused_matmul_bias_op_npu
-test_zero_dim_tensor_npu
 test_matmulv2_op_npu

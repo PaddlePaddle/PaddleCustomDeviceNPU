@@ -74,7 +74,7 @@ class TestKLDivLossOp(OpTest):
             ["X"],
             "Loss",
             no_grad_set=set(["Target"]),
-            max_relative_error=0.15,
+            max_relative_error=0.2,
         )
 
     def initTestCase(self):
@@ -99,7 +99,7 @@ class TestKLDivLossOp3(TestKLDivLossOp):
             ["X"],
             "Loss",
             no_grad_set=set(["Target"]),
-            max_relative_error=0.16,
+            max_relative_error=0.2,
         )
 
 

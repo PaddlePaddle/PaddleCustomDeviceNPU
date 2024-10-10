@@ -65,10 +65,29 @@ void GatherKernel(const Context& dev_ctx,
   DO_COMPATIBILITY(aclnnGatherV2,
                    (custom_kernel::AclopGatherKernel<T, Context>(
                        dev_ctx, x, index, axis, out)));
-  auto stream = dev_ctx.stream();
-  dev_ctx.template Alloc<T>(out);
 
   int64_t dim = axis.to<int64_t>();
+
+  auto out_dims = out->dims();
+  bool zero_index = false;
+  int count = 0;
+  if (index.dims().size() == 0) {
+    std::vector<int64_t> out_dims_new(out_dims.size() + 1);
+    for (int64_t i = 0; i <= out_dims_new.size() - 1; i++) {
+      if (i == dim) {
+        out_dims_new[i] = 1;
+      } else {
+        out_dims_new[i] = out_dims[count];
+        count++;
+      }
+    }
+
+    phi::DenseTensorMeta meta_1 = {x.dtype(), phi::make_ddim(out_dims_new)};
+    out->set_meta(meta_1);
+    zero_index = true;
+  }
+
+  dev_ctx.template Alloc<T>(out);
 
   auto index_shape_vec = phi::vectorize(index.dims());
   if (index_shape_vec.size() == 2 && index_shape_vec[1] == 1) {
@@ -81,6 +100,11 @@ void GatherKernel(const Context& dev_ctx,
     EXEC_NPU_CMD(aclnnGatherV2, dev_ctx, x, dim, *p_index, *out);
   } else {
     EXEC_NPU_CMD(aclnnGatherV2, dev_ctx, x, dim, index, *out);
+  }
+
+  if (zero_index) {
+    phi::DenseTensorMeta meta_0 = {x.dtype(), out_dims};
+    out->set_meta(meta_0);
   }
 }
 
@@ -118,8 +142,27 @@ void GatherGradKernel(const Context& dev_ctx,
   zeroslike_xout.Resize(x.dims());
 
   // step3: scatter(x_grad)
+  phi::DenseTensor out_grad_(out_grad);
+
+  int64_t dim = axis.to<int64_t>();
+  int count = 0;
+  if (index.dims().size() == 0) {
+    std::vector<int64_t> out_dims_new(out_grad.dims().size() + 1);
+    for (int64_t i = 0; i <= out_dims_new.size() - 1; i++) {
+      if (i == dim) {
+        out_dims_new[i] = 1;
+      } else {
+        out_dims_new[i] = out_grad.dims()[count];
+        count++;
+      }
+    }
+
+    phi::DenseTensorMeta meta_1 = {x.dtype(), phi::make_ddim(out_dims_new)};
+    out_grad_.set_meta(meta_1);
+  }
+
   EXEC_NPU_CMD(
-      aclnnScatterNd, dev_ctx, zeroslike_xout, *p_index, out_grad, *x_grad);
+      aclnnScatterNd, dev_ctx, zeroslike_xout, *p_index, out_grad_, *x_grad);
 }
 
 }  // namespace custom_kernel
