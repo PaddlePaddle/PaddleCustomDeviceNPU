@@ -58,12 +58,15 @@ void NormKernel(const Context& dev_ctx,
 
   phi::Scalar p = 2.0f;
   const auto& x_dims = x.dims();
-  std::vector<int64_t> axis;
+  std::vector<int64_t> axis, resize_list;
   for (int64_t i = 0; i < x_dims.size(); ++i) {
     axis.push_back(i);
+    resize_list.push_back(1);
   }
-  bool keepdim = false;
+  bool keepdim = true;
+  x_norm->Resize(phi::make_ddim(resize_list));
   EXEC_NPU_CMD(aclnnNorm, dev_ctx, x, p, axis, keepdim, *x_norm);
+  x_norm->Resize({1});
 }
 
 template <typename T, typename Context>

@@ -184,7 +184,7 @@ void SliceRawKernel(const Context& dev_ctx,
   out->Resize(phi::make_ddim(size));
 
   std::vector<int64_t> steps;
-  for (int i = 0; i < out->dims().size(); i++) {
+  for (int i = 0; i < axes_t.size(); i++) {
     steps.push_back(1.0);
   }
 

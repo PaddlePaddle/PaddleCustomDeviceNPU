@@ -215,7 +215,7 @@ void ConcatGradKernel(const Context& dev_ctx,
       ends_array.push_back(ins[j]->dims()[axis] + offset);
 
       std::vector<int64_t> steps;
-      for (int i = 0; i < outs[j]->dims().size(); i++) {
+      for (int i = 0; i < axes_t.size(); i++) {
         steps.push_back(1.0);
       }
 

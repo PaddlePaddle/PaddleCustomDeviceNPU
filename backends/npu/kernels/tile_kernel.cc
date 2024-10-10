@@ -316,7 +316,7 @@ void TileGradKernel(const Context& dev_ctx,
       for (int i = 0; i < out_grad.dims().size(); i++) {
         axes.push_back(i);
       }
-      std::vector<int64_t> steps(out_grad.dims().size(), 1);
+      std::vector<int64_t> steps(axes.size(), 1);
       static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
       auto starts_acl = aclCreateIntArray(starts.data(), starts.size());
       auto ends_acl = aclCreateIntArray(x_grad_dims.data(), x_grad_dims.size());
