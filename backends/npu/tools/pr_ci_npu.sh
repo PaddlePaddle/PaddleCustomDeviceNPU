@@ -158,9 +158,75 @@ function card_test() {
 }
 
 
+function run_paddlex() {
+
+    # PaddleX test
+    export DEVICE=($(echo $ASCEND_RT_VISIBLE_DEVICES | tr "," "\n"))
+    export DEVICE_LIST=$(echo $ASCEND_RT_VISIBLE_DEVICES)
+    unset USE_910B
+    unset ASCEND_RT_VISIBLE_DEVICES
+    echo "Start Download"
+    git clone --depth 1000 https://gitee.com/PaddlePaddle/PaddleX.git
+    cd PaddleX
+    pip install -e .
+    paddlex --install PaddleClas
+    paddlex --install PaddleDetection
+    paddlex --install PaddleSeg
+
+    wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/cls_flowers_examples.tar -P ./dataset
+    tar -xf ./dataset/cls_flowers_examples.tar -C ./dataset/
+    wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/det_coco_examples.tar -P ./dataset
+    tar -xf ./dataset/det_coco_examples.tar -C ./dataset/
+    wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/seg_optic_examples.tar -P ./dataset
+    tar -xf ./dataset/seg_optic_examples.tar -C ./dataset/
+    echo "End Download"
+
+    echo "Start PaddleX ResNet50"
+    python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
+    -o Global.mode=train \
+    -o Global.dataset_dir=./dataset/cls_flowers_examples \
+    -o Global.output=resnet50_output \
+    -o Global.device="npu:${DEVICE_LIST}"
+
+    #python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
+    #-o Global.mode=predict \
+    #-o Predict.model_dir="./resnet50_output/best_model" \
+    #-o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_image_classification_001.jpg" \
+    #-o Global.device="npu:${DEVICE}"
+    echo "End PaddleX ResNet50"
+
+    echo "Start PP-YOLOE+"
+    python main.py -c paddlex/configs/object_detection/PP-YOLOE_plus-S.yaml \
+    -o Global.mode=train \
+    -o Global.dataset_dir=./dataset/det_coco_examples \
+    -o Global.output=ppyolo_plus_s_output \
+    -o Global.device="npu:${DEVICE_LIST}"
+
+    #python main.py -c paddlex/configs/object_detection/PP-YOLOE_plus-S.yaml \
+    #-o Global.mode=predict \
+    #-o Predict.model_dir="./ppyolo_plus_s_output/best_model" \
+    #-o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_object_detection_002.png" \
+    #-o Global.device="npu:${DEVICE}"
+    echo "End PP-YOLOE+"
+
+    echo "Start DeepLabv3+"
+    python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
+    -o Global.mode=train \
+    -o Global.dataset_dir=./dataset/seg_optic_examples \
+    -o Global.output=deeplabv3p_output \
+    -o Global.device="npu:${DEVICE_LIST}"
+
+    #python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
+    #-o Global.mode=predict \
+    #-o Predict.model_dir="./deeplabv3p_output/best_model/model/" \
+    #-o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
+    #-o Global.device="npu:${DEVICE}"
+    echo "End DeepLabv3+"
+}
+
+
 function main() {
     # skip paddlepaddle cpu install as npu docker image already have cpu whl package installed
-
     # custom_npu build and install
     cd ${CODE_ROOT}
     bash tools/compile.sh
@@ -225,18 +291,16 @@ function main() {
     done <<< "$disable_ut_npu";
     disable_ut_list+="^disable_ut_npu$"
 
-    if [ "${TEST_IMPORTANT:-OFF}" == "OFF" ]; then
-        disable_ut_list+="|"
-        while read -r line; do
-            res=$(echo "${changed_ut_list[@]}" | grep "${line}" | wc -l)
-            if [ $res -eq 0 ]; then
-                disable_ut_list+="^"${line}"$|"
-            else
-                echo "Found ${line} code changed, ignore ut list disabled in disable_ut_npu"
-            fi
-        done <<< "$important_ut_npu";
-        disable_ut_list+="^important_ut_npu$"
-    fi
+    disable_ut_list+="|"
+    while read -r line; do
+        res=$(echo "${changed_ut_list[@]}" | grep "${line}" | wc -l)
+        if [ $res -eq 0 ]; then
+            disable_ut_list+="^"${line}"$|"
+        else
+            echo "Found ${line} code changed, ignore ut list disabled in disable_ut_npu"
+        fi
+    done <<< "$important_ut_npu";
+    disable_ut_list+="^important_ut_npu$"
     
     echo "disable_ut_list=${disable_ut_list}"
     IFS=$IFS_DEFAULT
@@ -360,6 +424,11 @@ function main() {
     fi
     if [[ "${WITH_COVERAGE:-OFF}" == "ON" ]];then
         bash ${CODE_ROOT}/tools/coverage/coverage_process.sh
+    fi
+
+    # Run PaddleX Test
+    if [[ "${TEST_IMPORTANT:-OFF}" == "OFF" ]];then
+        run_paddlex
     fi
 }
 
