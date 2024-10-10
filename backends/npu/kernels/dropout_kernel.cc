@@ -402,13 +402,21 @@ void DropoutRawKernel(const Context& dev_ctx,
     }
 
     if (!is_upscale) {
-      phi::Scalar revert_scale = static_cast<T>(1.0 - dropout_prob);
-      EXEC_NPU_CMD(aclnnInplaceMuls, dev_ctx, *out, revert_scale);
+      auto revert_scale = static_cast<T>(1.0 - dropout_prob);
+      aclDataType acl_data_type = ConvertToNpuDtype(x.dtype());
+      static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
+      aclScalar* acl_scalar_revert_scale =
+          aclCreateScalar(&revert_scale, acl_data_type);
+      EXEC_NPU_CMD(aclnnInplaceMuls, dev_ctx, *out, acl_scalar_revert_scale);
     }
   } else {
     if (!is_upscale) {
-      phi::Scalar down_scale = static_cast<T>(1.0 - dropout_prob);
-      EXEC_NPU_CMD(aclnnMuls, dev_ctx, x, down_scale, *out);
+      auto down_scale = static_cast<T>(1.0 - dropout_prob);
+      aclDataType acl_data_type = ConvertToNpuDtype(x.dtype());
+      static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
+      aclScalar* acl_scalar_down_scale =
+          aclCreateScalar(&down_scale, acl_data_type);
+      EXEC_NPU_CMD(aclnnMuls, dev_ctx, x, acl_scalar_down_scale, *out);
       return;
     }
     TensorCopy(dev_ctx, x, false, out);
@@ -565,8 +573,12 @@ void DropoutGradRawKernel(const Context& dev_ctx,
   }
 
   if (!is_upscale) {
-    phi::Scalar revert_scale = static_cast<T>(1.0 - dropout_prob);
-    EXEC_NPU_CMD(aclnnInplaceMuls, dev_ctx, *dx, revert_scale);
+    auto revert_scale = static_cast<T>(1.0 - dropout_prob);
+    aclDataType acl_data_type = ConvertToNpuDtype(dx->dtype());
+    static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
+    aclScalar* acl_scalar_revert_scale =
+        aclCreateScalar(&revert_scale, acl_data_type);
+    EXEC_NPU_CMD(aclnnInplaceMuls, dev_ctx, *dx, acl_scalar_revert_scale);
   }
   return;
 }

@@ -148,6 +148,28 @@ class TestDropoutModeDownOp1(TestDropoutOp):
         }
 
 
+class TestDropoutModeDownOp1Fp16(TestDropoutOp):
+    # the dropout_prob is 0.2
+    def init_dtype(self):
+        self.dtype = np.float16
+
+    def setUp(self):
+        self.op_type = "dropout"
+        self.set_npu()
+        self.init_dtype()
+        self.inputs = {"X": np.random.random((32, 64)).astype(self.dtype)}
+        self.attrs = {
+            "dropout_prob": 0.2,
+            "fix_seed": True,
+            "is_test": False,
+            "dropout_implementation": "downgrade_in_infer",
+        }
+        self.outputs = {
+            "Out": np.zeros((32, 64)).astype("float16"),
+            "Mask": convert_to_npu_mask(np.zeros((32, 64)).astype("uint8")),
+        }
+
+
 class TestDropoutOp2(TestDropoutOp):
     # the dropout_prob is 1.0
     def setUp(self):
