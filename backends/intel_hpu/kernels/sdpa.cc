@@ -21,6 +21,12 @@
 
 namespace custom_kernel {
 
+template <typename T, typename Context>
+void TransposeKernel(const Context &dev_ctx,
+                     const phi::DenseTensor &x,
+                     const std::vector<int> &axis,
+                     phi::DenseTensor *out);
+
 class FSDPA : public HpuOperator {
  public:
   explicit FSDPA(std::string guid_prefix) : HpuOperator(guid_prefix) {}
@@ -45,12 +51,14 @@ class FSDPA : public HpuOperator {
                                          true,
                                          outputs[i].name));
     }
-    for (size_t i = 1; i < outputs.size(); i++) {
-      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
-                                         outputs[i].type,
-                                         outputs[i].dims,
-                                         false,
-                                         outputs[i].name));
+    if (!params.is_inference) {
+      for (size_t i = 1; i < outputs.size(); i++) {
+        syn_outputs.push_back(createTensor(outputs[i].dims.size(),
+                                           outputs[i].type,
+                                           outputs[i].dims,
+                                           true,
+                                           outputs[i].name));
+      }
     }
 
     synStatus status = synNodeCreate(graphHandle_,
@@ -88,27 +96,42 @@ void FusedDotProductAttentionKernel(
     phi::DenseTensor *out,
     phi::DenseTensor *softmax_out,
     phi::DenseTensor *rng_state) {
-  dev_ctx.template Alloc<T>(out);
-
+  std::vector<int> axis = {0, 2, 1, 3};
+  phi::DenseTensor qt;
+  // auto q_dims = q.dims();
   std::vector<int64_t> q_dims = phi::vectorize<int64_t>(q.dims());
-  std::vector<int64_t> k_dims = phi::vectorize<int64_t>(k.dims());
-  std::vector<int64_t> v_dims = phi::vectorize<int64_t>(v.dims());
-  std::vector<int64_t> m_dims = phi::vectorize<int64_t>(mask.dims());
-  std::vector<int64_t> output_dims = phi::vectorize<int64_t>(out->dims());
-  std::vector<int64_t> softmax_out_dims =
-      phi::vectorize<int64_t>(softmax_out->dims());
-  std::vector<int64_t> transposed_shape;
-  transposed_shape.push_back(k_dims[0]);
-  transposed_shape.push_back(k_dims[1]);
-  transposed_shape.push_back(softmax_out_dims[1]);
-  transposed_shape.push_back(k_dims[2]);
-  softmax_out->Resize(phi::make_ddim(transposed_shape));
-  dev_ctx.template Alloc<T>(softmax_out);
+  std::vector<int64_t> qt_dims(q_dims.cbegin(), q_dims.cend());
+
+  int rank = q_dims.size();
+  qt_dims[rank - 3] = q_dims[rank - 2];
+  qt_dims[rank - 2] = q_dims[rank - 3];
+
+  phi::DenseTensorMeta qt_meta({q.dtype(), phi::make_ddim(qt_dims)});
+  qt.set_meta(qt_meta);
+  custom_kernel::TransposeKernel<T, Context>(dev_ctx, q, axis, &qt);
+
+  phi::DenseTensor kt;
+  phi::DenseTensor vt;
+  std::vector<int64_t> kv_dims = phi::vectorize<int64_t>(k.dims());
+  std::vector<int64_t> kvt_dims(kv_dims.cbegin(), kv_dims.cend());
+  kvt_dims[rank - 3] = kv_dims[rank - 2];
+  kvt_dims[rank - 2] = kv_dims[rank - 3];
+  phi::DenseTensorMeta kvt_meta({k.dtype(), phi::make_ddim(kvt_dims)});
+  kt.set_meta(kvt_meta);
+  vt.set_meta(kvt_meta);
+  custom_kernel::TransposeKernel<T, Context>(dev_ctx, k, axis, &kt);
+  custom_kernel::TransposeKernel<T, Context>(dev_ctx, v, axis, &vt);
+
+  out->Resize(phi::make_ddim(qt_dims));
+  dev_ctx.template Alloc<T>(out);
+  if (is_training) {
+    dev_ctx.template Alloc<T>(softmax_out);
+  }
 
   ConvertTensors ct;
-  ct.Add(q);
-  ct.Add(k);
-  ct.Add(v);
+  ct.Add(qt);
+  ct.Add(kt);
+  ct.Add(vt);
   ct.Add(mask);
   /*
   if (attention_mask.get_ptr()) {
@@ -116,7 +139,9 @@ void FusedDotProductAttentionKernel(
   }
   */
   ct.Add(out, false);
-  ct.Add(softmax_out, false);
+  if (is_training) {
+    ct.Add(softmax_out, false);
+  }
   std::vector<DIMS> in_out_dims = ct.GetDims();
   std::vector<DIMS> out_dims = ct.GetDims(false);
   in_out_dims.insert(in_out_dims.end(), out_dims.begin(), out_dims.end());
@@ -132,7 +157,8 @@ void FusedDotProductAttentionKernel(
   params.softmax_mode = SDPA_DEFAULT_SOFTMAX;
 
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, ns_Sdpa::ParamsV2>("sdpa_fwd", in_out_dims, &params);
+  op_info.prepareOpInfo<T, ns_Sdpa::ParamsV2>(
+      "sdpa_recomp_fwd", in_out_dims, &params);
 
   auto recipe = op_info.GetRecipe();
 
