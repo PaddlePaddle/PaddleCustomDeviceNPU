@@ -291,16 +291,18 @@ function main() {
     done <<< "$disable_ut_npu";
     disable_ut_list+="^disable_ut_npu$"
 
-    disable_ut_list+="|"
-    while read -r line; do
-        res=$(echo "${changed_ut_list[@]}" | grep "${line}" | wc -l)
-        if [ $res -eq 0 ]; then
-            disable_ut_list+="^"${line}"$|"
-        else
-            echo "Found ${line} code changed, ignore ut list disabled in disable_ut_npu"
-        fi
-    done <<< "$important_ut_npu";
-    disable_ut_list+="^important_ut_npu$"
+    if [ "${TEST_IMPORTANT:-OFF}" == "OFF" ]; then
+        disable_ut_list+="|"
+        while read -r line; do
+            res=$(echo "${changed_ut_list[@]}" | grep "${line}" | wc -l)
+            if [ $res -eq 0 ]; then
+                disable_ut_list+="^"${line}"$|"
+            else
+                echo "Found ${line} code changed, ignore ut list disabled in disable_ut_npu"
+            fi
+        done <<< "$important_ut_npu";
+        disable_ut_list+="^important_ut_npu$"
+    fi
     
     echo "disable_ut_list=${disable_ut_list}"
     IFS=$IFS_DEFAULT
