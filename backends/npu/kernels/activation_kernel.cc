@@ -1916,14 +1916,16 @@ PD_REGISTER_PLUGIN_KERNEL(gelu,
                           ALL_LAYOUT,
                           custom_kernel::GeluKernel,
                           float,
-                          phi::dtype::float16) {}
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(gelu_grad,
                           npu,
                           ALL_LAYOUT,
                           custom_kernel::GeluGradKernel,
                           float,
-                          phi::dtype::float16) {}
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(tanh,
                           npu,
@@ -1945,6 +1947,7 @@ PD_REGISTER_PLUGIN_KERNEL(sigmoid,
                           custom_kernel::SigmoidKernel,
                           float,
                           phi::dtype::float16,
+                          phi::dtype::bfloat16,
                           double) {}
 
 PD_REGISTER_PLUGIN_KERNEL(sigmoid_grad,
@@ -1953,6 +1956,7 @@ PD_REGISTER_PLUGIN_KERNEL(sigmoid_grad,
                           custom_kernel::SigmoidGradKernel,
                           float,
                           phi::dtype::float16,
+                          phi::dtype::bfloat16,
                           double) {}
 
 PD_REGISTER_PLUGIN_KERNEL(sqrt,

@@ -492,11 +492,13 @@ PD_REGISTER_PLUGIN_KERNEL(conv2d,
                           ALL_LAYOUT,
                           custom_kernel::Conv2dKernel,
                           float,
-                          phi::dtype::float16) {}
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(conv2d_grad,
                           npu,
                           ALL_LAYOUT,
                           custom_kernel::Conv2DGradKernel,
                           float,
-                          phi::dtype::float16) {}
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {}
