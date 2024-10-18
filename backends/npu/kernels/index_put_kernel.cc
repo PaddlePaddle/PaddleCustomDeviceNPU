@@ -20,6 +20,23 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
+void StackKernel(const Context& dev_ctx,
+                 const std::vector<const phi::DenseTensor*>& x,
+                 int axis,
+                 phi::DenseTensor* y);
+
+template <typename T, typename Context>
+void GatherNdKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    const phi::DenseTensor& index,
+                    phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void NonZeroKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& condition,
+                   phi::DenseTensor* out);
+
+template <typename T, typename Context>
 void CastKernel(const Context& dev_ctx,
                 const phi::DenseTensor& x,
                 phi::DataType dtype,
@@ -59,8 +76,10 @@ void IndexPutGradKernel(const Context& dev_ctx,
                         const phi::DenseTensor& x,
                         const std::vector<const phi::DenseTensor*>& indices,
                         const phi::DenseTensor& value,
+                        const phi::DenseTensor& out_grad,
                         bool accumulate,
-                        phi::DenseTensor* out) {
+                        phi::DenseTensor* x_grad,
+                        phi::DenseTensor* value_grad) {
   bool unsafe = true;
 
   std::vector<phi::DenseTensor*> tensor_list(indices.size());
@@ -76,10 +95,49 @@ void IndexPutGradKernel(const Context& dev_ctx,
     }
   }
 
-  EXEC_NPU_CMD(
-      aclnnIndexPutImpl, dev_ctx, x, tensor_list, value, accumulate, unsafe);
-  dev_ctx.template Alloc<T>(out);
-  TensorCopy(dev_ctx, x, true, out);
+  if (x_grad) {
+    dev_ctx.template Alloc<T>(x_grad);
+    TensorCopy(dev_ctx, out_grad, true, x_grad);
+    phi::DenseTensorMeta value_zero_meta = {value.dtype(), value.dims()};
+    phi::DenseTensor value_zero;
+    value_zero.set_meta(value_zero_meta);
+    dev_ctx.template Alloc<T>(&value_zero);
+    EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, value_zero);
+    EXEC_NPU_CMD(aclnnIndexPutImpl,
+                 dev_ctx,
+                 *x_grad,
+                 tensor_list,
+                 value_zero,
+                 accumulate,
+                 unsafe);
+  }
+
+  if (value_grad) {
+    dev_ctx.template Alloc<T>(value_grad);
+    if (tensor_list[0]->dtype() == phi::DataType::BOOL) {
+      // deal with bool indices
+      PADDLE_ENFORCE_EQ(
+          tensor_list.size(),
+          1,
+          phi::errors::InvalidArgument("bool indices should be 1d"));
+
+      phi::DenseTensor non_zero_index;
+      custom_kernel::NonZeroKernel<int64_t, Context>(
+          dev_ctx, *tensor_list[0], &non_zero_index);
+      custom_kernel::GatherNdKernel<T, Context>(
+          dev_ctx, out_grad, non_zero_index, value_grad);
+    } else {
+      phi::DenseTensorMeta index_tensor_meta = {
+          tensor_list[0]->dtype(),
+          phi::make_ddim({tensor_list[0]->dims()[0], tensor_list.size()})};
+      phi::DenseTensor index_tensor;
+      index_tensor.set_meta(index_tensor_meta);
+      custom_kernel::StackKernel<int64_t, Context>(
+          dev_ctx, indices, -1, &index_tensor);
+      custom_kernel::GatherNdKernel<T, Context>(
+          dev_ctx, out_grad, index_tensor, value_grad);
+    }
+  }
 }
 
 }  // namespace custom_kernel
