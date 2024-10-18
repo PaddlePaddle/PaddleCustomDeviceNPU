@@ -147,10 +147,11 @@ void InferMetaFromVecValue(const phi::DenseTensor& x,
 }  // namespace
 
 template <typename T, typename Context>
-void ReshapeInferKernel(const Context& dev_ctx,
-                        const phi::DenseTensor& x,
-                        const phi::IntArray& shape,
-                        phi::DenseTensor* out) {
+void ReshapeKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::IntArray& shape,
+                   phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("reshape");
   PADDLE_ENFORCE_NE(
       x.layout(),
       common::DataLayout::kNDHWC,
@@ -180,13 +181,13 @@ void ReshapeInferKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void ReshapeKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::IntArray& shape,
-                   phi::DenseTensor* out,
-                   phi::DenseTensor* xshape) {
-  PADDLE_GCU_KERNEL_TRACE("reshape");
-  ReshapeInferKernel<T>(dev_ctx, x, shape, out);
+void ReshapeWithXShapeKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::IntArray& shape,
+                             phi::DenseTensor* out,
+                             phi::DenseTensor* xshape) {
+  PADDLE_GCU_KERNEL_TRACE("reshape_with_xshape");
+  ReshapeKernel<T>(dev_ctx, x, shape, out);
 }
 
 template <typename T, typename Context>
@@ -251,6 +252,19 @@ PD_REGISTER_PLUGIN_KERNEL(reshape,
                           uint8_t,
                           bool) {}
 
+PD_REGISTER_PLUGIN_KERNEL(reshape_with_xshape,
+                          gcu,
+                          ALL_LAYOUT,
+                          custom_kernel::ReshapeWithXShapeKernel,
+                          float,
+                          phi::dtype::float16,
+                          double,
+                          int8_t,
+                          int16_t,
+                          int32_t,
+                          int64_t,
+                          uint8_t,
+                          bool) {}
 // PD_REGISTER_PLUGIN_KERNEL(reshape_grad,
 //                           gcu,
 //                           ALL_LAYOUT,

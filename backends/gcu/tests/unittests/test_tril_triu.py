@@ -18,7 +18,6 @@ import unittest
 from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 from paddle import base
-from paddle.base import Program, program_guard
 from paddle.base.layer_helper import LayerHelper
 
 # The table retains its original format for better comparison of parameter settings.
@@ -78,41 +77,43 @@ class TestTrilTriu(TestAPIBase):
         paddle.seed(2036)
         np.random.seed(2036)
         paddle.enable_static()
-        startup_program = Program()
-        main_program = Program()
+        with paddle.pir_utils.OldIrGuard():
+            startup_program = paddle.static.Program()
+            main_program = paddle.static.Program()
 
-        with program_guard(main_program, startup_program):
-            attrs = {
-                "diagonal": diagonal,
-                "lower": lower,
-            }
-            helper = LayerHelper("tril_triu")
-            x = helper.create_variable(name="X", shape=self.x_shape, dtype=dtype)
-            out = helper.create_variable_for_type_inference(dtype=dtype)
+            with paddle.static.program_guard(main_program, startup_program):
+                attrs = {
+                    "diagonal": diagonal,
+                    "lower": lower,
+                }
+                helper = LayerHelper("tril_triu")
+                x = helper.create_variable(name="X", shape=self.x_shape, dtype=dtype)
+                out = helper.create_variable_for_type_inference(dtype=dtype)
 
-            inputs = {"X": x}
-            outputs = {"Out": out}
-            helper.append_op(
-                type="tril_triu",
-                inputs=inputs,
-                outputs=outputs,
-                attrs=attrs,
-            )
-        # print("DEBUG startup_program:{}".format(startup_program))
-        # print("DEBUG main_program:{}".format(main_program))
-        cpu_exe = base.Executor(place=base.CPUPlace())
-        cpu_exe.run(startup_program)
+                inputs = {"X": x}
+                outputs = {"Out": out}
+                helper.append_op(
+                    type="tril_triu",
+                    inputs=inputs,
+                    outputs=outputs,
+                    attrs=attrs,
+                )
+            # print("DEBUG startup_program:{}".format(startup_program))
+            # print("DEBUG main_program:{}".format(main_program))
+            cpu_exe = base.Executor(place=base.CPUPlace())
+            cpu_exe.run(startup_program)
         return main_program, out.name
 
     def run_program(self, main_program, place, out_name, cast_inputs=False):
         paddle.enable_static()
-        exe = base.Executor(place=place)
-        if cast_inputs:
-            x = self.data_x.astype(np.float32)
-        else:
-            x = self.data_x
-        feed = {"X": x}
-        out = exe.run(main_program, feed=feed, fetch_list=[out_name])
+        with paddle.pir_utils.OldIrGuard():
+            exe = base.Executor(place=place)
+            if cast_inputs:
+                x = self.data_x.astype(np.float32)
+            else:
+                x = self.data_x
+            feed = {"X": x}
+            out = exe.run(main_program, feed=feed, fetch_list=[out_name])
         return out
 
     @data(*TRIL_TRIU_CASE)

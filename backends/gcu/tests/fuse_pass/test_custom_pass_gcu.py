@@ -36,9 +36,9 @@ def generate_add_n():
 
 @paddle.jit.to_static(
     input_spec=[
-        paddle.static.InputSpec([None, 32], "int32", "x"),
-        paddle.static.InputSpec([None, 32], "int32", "y"),
-        paddle.static.InputSpec([None, 32], "int32", "z"),
+        paddle.static.InputSpec([None, 32], "float32", "x"),
+        paddle.static.InputSpec([None, 32], "float32", "y"),
+        paddle.static.InputSpec([None, 32], "float32", "z"),
     ]
 )
 def func(x, y, z):
@@ -56,7 +56,8 @@ class TestCustomPass(unittest.TestCase):
                 paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(
                     lib
                 )
-        paddle.jit.save(func, MODEL_FILE)
+        with paddle.pir_utils.OldIrGuard():
+            paddle.jit.save(func, MODEL_FILE)
 
     def test_my_add_n(self):
         config = paddle.inference.Config()

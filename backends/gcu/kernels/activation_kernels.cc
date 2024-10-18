@@ -791,6 +791,21 @@ void EluKernel(const Context& dev_ctx,
   }
 }
 
+template <typename T, typename Context>
+void RoundKernel(const Context& dev_ctx,
+                 const phi::DenseTensor& x,
+                 const int decimals,
+                 phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("round");
+  if (LaunchAOTKernel()) {
+    dev_ctx.template Alloc<T>(out);
+    LAUNCH_TOPSATENOP(topsatenRound, dev_ctx, *out, x, decimals);
+
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
+}
+
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(logsigmoid, LogSigmoid)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(rsqrt, Rsqrt)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(log2, Log2)
@@ -805,7 +820,6 @@ DEFINE_UNARY_AOT_ACTIVATION_KERNEL(asinh, Asinh)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(atanh, Atanh)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(cosh, Cosh)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(sinh, Sinh)
-DEFINE_UNARY_AOT_ACTIVATION_KERNEL(round, Round)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(tan, Tan)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(erf, Erf)
 DEFINE_UNARY_AOT_ACTIVATION_KERNEL(expm1, Expm1)

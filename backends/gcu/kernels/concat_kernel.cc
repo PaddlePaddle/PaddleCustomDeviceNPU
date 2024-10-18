@@ -23,6 +23,19 @@ void ConcatKernel(const Context& dev_ctx,
                   const phi::Scalar& axis_scalar,
                   phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("concat");
+  int64_t dim = axis_scalar.to<int64_t>();
+  if (common::contain_unknown_dim(out->dims())) {
+    std::vector<phi::MetaTensor> x_meta_vec;
+    x_meta_vec.reserve(ins.size());
+    std::vector<const phi::MetaTensor*> x_metas(ins.size(), nullptr);
+    for (size_t i = 0; i < ins.size(); ++i) {
+      x_meta_vec.emplace_back(*ins[i]);
+      x_metas[i] = &x_meta_vec[i];
+    }
+    phi::MetaTensor meta_out(*out);
+    phi::ConcatInferMeta(x_metas, dim, &meta_out);
+  }
+
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
@@ -54,7 +67,7 @@ void ConcatKernel(const Context& dev_ctx,
       }
       in_tensors.emplace_back(CreateTopsatenTensor(tensor));
     }
-    int64_t dim = axis_scalar.to<int64_t>();
+
     if (dim < 0 && !ins.empty()) {
       dim += ins[0]->dims().size();
     }
