@@ -671,9 +671,14 @@ class TestRound(TestUnary):
     def init_api_and_data(self):
         self.unary_api = paddle.round
         self.data_x = np.random.uniform(-1, 1, self.x_shape).astype(self.x_dtype)
+        self.decimals = np.random.randint(low=-1, high=1, dtype="int32")
+
+    def forward(self):
+        x = paddle.to_tensor(self.data_x, dtype=self.x_dtype)
+        return self.unary_api(x, self.decimals)
 
     def get_numpy_out(self):
-        return np.round(self.data_x)
+        return np.round(self.data_x, self.decimals)
 
 
 class TestElu(TestUnary):

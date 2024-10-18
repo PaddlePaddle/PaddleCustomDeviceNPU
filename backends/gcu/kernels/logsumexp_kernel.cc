@@ -19,7 +19,7 @@ namespace custom_kernel {
 template <typename T, typename Context>
 void LogsumexpKernel(const Context& dev_ctx,
                      const phi::DenseTensor& x,
-                     const std::vector<int64_t>& axis,
+                     const std::vector<int>& axis,
                      bool keepdim,
                      bool reduce_all,
                      phi::DenseTensor* out) {
@@ -27,7 +27,7 @@ void LogsumexpKernel(const Context& dev_ctx,
   if (LaunchAOTKernel()) {
     dev_ctx.template Alloc<T>(out);
 
-    auto reduce_axis = axis;
+    std::vector<int64_t> reduce_axis(axis.begin(), axis.end());
     int64_t rank = x.dims().size();
     if (reduce_all || reduce_axis.empty()) {
       reduce_axis.assign(rank, 0);

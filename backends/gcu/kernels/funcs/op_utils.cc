@@ -14,14 +14,25 @@
 
 #include "kernels/funcs/op_utils.h"
 
+#include "paddle/common/flags.h"
 #include "paddle/phi/common/data_type.h"
 #include "paddle/phi/core/dense_tensor.h"
+
+PHI_DECLARE_bool(use_stride_kernel);
 
 namespace custom_kernel {
 
 void *GcuDataPtr(const phi::DenseTensor &tensor) {
   if (tensor.initialized()) {
-    return const_cast<void *>(tensor.data());
+    auto contiguous_strides = phi::DenseTensorMeta::calc_strides(tensor.dims());
+    bool is_contiguous = (tensor.strides() == contiguous_strides);
+    auto tensor_tmp = tensor;
+    if (!is_contiguous && !FLAGS_use_stride_kernel) {
+      auto meta = tensor_tmp.meta();
+      meta.strides = contiguous_strides;
+      tensor_tmp.set_meta(meta);
+    }
+    return const_cast<void *>(tensor_tmp.data());
   }
   return nullptr;
 }

@@ -17,14 +17,14 @@
 
 namespace custom_kernel {
 template <typename T, typename Context>
-void FlattenInferKernel(const Context& dev_ctx,
-                        const phi::DenseTensor& x,
-                        int start_axis UNUSED,
-                        int stop_axis UNUSED,
-                        phi::DenseTensor* out) {
-  PADDLE_GCU_KERNEL_TRACE("flatten_infer");
+void FlattenKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   int start_axis UNUSED,
+                   int stop_axis UNUSED,
+                   phi::DenseTensor* out) {
+  PADDLE_GCU_KERNEL_TRACE("flatten");
   if (LaunchAOTKernel()) {
-    VLOG(6) << "[HOST_KERNEL] Impl on host for flatten_infer";
+    VLOG(6) << "[HOST_KERNEL] Impl on host for flatten";
     if (x.numel() == 0) {
       return;
     }
@@ -59,18 +59,19 @@ void FlattenInferKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void FlattenKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   int start_axis,
-                   int stop_axis,
-                   phi::DenseTensor* out,
-                   phi::DenseTensor* xshape) {
-  PADDLE_GCU_KERNEL_TRACE("flatten");
+void FlattenWithXShapeKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             int start_axis,
+                             int stop_axis,
+                             phi::DenseTensor* out,
+                             phi::DenseTensor* xshape) {
+  PADDLE_GCU_KERNEL_TRACE("flatten_with_xshape");
   if (LaunchAOTKernel()) {
-    custom_kernel::FlattenInferKernel<T, Context>(
+    custom_kernel::FlattenKernel<T, Context>(
         dev_ctx, x, start_axis, stop_axis, out);
 
   } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
     dev_ctx.template Alloc<T>(out);
     dev_ctx.template Alloc<T>(xshape);
 
@@ -161,10 +162,10 @@ PD_REGISTER_PLUGIN_KERNEL(flatten,
                           int,
                           int64_t) {}
 
-PD_REGISTER_PLUGIN_KERNEL(flatten_infer,
+PD_REGISTER_PLUGIN_KERNEL(flatten_with_xshape,
                           gcu,
                           ALL_LAYOUT,
-                          custom_kernel::FlattenInferKernel,
+                          custom_kernel::FlattenWithXShapeKernel,
                           phi::dtype::bfloat16,
                           phi::dtype::float16,
                           float,

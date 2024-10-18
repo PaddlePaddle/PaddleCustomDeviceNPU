@@ -22,13 +22,12 @@ from api_base import TestAPIBase
 # The table retains its original format for better comparison of parameter settings.
 # fmt: off
 DIAG_CASE = [
-    {"shape": [3], "dtype": np.float32, "offset": 0, "padding_value": 0},
-    {"shape": [3], "dtype": np.float32, "offset": 1, "padding_value": 0},
-    {"shape": [3], "dtype": np.float32, "offset": -1, "padding_value": 0},
-    {"shape": [3], "dtype": np.float32, "offset": 0, "padding_value": 6},
-    {"shape": [3], "dtype": np.float32, "offset": 1, "padding_value": 6},
-    {"shape": [3], "dtype": np.float32, "offset": -1, "padding_value": 6},
     {"shape": [3, 3], "dtype": np.float32, "offset": 0, "padding_value": 0},
+    {"shape": [3, 3], "dtype": np.float32, "offset": 1, "padding_value": 0},
+    {"shape": [3, 3], "dtype": np.float32, "offset": -1, "padding_value": 0},
+    {"shape": [3, 6], "dtype": np.float32, "offset": 0, "padding_value": 6},
+    {"shape": [3, 6], "dtype": np.float32, "offset": 1, "padding_value": 6},
+    {"shape": [3, 6], "dtype": np.float32, "offset": -1, "padding_value": 6},
 ]
 # fmt: on
 

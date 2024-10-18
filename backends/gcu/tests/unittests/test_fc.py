@@ -18,7 +18,6 @@ import unittest
 from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 from paddle import base
-from paddle.base import Program, program_guard
 from paddle.base.layer_helper import LayerHelper
 
 # The table retains its original format for better comparison of parameter settings.
@@ -76,72 +75,78 @@ class TestFc(TestAPIBase):
         paddle.seed(2036)
         np.random.seed(2036)
         paddle.enable_static()
-        startup_program = Program()
-        main_program = Program()
+        with paddle.pir_utils.OldIrGuard():
+            startup_program = paddle.static.Program()
+            main_program = paddle.static.Program()
 
-        with program_guard(main_program, startup_program):
-            # x = paddle.static.data(
-            #     name="Input",
-            #     shape=self.x_shape,
-            #     dtype=dtype,
-            # )
-            # w = paddle.static.data(
-            #     name="W",
-            #     shape=self.w_shape,
-            #     dtype=dtype,
-            # )
-            # if self.has_bias:
-            #     b = paddle.static.data(
-            #         name="Bias",
-            #         shape=self.b_shape,
-            #         dtype=dtype,
-            #     )
+            with paddle.static.program_guard(main_program, startup_program):
+                # x = paddle.static.data(
+                #     name="Input",
+                #     shape=self.x_shape,
+                #     dtype=dtype,
+                # )
+                # w = paddle.static.data(
+                #     name="W",
+                #     shape=self.w_shape,
+                #     dtype=dtype,
+                # )
+                # if self.has_bias:
+                #     b = paddle.static.data(
+                #         name="Bias",
+                #         shape=self.b_shape,
+                #         dtype=dtype,
+                #     )
 
-            attrs = {
-                "in_num_col_dims": num_flatten_dims,
-                "activation_type": "",
-                "padding_weights": False,
-            }
-            helper = LayerHelper("fc")
-            x = helper.create_variable(name="Input", shape=self.x_shape, dtype=dtype)
-            w = helper.create_variable(name="W", shape=self.w_shape, dtype=dtype)
-            b = helper.create_variable(name="Bias", shape=self.b_shape, dtype=dtype)
-            out = helper.create_variable_for_type_inference(dtype=dtype)
+                attrs = {
+                    "in_num_col_dims": num_flatten_dims,
+                    "activation_type": "",
+                    "padding_weights": False,
+                }
+                helper = LayerHelper("fc")
+                x = helper.create_variable(
+                    name="Input", shape=self.x_shape, dtype=dtype
+                )
+                w = helper.create_variable(name="W", shape=self.w_shape, dtype=dtype)
+                b = helper.create_variable(name="Bias", shape=self.b_shape, dtype=dtype)
+                out = helper.create_variable_for_type_inference(dtype=dtype)
 
-            inputs = (
-                {"Input": x, "W": w, "Bias": b}
-                if self.has_bias
-                else {"Input": x, "W": w}
-            )
-            outputs = {"Out": out}
-            helper.append_op(
-                type="fc",
-                inputs=inputs,
-                outputs=outputs,
-                attrs=attrs,
-            )
-        # print("DEBUG startup_program:{}".format(startup_program))
-        # print("DEBUG main_program:{}".format(main_program))
-        cpu_exe = base.Executor(place=base.CPUPlace())
-        cpu_exe.run(startup_program)
+                inputs = (
+                    {"Input": x, "W": w, "Bias": b}
+                    if self.has_bias
+                    else {"Input": x, "W": w}
+                )
+                outputs = {"Out": out}
+                helper.append_op(
+                    type="fc",
+                    inputs=inputs,
+                    outputs=outputs,
+                    attrs=attrs,
+                )
+            # print("DEBUG startup_program:{}".format(startup_program))
+            # print("DEBUG main_program:{}".format(main_program))
+            cpu_exe = base.Executor(place=base.CPUPlace())
+            cpu_exe.run(startup_program)
         return main_program, out.name
 
     def run_program(self, main_program, place, out_name, cast_inputs=False):
         paddle.enable_static()
-        exe = base.Executor(place=place)
-        if cast_inputs:
-            x = self.data_x.astype(np.float32)
-            w = self.data_w.astype(np.float32)
-            if self.has_bias:
-                b = self.data_b.astype(np.float32)
-        else:
-            x = self.data_x
-            w = self.data_w
-            b = self.data_b
-        feed = (
-            {"Input": x, "W": w, "Bias": b} if self.has_bias else {"Input": x, "W": w}
-        )
-        out = exe.run(main_program, feed=feed, fetch_list=[out_name])
+        with paddle.pir_utils.OldIrGuard():
+            exe = base.Executor(place=place)
+            if cast_inputs:
+                x = self.data_x.astype(np.float32)
+                w = self.data_w.astype(np.float32)
+                if self.has_bias:
+                    b = self.data_b.astype(np.float32)
+            else:
+                x = self.data_x
+                w = self.data_w
+                b = self.data_b
+            feed = (
+                {"Input": x, "W": w, "Bias": b}
+                if self.has_bias
+                else {"Input": x, "W": w}
+            )
+            out = exe.run(main_program, feed=feed, fetch_list=[out_name])
         return out
 
     @data(*FC_CASE)

@@ -23,12 +23,12 @@ cd PaddleCustomDevice
 cd backends/gcu
 
 # 2) 编译之前需确保环境下装有飞桨安装包，直接安装飞桨CPU版本即可
-python -m pip install paddlepaddle==0.0.0 -f https://www.paddlepaddle.org.cn/whl/linux/cpu-mkl/develop.html
+python -m pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
 
 # 3) 编译，编译时会按需下载submodule
 mkdir -p build && cd build
 export PADDLE_CUSTOM_PATH=`python -c "import re, paddle; print(re.compile('/__init__.py.*').sub('',paddle.__file__))"`
-cmake .. -DWITH_TESTING=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPY_VERSION=3.9
+cmake .. -DWITH_TESTING=ON -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPY_VERSION=3.10
 make -j $(nproc)
 
 # 4) 编译产出在build/dist路径下，使用pip安装
