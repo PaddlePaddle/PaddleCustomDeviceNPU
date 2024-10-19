@@ -364,13 +364,15 @@ void AclnnGroupNormKernel(const Context& dev_ctx,
     scale_tensor = scale.get();
   } else {
     scale_tensor.Resize({C});
-    FillNpuTensorWithConstant<T>(&scale_tensor, dev_ctx, static_cast<T>(1));
+    dev_ctx.template Alloc<T>(&scale_tensor);
+    EXEC_NPU_CMD(aclnnInplaceOne, dev_ctx, scale_tensor);
   }
   if (bias) {
     bias_tensor = bias.get();
   } else {
     bias_tensor.Resize({C});
-    FillNpuTensorWithConstant<T>(&bias_tensor, dev_ctx, static_cast<T>(0));
+    dev_ctx.template Alloc<T>(&bias_tensor);
+    EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, bias_tensor);
   }
   double eps = static_cast<double>(epsilon);
   EXEC_NPU_CMD(aclnnGroupNorm,
