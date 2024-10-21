@@ -284,7 +284,7 @@ function main() {
 
     python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
     -o Global.mode=predict \
-    -o Predict.model_dir="./resnet50_output/best_model" \
+    -o Predict.model_dir="./resnet50_output/best_model/inference" \
     -o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_image_classification_001.jpg" \
     -o Global.device="mlu:0"
     echo "End PaddleX ResNet50"
@@ -298,7 +298,7 @@ function main() {
 
     python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
     -o Global.mode=predict \
-    -o Predict.model_dir="./deeplabv3p_output/best_model/model/" \
+    -o Predict.model_dir="./deeplabv3p_output/best_model/model/inference" \
     -o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
     -o Global.device="mlu:0"
     echo "End DeepLabv3"
