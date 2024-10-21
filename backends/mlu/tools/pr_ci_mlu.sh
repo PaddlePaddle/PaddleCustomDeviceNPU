@@ -298,7 +298,7 @@ function main() {
 
     python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
     -o Global.mode=predict \
-    -o Predict.model_dir="./deeplabv3p_output/best_model/model/inference" \
+    -o Predict.model_dir="./deeplabv3p_output/best_model/inference" \
     -o Predict.input="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
     -o Global.device="mlu:0"
     echo "End DeepLabv3"
