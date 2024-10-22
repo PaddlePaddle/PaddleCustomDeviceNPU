@@ -17,8 +17,6 @@ import numpy as np
 import unittest
 from ddt import ddt, data, unpack
 from api_base import TestAPIBase
-from paddle import base
-from paddle.base.layer_helper import LayerHelper
 
 # The table retains its original format for better comparison of parameter settings.
 # fmt: off
@@ -56,64 +54,25 @@ class TestTrilTriu(TestAPIBase):
 
     def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
-        dtype = self.dtype if self.dtype != np.float16 else np.float32
-        self.prog, self.out_names = self.create_program(
-            dtype, self.diagonal, self.lower
-        )
+
+    def forward_with_dtype(self, dtype):
+        x = paddle.to_tensor(self.data_x, dtype=dtype)
+        if self.lower:
+            return paddle.tril(x, self.diagonal)
+        else:
+            return paddle.triu(x, self.diagonal)
 
     def forward(self):
-        return self.run_program(self.prog, base.CustomPlace("gcu", 0), self.out_names)[
-            0
-        ]
+        return self.forward_with_dtype(self.dtype)
+
+    def gcu_cast(self):
+        return self.forward_with_dtype(np.float32).astype("float16")
 
     def expect_output(self):
-        cast_inputs = True if self.dtype == np.float16 else False
-        out = self.run_program(self.prog, base.CPUPlace(), self.out_names, cast_inputs)
-        if self.dtype == np.float16:
-            out[0] = out[0].astype(self.dtype)
-        return out[0]
-
-    def create_program(self, dtype, diagonal, lower):
-        paddle.seed(2036)
-        np.random.seed(2036)
-        paddle.enable_static()
-        with paddle.pir_utils.OldIrGuard():
-            startup_program = paddle.static.Program()
-            main_program = paddle.static.Program()
-
-            with paddle.static.program_guard(main_program, startup_program):
-                attrs = {
-                    "diagonal": diagonal,
-                    "lower": lower,
-                }
-                helper = LayerHelper("tril_triu")
-                x = helper.create_variable(name="X", shape=self.x_shape, dtype=dtype)
-                out = helper.create_variable_for_type_inference(dtype=dtype)
-
-                inputs = {"X": x}
-                outputs = {"Out": out}
-                helper.append_op(
-                    type="tril_triu",
-                    inputs=inputs,
-                    outputs=outputs,
-                    attrs=attrs,
-                )
-            # print("DEBUG startup_program:{}".format(startup_program))
-            # print("DEBUG main_program:{}".format(main_program))
-            cpu_exe = base.Executor(place=base.CPUPlace())
-            cpu_exe.run(startup_program)
-        return main_program, out.name
-
-    def run_program(self, main_program, place, out_name, cast_inputs=False):
-        paddle.enable_static()
-        with paddle.pir_utils.OldIrGuard():
-            exe = base.Executor(place=place)
-            if cast_inputs:
-                x = self.data_x.astype(np.float32)
-            else:
-                x = self.data_x
-            feed = {"X": x}
-            out = exe.run(main_program, feed=feed, fetch_list=[out_name])
+        if self.dtype != np.float16:
+            out = self.forward()
+        else:
+            out = self.gcu_cast()
         return out
 
     @data(*TRIL_TRIU_CASE)
