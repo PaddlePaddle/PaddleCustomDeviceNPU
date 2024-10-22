@@ -268,7 +268,6 @@ function main() {
     pip install -e .
     paddlex --install PaddleClas
     paddlex --install PaddleSeg
-
     wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/cls_flowers_examples.tar -P ./dataset
     tar -xf ./dataset/cls_flowers_examples.tar -C ./dataset/
     wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/seg_optic_examples.tar -P ./dataset
