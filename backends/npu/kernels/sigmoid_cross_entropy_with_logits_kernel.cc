@@ -51,14 +51,12 @@ void SigmoidCrossEntropyWithLogitsKernel(
   phi::DenseTensor pos_weight_tensor;
   phi::DenseTensorMeta weight_tensor_meta = {phi::DataType::FLOAT32, x.dims()};
   weight_tensor.set_meta(weight_tensor_meta);
-  dev_ctx.template Alloc<float>(&weight_tensor);
-  EXEC_NPU_CMD(aclnnInplaceOne, dev_ctx, weight_tensor);
+  FillNpuTensorWithConstant<float>(&weight_tensor, dev_ctx, 1.0);
   weight_tensor.Resize(x.dims());
 
   if (pos_weight.get_ptr() == nullptr) {
     pos_weight_tensor.set_meta(weight_tensor_meta);
-    dev_ctx.template Alloc<float>(&pos_weight_tensor);
-    EXEC_NPU_CMD(aclnnInplaceOne, dev_ctx, pos_weight_tensor);
+    FillNpuTensorWithConstant<float>(&pos_weight_tensor, dev_ctx, 1.0);
     pos_weight_tensor.Resize(x.dims());
   } else {
     pos_weight_tensor = *pos_weight.get_ptr();
