@@ -64,7 +64,7 @@ endif()
 
 # build shared library
 add_library(${CUSTOM_MLU_NAME} SHARED ${CUSTOM_MLU_SRCS})
-target_link_libraries(${CUSTOM_MLU_NAME} PRIVATE ${NEUWARE_LIBS} glog gflags)
+target_link_libraries(${CUSTOM_MLU_NAME} PRIVATE ${NEUWARE_LIBS} glog)
 
 # link paddle shared library
 include(third_party)
