@@ -122,10 +122,10 @@ static std::vector<int64_t> ValidateShape(const std::vector<int64_t> shape,
 }
 
 template <typename T>
-void ReshapeInferKernel(const phi::Context& dev_ctx,
-                        const phi::DenseTensor& x,
-                        const phi::IntArray& shape,
-                        phi::DenseTensor* out) {
+void ReshapeKernel(const phi::Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::IntArray& shape,
+                   phi::DenseTensor* out) {
   auto x_dims = x.dims();
   auto out_dims = ValidateShape(shape.GetData(), x_dims);
   out->Resize(out_dims);
@@ -149,20 +149,20 @@ void ReshapeInferKernel(const phi::Context& dev_ctx,
 }
 
 template <typename T>
-void ReshapeKernel(const phi::Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::IntArray& shape,
-                   phi::DenseTensor* out,
-                   phi::DenseTensor* xshape) {
-  ReshapeInferKernel<T>(dev_ctx, x, shape, out);
+void ReshapeWithXShapeKernel(const phi::Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::IntArray& shape,
+                             phi::DenseTensor* out,
+                             phi::DenseTensor* xshape) {
+  ReshapeKernel<T>(dev_ctx, x, shape, out);
 }
 
 }  // namespace custom_kernel
 
-PD_BUILD_PHI_KERNEL(reshape_infer,
+PD_BUILD_PHI_KERNEL(reshape,
                     custom_cpu,
                     ALL_LAYOUT,
-                    custom_kernel::ReshapeInferKernel,
+                    custom_kernel::ReshapeKernel,
                     float,
                     double,
                     int8_t,
@@ -172,10 +172,10 @@ PD_BUILD_PHI_KERNEL(reshape_infer,
                     uint8_t,
                     bool) {}
 
-PD_BUILD_PHI_KERNEL(reshape,
+PD_BUILD_PHI_KERNEL(reshape_with_xshape,
                     custom_cpu,
                     ALL_LAYOUT,
-                    custom_kernel::ReshapeKernel,
+                    custom_kernel::ReshapeWithXShapeKernel,
                     float,
                     double,
                     int8_t,
