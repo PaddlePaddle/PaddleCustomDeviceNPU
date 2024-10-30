@@ -46,8 +46,8 @@ void FlipKernel(const Context& dev_ctx,
                 const std::vector<int>& axis,
                 phi::DenseTensor* out) {
   DO_COMPATIBILITY(
-    aclnnFlip,
-    (custom_kernel::AclopFlipKernel<T, Context>(dev_ctx, x, axis, out)));
+      aclnnFlip,
+      (custom_kernel::AclopFlipKernel<T, Context>(dev_ctx, x, axis, out)));
   dev_ctx.template Alloc<T>(out);
   std::vector<int64_t> axis_trans(axis.begin(), axis.end());
   EXEC_NPU_CMD(aclnnFlip, dev_ctx, x, axis_trans, *out);
