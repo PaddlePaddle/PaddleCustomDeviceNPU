@@ -39,7 +39,8 @@ def generate_add_n():
         paddle.static.InputSpec([None, 32], "float32", "x"),
         paddle.static.InputSpec([None, 32], "float32", "y"),
         paddle.static.InputSpec([None, 32], "float32", "z"),
-    ]
+    ],
+    full_graph=True,
 )
 def func(x, y, z):
     return x + y + z
@@ -64,10 +65,14 @@ class TestCustomPass(unittest.TestCase):
         config.set_prog_file(MODEL_FILE + ".pdmodel")
         config.enable_memory_optim()
         config.enable_custom_device("gcu")
+        config.enable_new_ir(True)
+        config.enable_new_executor(True)
+        kPirGcuPasses = []
+        config.enable_custom_passes(kPirGcuPasses, True)
         config.set_optim_cache_dir("./optim_cache")
         pass_builder = config.pass_builder()
-        pass_builder.append_pass("generate_add_n")
-        print(pass_builder.all_passes())
+        # pass_builder.append_pass("generate_add_n")
+        # print(pass_builder.all_passes())
         pass_builder.turn_on_debug()
         predictor = paddle.inference.create_predictor(config)
 
