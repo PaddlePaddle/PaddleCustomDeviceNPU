@@ -14,7 +14,6 @@
 
 #include "common/gcu_op_runner.h"
 #include "kernels/funcs/gcu_kernel_funcs.h"
-#include "paddle/phi/kernels/cpu/conv_util.h"
 
 namespace custom_kernel {
 static std::unordered_set<const void*> g_conv2d_weights_nhwc;
@@ -136,27 +135,17 @@ void Conv2dBiasKernel(const Context& dev_ctx,
     // phi::DenseTensor input_x = input;
     // phi::DenseTensor filter_x = filter;
     // phi::DenseTensor output = *out;
+
     // update paddings and dilations according to padding_algorithm
-    auto input_dims = input.dims();
-    auto filter_dims = filter.dims();
     std::vector<int> paddings_vec = paddings;
     std::vector<int> dilations_vec = dilations;
-    phi::DDim in_data_dims =
-        common::slice_ddim(input_dims, 2, input_dims.size());
-    phi::DDim filter_data_dims =
-        common::slice_ddim(filter_dims, 2, filter_dims.size());
-    std::vector<int> ksize = common::vectorize<int>(filter_data_dims);
-    phi::UpdatePaddingAndDilation(&paddings_vec,
-                                  &dilations_vec,
-                                  padding_algorithm,
-                                  in_data_dims,
-                                  strides,
-                                  ksize);
-    PADDLE_ENFORCE_EQ(
-        paddings_vec.size(),
-        4,
-        phi::errors::Fatal("Paddings size should be the same as 4 after update "
-                           "padding and dilation process."));
+    custom_kernel::UpdatePaddingAndDilation(input.dims(),
+                                            filter.dims(),
+                                            padding_algorithm,
+                                            strides,
+                                            paddings_vec,
+                                            dilations_vec);
+
     if (EnableTransposeOptimize()) {
       PADDLE_ENFORCE_EQ(data_format,
                         "NCHW",
@@ -333,6 +322,16 @@ void DepthwiseConv2dKernel(const Context& dev_ctx,
     phi::DenseTensor filter_x = filter;
     phi::DenseTensor output = *out;
 
+    // update paddings and dilations according to padding_algorithm
+    std::vector<int> paddings_vec = paddings;
+    std::vector<int> dilations_vec = dilations;
+    custom_kernel::UpdatePaddingAndDilation(input.dims(),
+                                            filter.dims(),
+                                            padding_algorithm,
+                                            strides,
+                                            paddings_vec,
+                                            dilations_vec);
+
     if (EnableTransposeOptimize()) {
       PADDLE_ENFORCE_EQ(data_format,
                         "NCHW",
@@ -371,8 +370,10 @@ void DepthwiseConv2dKernel(const Context& dev_ctx,
     auto bias = TensorZeros(dev_ctx, meta);
 
     std::vector<int64_t> strides_v = {strides.begin(), strides.end()};
-    std::vector<int64_t> paddings_v = {paddings.begin(), paddings.end()};
-    std::vector<int64_t> dilations_v = {dilations.begin(), dilations.end()};
+    std::vector<int64_t> paddings_v = {paddings_vec.begin(),
+                                       paddings_vec.end()};
+    std::vector<int64_t> dilations_v = {dilations_vec.begin(),
+                                        dilations_vec.end()};
 
     LAUNCH_TOPSATENOP(topsatenConvDepthwise2d,
                       dev_ctx,
@@ -460,6 +461,16 @@ void Conv3dKernel(const Context& dev_ctx,
     phi::DenseTensor output =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
 
+    // update paddings and dilations according to padding_algorithm
+    std::vector<int> paddings_vec = paddings;
+    std::vector<int> dilations_vec = dilations;
+    custom_kernel::UpdatePaddingAndDilation(input.dims(),
+                                            filter.dims(),
+                                            padding_algorithm,
+                                            strides,
+                                            paddings_vec,
+                                            dilations_vec);
+
     if (EnableTransposeOptimize()) {
       PADDLE_ENFORCE_EQ(data_format,
                         "NCHW",
@@ -498,8 +509,10 @@ void Conv3dKernel(const Context& dev_ctx,
     auto bias = TensorZeros(dev_ctx, meta);
 
     std::vector<int64_t> strides_v = {strides.begin(), strides.end()};
-    std::vector<int64_t> paddings_v = {paddings.begin(), paddings.end()};
-    std::vector<int64_t> dilations_v = {dilations.begin(), dilations.end()};
+    std::vector<int64_t> paddings_v = {paddings_vec.begin(),
+                                       paddings_vec.end()};
+    std::vector<int64_t> dilations_v = {dilations_vec.begin(),
+                                        dilations_vec.end()};
     std::vector<int64_t> output_padding_v = {0, 0, 0};
 
     int64_t groups_64 = groups;

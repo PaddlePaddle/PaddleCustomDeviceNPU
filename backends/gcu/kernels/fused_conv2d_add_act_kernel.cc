@@ -55,6 +55,16 @@ void FusedConv2dAddActKernel(const Context& dev_ctx,
       residual_perm = residual.get();
     }
 
+    // update paddings and dilations according to padding_algorithm
+    std::vector<int> paddings_vec = paddings;
+    std::vector<int> dilations_vec = dilations;
+    custom_kernel::UpdatePaddingAndDilation(input.dims(),
+                                            filter.dims(),
+                                            padding_algorithm,
+                                            strides,
+                                            paddings_vec,
+                                            dilations_vec);
+
     if (EnableTransposeOptimize()) {
       PADDLE_ENFORCE_EQ(data_format,
                         "NCHW",
@@ -92,9 +102,23 @@ void FusedConv2dAddActKernel(const Context& dev_ctx,
       }
     }
 
+    auto new_bias = bias;
+    auto bias_dims = common::vectorize(bias.dims());
+    if (bias_dims.size() != 1) {
+      if (std::count(bias_dims.begin(), bias_dims.end(), 1) !=
+          bias_dims.size() - 1) {
+        PADDLE_THROW(phi::errors::InvalidArgument(
+            "Bias rank should be 1, unsupport bias dims: %s.",
+            bias.dims().to_str().c_str()));
+      }
+      new_bias.Resize({bias.numel()});
+    }
+
     std::vector<int64_t> strides_v = {strides.begin(), strides.end()};
-    std::vector<int64_t> paddings_v = {paddings.begin(), paddings.end()};
-    std::vector<int64_t> dilations_v = {dilations.begin(), dilations.end()};
+    std::vector<int64_t> paddings_v = {paddings_vec.begin(),
+                                       paddings_vec.end()};
+    std::vector<int64_t> dilations_v = {dilations_vec.begin(),
+                                        dilations_vec.end()};
 
     int ic = input_perm.dims().at(1);
     int oc = filter_perm.dims().at(0);
@@ -127,7 +151,7 @@ void FusedConv2dAddActKernel(const Context& dev_ctx,
                           conv_out_perm,
                           input_perm,
                           filter_perm,
-                          bias,
+                          new_bias,
                           strides_v,
                           paddings_v,
                           dilations_v,
@@ -145,7 +169,7 @@ void FusedConv2dAddActKernel(const Context& dev_ctx,
                           conv_out_perm,
                           input_perm,
                           filter_perm,
-                          bias,
+                          new_bias,
                           residual_perm,
                           strides_v,
                           paddings_v,
@@ -173,7 +197,7 @@ void FusedConv2dAddActKernel(const Context& dev_ctx,
                         conv_out_perm,
                         input_perm,
                         filter_perm,
-                        bias,
+                        new_bias,
                         strides_v,
                         paddings_v,
                         dilations_v);
