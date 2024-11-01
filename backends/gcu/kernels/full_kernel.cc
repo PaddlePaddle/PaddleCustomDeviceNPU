@@ -42,6 +42,10 @@ void FullKernel(const Context& dev_ctx,
       output.set_meta(meta);
       dev_ctx.template Alloc<float>(&output);
     }
+    // zero tensor process
+    if (std::find(shape_vec.begin(), shape_vec.end(), 0) != shape_vec.end()) {
+      return;
+    }
     // topsatenFull not support bool or int32 yet.
     LAUNCH_TOPSATENOP(topsatenFull, dev_ctx, output, shape_vec, val);
     if (out->dtype() == phi::DataType::BOOL ||
