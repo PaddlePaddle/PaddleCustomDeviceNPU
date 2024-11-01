@@ -76,3 +76,6 @@ from .gcu_netoutput_pass import (
 )
 
 from .common import register_pass
+from .common import inference_passes
+from .common import append_passes_for_legacy_ir
+from .common import set_exp_enable_mixed_precision_ops
