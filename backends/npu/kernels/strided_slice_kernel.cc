@@ -16,6 +16,11 @@
 #include "kernels/funcs/npu_op_runner.h"
 
 namespace custom_kernel {
+template <typename T, typename Context>
+void CastKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                phi::DataType dtype,
+                phi::DenseTensor* out);
 
 static void StridedSliceOutDims(const std::vector<int64_t>& starts,
                                 const std::vector<int64_t>& ends,
@@ -169,15 +174,15 @@ static void StridedSliceFunctor(int64_t* starts,
 }
 
 template <typename T, typename Context, size_t D>
-void StridedSliceCompute(const Context& dev_ctx,
-                         const phi::DenseTensor& x,
-                         const std::vector<int>& axes,
-                         const phi::IntArray& starts_array,
-                         const phi::IntArray& ends_array,
-                         const phi::IntArray& strides_array,
-                         const std::vector<int>& infer_flags,
-                         const std::vector<int>& decrease_axis,
-                         phi::DenseTensor* out) {
+void AclopStridedSliceCompute(const Context& dev_ctx,
+                              const phi::DenseTensor& x,
+                              const std::vector<int>& axes,
+                              const phi::IntArray& starts_array,
+                              const phi::IntArray& ends_array,
+                              const phi::IntArray& strides_array,
+                              const std::vector<int>& infer_flags,
+                              const std::vector<int>& decrease_axis,
+                              phi::DenseTensor* out) {
   auto stream = dev_ctx.stream();
 
   auto in_dims = x.dims();
@@ -263,26 +268,18 @@ void StridedSliceCompute(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (x.dtype() == phi::DataType::BOOL) {
-    std::vector<int64_t> axes_vec;
-    for (int i = 0; i < D; i++) {
-      axes_vec.push_back(i);
-    }
-    static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
-    auto starts_acl = aclCreateIntArray(starts_indices_vector.data(),
-                                        starts_indices_vector.size());
-    auto ends_acl = aclCreateIntArray(ends_indices_vector.data(),
-                                      ends_indices_vector.size());
-    auto axes_acl = aclCreateIntArray(axes_vec.data(), axes_vec.size());
-    auto steps_acl = aclCreateIntArray(strides_indices_vector.data(),
-                                       strides_indices_vector.size());
-    EXEC_NPU_CMD(aclnnSliceV2,
-                 dev_ctx,
-                 x,
-                 starts_acl,
-                 ends_acl,
-                 axes_acl,
-                 steps_acl,
-                 *out);
+    const auto& runner = NpuOpRunner("StridedSliceD",
+                                     {x},
+                                     {*out},
+                                     {{"begin", starts_indices_vector},
+                                      {"end", ends_indices_vector},
+                                      {"strides", strides_indices_vector},
+                                      {"begin_mask", 0},
+                                      {"end_mask", 0},
+                                      {"ellipsis_mask", 0},
+                                      {"new_axis_mask", 0},
+                                      {"shrink_axis_mask", 0}});
+    runner.Run(stream);
   } else {
     NpuOpRunner runner;
     runner.SetType("StridedSlice")
@@ -319,6 +316,152 @@ void StridedSliceCompute(const Context& dev_ctx,
     const auto& runner_reverse =
         NpuOpRunner("ReverseV2", {out_tmp, reverse_axis}, {*out});
     runner_reverse.Run(stream);
+  }
+
+  if (decrease_axis.size() > 0) {
+    out->Resize(out_dims_origin);
+  }
+}
+
+template <typename T, typename Context, size_t D>
+void StridedSliceCompute(const Context& dev_ctx,
+                         const phi::DenseTensor& x,
+                         const std::vector<int>& axes,
+                         const phi::IntArray& starts_array,
+                         const phi::IntArray& ends_array,
+                         const phi::IntArray& strides_array,
+                         const std::vector<int>& infer_flags,
+                         const std::vector<int>& decrease_axis,
+                         phi::DenseTensor* out) {
+  DO_COMPATIBILITY(
+      aclnnSliceV2,
+      (custom_kernel::AclopStridedSliceCompute<T, Context, D>(dev_ctx,
+                                                              x,
+                                                              axes,
+                                                              starts_array,
+                                                              ends_array,
+                                                              strides_array,
+                                                              infer_flags,
+                                                              decrease_axis,
+                                                              out)));
+
+  if (x.dtype() == phi::DataType::FLOAT64) {
+    return custom_kernel::AclopStridedSliceCompute<T, Context, D>(dev_ctx,
+                                                                  x,
+                                                                  axes,
+                                                                  starts_array,
+                                                                  ends_array,
+                                                                  strides_array,
+                                                                  infer_flags,
+                                                                  decrease_axis,
+                                                                  out);
+  }
+
+  auto stream = dev_ctx.stream();
+  auto in_dims = x.dims();
+
+  // list<int>
+  auto starts = starts_array.GetData();
+  auto ends = ends_array.GetData();
+  auto strides = strides_array.GetData();
+
+  // out dims calculation
+  std::vector<int64_t> out_dims_vector(in_dims.size(), -1);
+  custom_kernel::StridedSliceOutDims(starts,
+                                     ends,
+                                     strides,
+                                     axes,
+                                     infer_flags,
+                                     in_dims,
+                                     decrease_axis,
+                                     out_dims_vector.data(),
+                                     axes.size(),
+                                     false);
+  phi::DDim out_dims(phi::make_ddim(out_dims_vector));
+
+  // check whether need to reverse (false: stride > 0; true: stride < 0)
+  std::vector<int> reverse_vector(starts.size(), 0);
+  custom_kernel::StridedSliceFunctor(starts.data(),
+                                     ends.data(),
+                                     strides.data(),
+                                     axes.data(),
+                                     reverse_vector.data(),
+                                     in_dims,
+                                     infer_flags,
+                                     decrease_axis,
+                                     starts.size());
+
+  // construct the starts_indices, ends_indices and strides_indices tensor for
+  // calling StridedSlice op
+  std::vector<int64_t> starts_indices_vector(D, 0);
+  std::vector<int64_t> ends_indices_vector(out_dims_vector.begin(),
+                                           out_dims_vector.end());
+  std::vector<int64_t> strides_indices_vector(D, 1);
+
+  for (size_t axis = 0; axis < axes.size(); axis++) {
+    int axis_index = axes[axis];
+    starts_indices_vector[axis_index] = starts[axis];
+    ends_indices_vector[axis_index] = ends[axis];
+    strides_indices_vector[axis_index] = strides[axis];
+  }
+
+  auto out_dims_origin = out_dims;
+  if (decrease_axis.size() > 0) {
+    std::vector<int64_t> new_out_shape;
+    for (size_t i = 0; i < decrease_axis.size(); ++i) {
+      PADDLE_ENFORCE_EQ(
+          out_dims[decrease_axis[i]],
+          1,
+          phi::errors::InvalidArgument(
+              "the size of decrease dimension should be 1, but received %d.",
+              out_dims[decrease_axis[i]]));
+      out_dims_origin[decrease_axis[i]] = 0;
+    }
+
+    for (int i = 0; i < out_dims_origin.size(); ++i) {
+      if (out_dims_origin[i] != 0) {
+        new_out_shape.push_back(out_dims_origin[i]);
+      }
+    }
+    if (new_out_shape.size() == 0) {
+      new_out_shape.push_back(1);
+    }
+    out_dims_origin = phi::make_ddim(new_out_shape);
+  }
+
+  bool need_reverse = false;
+  for (size_t axis = 0; axis < axes.size(); axis++) {
+    if (reverse_vector[axis] == 1) {
+      need_reverse = true;
+      break;
+    }
+  }
+
+  out->Resize(out_dims);
+  dev_ctx.template Alloc<T>(out);
+
+  std::vector<int64_t> axes_vec;
+  for (int i = 0; i < D; i++) {
+    axes_vec.push_back(i);
+  }
+
+  EXEC_NPU_CMD(aclnnSliceV2,
+               dev_ctx,
+               x,
+               starts_indices_vector,
+               ends_indices_vector,
+               axes_vec,
+               strides_indices_vector,
+               *out);
+
+  if (need_reverse) {
+    std::vector<int64_t> reverse_axis_vector;
+    for (size_t axis = 0; axis < axes.size(); axis++) {
+      if (reverse_vector[axis] == 1) {
+        reverse_axis_vector.push_back(axes[axis]);
+      }
+    }
+    EXEC_NPU_CMD(aclnnFlip, dev_ctx, *out, reverse_axis_vector, *out);
   }
 
   if (decrease_axis.size() > 0) {
