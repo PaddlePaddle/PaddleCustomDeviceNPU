@@ -23,6 +23,11 @@ void CastKernel(const Context& dev_ctx,
                 phi::DenseTensor* out);
 
 template <typename T, typename Context>
+void FillKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                const phi::Scalar& val);
+
+template <typename T, typename Context>
 void AclopScaleKernel(const Context& dev_ctx,
                       const phi::DenseTensor& x,
                       const phi::Scalar& in_scale,
@@ -99,11 +104,7 @@ void ScaleKernel(const Context& dev_ctx,
         dev_ctx, x, in_scale, in_bias, bias_after_scale, out);
   }
 
-  DO_COMPATIBILITY(aclnnMuls,
-                   (custom_kernel::AclopScaleKernel<T, Context>(
-                       dev_ctx, x, in_scale, in_bias, bias_after_scale, out)));
-
-  DO_COMPATIBILITY(aclnnAdds,
+  DO_COMPATIBILITY(aclnnScale,
                    (custom_kernel::AclopScaleKernel<T, Context>(
                        dev_ctx, x, in_scale, in_bias, bias_after_scale, out)));
 
@@ -122,19 +123,41 @@ void ScaleKernel(const Context& dev_ctx,
     bias *= scale;
   }
 
-  phi::Scalar scale_scalar = scale;
-  phi::Scalar bias_scalar = bias;
-  phi::Scalar alpha_scalar = alpha;
-
   if (x.dtype() == phi::DataType::INT64 || x.dtype() == phi::DataType::INT32) {
+    phi::Scalar scale_scalar = scale;
+    phi::Scalar bias_scalar = bias;
+    phi::Scalar alpha_scalar = alpha;
+
     phi::DenseTensor cast_x;
     if (x.dtype() == phi::DataType::INT32) {
       cast_x = x;
     } else {
       cast_x.Resize(x.dims());
       dev_ctx.Alloc(&cast_x, phi::DataType::INT32);
-      custom_kernel::CastKernel<T, Context>(dev_ctx, x, out->dtype(), &cast_x);
+      custom_kernel::CastKernel<T, Context>(
+          dev_ctx, x, cast_x.dtype(), &cast_x);
     }
+
+    phi::DenseTensor mid_out;
+    mid_out.Resize(out->dims());
+    dev_ctx.Alloc(&mid_out, phi::DataType::FLOAT32);
+
+    EXEC_NPU_CMD(aclnnMuls, dev_ctx, cast_x, scale_scalar, mid_out);
+    EXEC_NPU_CMD(
+        aclnnAdds, dev_ctx, mid_out, bias_scalar, alpha_scalar, mid_out);
+
+    dev_ctx.template Alloc<T>(out);
+    custom_kernel::CastKernel<T, Context>(dev_ctx, mid_out, out->dtype(), out);
+
+  } else if (x.dtype() == phi::DataType::FLOAT64) {
+    phi::Scalar scale_scalar = scale;
+    phi::Scalar bias_scalar = bias;
+    phi::Scalar alpha_scalar = alpha;
+
+    phi::DenseTensor cast_x;
+    cast_x.Resize(x.dims());
+    dev_ctx.Alloc(&cast_x, phi::DataType::FLOAT32);
+    custom_kernel::CastKernel<T, Context>(dev_ctx, x, cast_x.dtype(), &cast_x);
 
     phi::DenseTensor mid_out;
     mid_out.Resize(out->dims());
@@ -148,25 +171,41 @@ void ScaleKernel(const Context& dev_ctx,
     custom_kernel::CastKernel<T, Context>(dev_ctx, mid_out, out->dtype(), out);
 
   } else {
-    phi::DenseTensor cast_x;
-    if (x.dtype() == phi::DataType::FLOAT32) {
-      cast_x = x;
-    } else {
-      cast_x.Resize(x.dims());
-      dev_ctx.Alloc(&cast_x, phi::DataType::FLOAT32);
-      custom_kernel::CastKernel<T, Context>(dev_ctx, x, out->dtype(), &cast_x);
+    phi::DenseTensor scale_tensor, bias_tensor;
+    scale_tensor.set_meta(x.meta());
+    dev_ctx.template Alloc<T>(&scale_tensor);
+
+    aclDataType acl_data_type = ConvertToNpuDtype(x.dtype());
+    static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
+
+    auto scale_scalar = static_cast<T>(scale);
+    aclScalar* acl_scale_scalar = aclCreateScalar(&scale_scalar, acl_data_type);
+    EXEC_NPU_CMD(
+        aclnnInplaceFillScalar, dev_ctx, scale_tensor, acl_scale_scalar);
+
+    if (bias != 0) {
+      bias_tensor.set_meta(x.meta());
+      dev_ctx.template Alloc<T>(&bias_tensor);
+
+      auto bias_scalar = static_cast<T>(bias);
+      aclScalar* acl_bias_scalar = aclCreateScalar(&bias_scalar, acl_data_type);
+      EXEC_NPU_CMD(
+          aclnnInplaceFillScalar, dev_ctx, bias_tensor, acl_bias_scalar);
     }
 
-    phi::DenseTensor mid_out;
-    mid_out.Resize(out->dims());
-    dev_ctx.Alloc(&mid_out, phi::DataType::FLOAT32);
-
-    EXEC_NPU_CMD(aclnnMuls, dev_ctx, cast_x, scale_scalar, mid_out);
-    EXEC_NPU_CMD(
-        aclnnAdds, dev_ctx, mid_out, bias_scalar, alpha_scalar, mid_out);
-
+    int64_t axis = 0;
+    int64_t num_axes = -1;
+    bool scale_from_blob = false;
     dev_ctx.template Alloc<T>(out);
-    custom_kernel::CastKernel<T, Context>(dev_ctx, mid_out, out->dtype(), out);
+    EXEC_NPU_CMD(aclnnScale,
+                 dev_ctx,
+                 x,
+                 scale_tensor,
+                 bias_tensor,
+                 axis,
+                 num_axes,
+                 scale_from_blob,
+                 *out);
   }
 }
 
