@@ -16,7 +16,6 @@
 
 #include "common/gcu_funcs.h"
 #include "kernels/funcs/topsaten_op_launch.h"
-#include "kernels/funcs/topscl_op_launch.h"
 
 namespace custom_kernel {
 

@@ -25,13 +25,36 @@ void DiagonalKernel(const Context& dev_ctx,
                     phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("diagonal");
   dev_ctx.template Alloc<T>(out);
-  LAUNCH_TOPSCLOP(diagonal,
-                  dev_ctx,
-                  *out,
-                  x,
-                  static_cast<int64_t>(offset),
-                  static_cast<int64_t>(axis1),
-                  static_cast<int64_t>(axis2));
+  if (LaunchAOTKernel()) {
+    phi::DenseTensor out_tmp;
+    out_tmp.set_meta(out->meta());
+
+    auto out_tmp_tensor = CreateTopsatenTensorWithoutInitialized(out_tmp);
+    auto x_tensor = CreateTopsatenTensor(x);
+
+    std::string abstract_info = custom_kernel::GetAbstractInfo(
+        "Diagonal_topsatenDiagonal", out_tmp, x, offset, axis1, axis2);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenDiagonal,
+                                        dev_ctx,
+                                        abstract_info,
+                                        out_tmp_tensor,
+                                        x_tensor,
+                                        offset,
+                                        axis1,
+                                        axis2);
+
+    auto out_tensor = CreateTopsatenTensor(*out);
+    abstract_info = custom_kernel::GetAbstractInfo(
+        "Diagonal_topsatenCopy", out_tensor, false);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenCopy,
+                                        dev_ctx,
+                                        abstract_info,
+                                        out_tensor,
+                                        out_tmp_tensor,
+                                        false);
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
 }
 }  // namespace custom_kernel
 

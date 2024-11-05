@@ -24,7 +24,13 @@ void IncrementKernel(const Context& dev_ctx,
                      phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("increment");
   dev_ctx.template Alloc<T>(out);
-  LAUNCH_TOPSCLOP(increment, dev_ctx, *out, x, step);
+
+  if (LaunchAOTKernel()) {
+    phi::Scalar factor(1.0f);
+    LAUNCH_TOPSATENOP(topsatenAdd, dev_ctx, *out, x, phi::Scalar(step), factor);
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
 }
 }  // namespace custom_kernel
 

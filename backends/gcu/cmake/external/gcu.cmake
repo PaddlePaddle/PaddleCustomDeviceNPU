@@ -34,7 +34,6 @@ find_library(
   NAMES topstx ${GCU_LIB_DIR}
   HINTS ${TOPS_LIB_DIR})
 find_library(TOPSATENOP_LIB NAMES topsaten ${GCU_LIB_DIR})
-find_library(TOPSCL_LIB NAMES topscl ${GCU_LIB_DIR})
 
 set(GCU_LIBS
     -Wl,--no-as-needed
@@ -43,7 +42,6 @@ set(GCU_LIBS
     ${TOPS_RT_LIB}
     ${TOPSTX_LIB}
     ${TOPSATENOP_LIB}
-    ${TOPSCL_LIB}
     -Wl,--as-needed)
 
 set(VERSION_REGEX "( [0-9]+\.[0-9]+\.(RC)?[0-9]*) ")

@@ -24,9 +24,28 @@ void EyeKernel(const Context& dev_ctx,
                phi::DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("eye");
   dev_ctx.template Alloc<T>(out);
-  auto num_columns = columns.to<int>();
-  auto num_rows = rows.to<int>();
-  LAUNCH_TOPSCLOP(eye, dev_ctx, *out, num_rows, num_columns);
+
+  if (LaunchAOTKernel()) {
+    auto num_cols = columns.to<int>();
+    auto num_rows = rows.to<int>();
+
+    PADDLE_ENFORCE_GT(
+        num_rows,
+        0,
+        phi::errors::InvalidArgument("num_rows must be greater than 0"));
+    if (num_cols == -1) {
+      num_cols = num_rows;
+    } else {
+      PADDLE_ENFORCE_GT(
+          num_cols,
+          0,
+          phi::errors::InvalidArgument("num_cols must be greater than 0"));
+    }
+
+    LAUNCH_TOPSATENOP(topsatenEye, dev_ctx, *out, num_rows, num_cols);
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
 }
 }  // namespace custom_kernel
 
