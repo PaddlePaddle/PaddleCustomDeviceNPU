@@ -239,9 +239,12 @@ void MaskedSelectGradKernel(const Context& dev_ctx,
                        dev_ctx, x, mask, out_grad, x_grad)));
   dev_ctx.template Alloc<T>(x_grad);
 
-  phi::DenseTensor mask_int32;
-  mask_int32.Resize(mask.dims());
-  dev_ctx.template Alloc<int32_t>(&mask_int32);
+  phi::DenseTensor mask_int64;
+  mask_int64.Resize(mask.dims());
+  dev_ctx.template Alloc<int64_t>(&mask_int64);
+  custom_kernel::CastKernel<T, Context>(
+      dev_ctx, mask, phi::DataType::INT64, &mask_int64);
+  mask_int64.Resize({mask_int64.numel()});
 
   int64_t k = out_grad.numel();
   int64_t dim = 0;
@@ -252,12 +255,12 @@ void MaskedSelectGradKernel(const Context& dev_ctx,
   phi::DenseTensor indices;
   topkv2_out.Resize({k});
   indices.Resize({k});
-  dev_ctx.template Alloc<int32_t>(&topkv2_out);
-  dev_ctx.template Alloc<int32_t>(&indices);
+  dev_ctx.template Alloc<int64_t>(&topkv2_out);
+  dev_ctx.template Alloc<int64_t>(&indices);
 
   EXEC_NPU_CMD(aclnnTopk,
                dev_ctx,
-               mask,
+               mask_int64,
                k,
                dim,
                true_value,
