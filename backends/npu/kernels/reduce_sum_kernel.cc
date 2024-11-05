@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <set>
 #include "kernels/funcs/npu_funcs.h"
 #include "kernels/funcs/npu_op_runner.h"
 #include "kernels/funcs/slice_utils.h"
