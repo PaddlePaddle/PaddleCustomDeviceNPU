@@ -29,7 +29,7 @@ void TransposeKernel(const Context &dev_ctx,
 
 class FSDPA : public HpuOperator {
  public:
-  explicit FSDPA(std::string guid_prefix) : HpuOperator(guid_prefix) {}
+  explicit FSDPA(std::string guid_prefix) : HpuOperator(guid_prefix, false) {}
   void AddNode(ConvertTensors &ct, ns_Sdpa::ParamsV2 params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);

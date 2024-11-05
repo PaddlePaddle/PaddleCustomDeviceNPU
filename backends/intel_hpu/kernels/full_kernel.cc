@@ -25,7 +25,7 @@ struct FullParams {
 
 class Full : public HpuOperator {
  public:
-  Full() : HpuOperator("constant_") {}
+  Full() : HpuOperator("constant_", false) {}
 
   void AddNode(ConvertTensors& ct, FullParams params) {
     auto outputs = ct.GetTensors(false);

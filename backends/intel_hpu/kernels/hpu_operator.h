@@ -39,9 +39,23 @@ static uint32_t recipe_count = 0;
 
 class HpuOperator {
  public:
-  explicit HpuOperator(const std::string guid) : guid_(guid) {
-    synStatus status = synGraphCreate(&graphHandle_, synDeviceGaudi2);
-    PD_CHECK(status == synSuccess, "synGraphCreate() failed = %d", status);
+  explicit HpuOperator(const std::string guid, bool is_eager = true)
+      : guid_(guid), is_eager_(is_eager) {
+    if (is_eager_) {
+      synStatus status = synGraphCreateEager(&graphHandle_, synDeviceGaudi2);
+      PD_CHECK(status == synSuccess,
+               "synGraphCreateEager() ",
+               guid_,
+               " failed = ",
+               status);
+    } else {
+      synStatus status = synGraphCreate(&graphHandle_, synDeviceGaudi2);
+      PD_CHECK(status == synSuccess,
+               "synGraphCreate() ",
+               guid_,
+               " failed = ",
+               status);
+    }
   }
 
   void Compile() {
@@ -50,7 +64,13 @@ class HpuOperator {
     synStatus status =
         synGraphCompile(&recipeHandle_, graphHandle_, recipe_name.c_str(), 0);
 
-    PD_CHECK(status == synSuccess, "synGraphCompile() failed = %d", status);
+    PD_CHECK(status == synSuccess,
+             "synGraphCompile() ",
+             guid_,
+             " failed = ",
+             status,
+             " eager = ",
+             is_eager_);
 
     VLOG(9) << " synGraphCompile =" << guid_ << ", count = " << recipe_count;
     recipe_count += 1;
@@ -114,6 +134,7 @@ class HpuOperator {
   synGraphHandle graphHandle_;
   synRecipeHandle recipeHandle_;
   std::vector<synSectionHandle> sectons_;
+  bool is_eager_;
 
   std::map<std::string, synTensor> tensors_;
 };
