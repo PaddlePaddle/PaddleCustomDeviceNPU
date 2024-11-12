@@ -594,7 +594,7 @@ class TestSliceApiEager(unittest.TestCase):
 #         self.set_program_and_run(main_program, 2)
 
 #         self.assertTrue(
-#             self.sliced_arr.type == core.VarDesc.VarType.LOD_TENSOR_ARRAY)
+#             self.sliced_arr.type == core.VarDesc.VarType.DENSE_TENSOR_ARRAY)
 #         self.assertEqual(self.sliced_arr.shape, self.shape)
 #         self.assertTrue(
 #             np.array_equal(
@@ -609,7 +609,7 @@ class TestSliceApiEager(unittest.TestCase):
 #         self.set_program_and_run(main_program, 3)
 
 #         self.assertTrue(
-#             self.sliced_arr.type == core.VarDesc.VarType.LOD_TENSOR_ARRAY)
+#             self.sliced_arr.type == core.VarDesc.VarType.DENSE_TENSOR_ARRAY)
 #         self.assertEqual(self.sliced_arr.shape, self.shape)
 #         self.assertTrue(
 #             np.array_equal(
