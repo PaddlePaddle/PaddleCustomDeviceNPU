@@ -94,6 +94,9 @@ void NotEqualRawKernel(const Context& dev_ctx,
   phi::DenseTensorMeta meta({x.dtype(), x.dims()});
   tmp.set_meta(meta);
   custom_kernel::EqualRawKernel<T, Context>(dev_ctx, x, y, axis, &tmp);
+  // Need refine this logic later since input and output dims may be different
+  // for reduce_all case
+  if (tmp.dims() != out->dims()) tmp.Resize(out->dims());
   custom_kernel::LogicalNotKernel<T, Context>(dev_ctx, tmp, out);
 }
 
