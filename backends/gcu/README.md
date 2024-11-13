@@ -7,11 +7,39 @@ Please refer to the following steps to compile, install and verify the hardware 
 ## Prepare environment and source code
 
 ```bash
-# 1) Pull PaddlePaddle development docker image，and install Enflame GCU development kit.
+# 1) Pull the image. Note that this image is only for development environment
+#    and does not contain precompiled PaddlePaddle installation package.
+#    The build script and dockerfile of this image are located in the tools/dockerfile directory.
+#    Note: This docker is in the release process now. (20241113)
+registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84
 
-# 2) Clone the source code.
+# 2) Refer to the following command to start the container.
+docker run --name paddle-gcu-dev -v /home:/home \
+    --network=host --ipc=host -it --privileged \
+    registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
+
+# 3) Clone the source code.
 git clone https://github.com/PaddlePaddle/PaddleCustomDevice
 cd PaddleCustomDevice
+
+# 4) Prepare the machine and initialize the environment (only required for device used for execution).
+# 4a) Get the driver: The full software package is placed in docker in advance
+#     and needs to be copied to the directory outside docker, such as: /home/workspace/deps/.
+mkdir -p /home/workspace/deps/ && cp /root/TopsRider_i3x_*/TopsRider_i3x_*_deb_amd64.run /home/workspace/deps/
+
+# 4b) Verify whether the machine has Enflame S60 accelerators.
+#     Check whether the following command has output in the system environment.
+#     Note: You need to press Ctrl+D to exit docker.
+#     The following initialization environment operations are all performed in the system environment.
+lspci | grep S60
+
+# 4c) Install the driver.
+cd /home/workspace/deps/
+bash TopsRider_i3x_*_deb_amd64.run --driver --no-auto-load
+
+# 4d) After the driver is installed, refer to the following command to re-enter docker.
+docker start paddle-gcu-dev
+docker exec -it paddle-gcu-dev bash
 ```
 
 ## PaddleCustomDevice Installation and Verification
@@ -20,7 +48,7 @@ cd PaddleCustomDevice
 
 ```bash
 # 1) Enter the hardware backend (Enflame GCU) directory.
-cd backends/gcu
+cd PaddleCustomDevice/backends/gcu
 
 # 2) Before compiling, you need to ensure that the PaddlePaddle installation package is installed in the environment.
 #    Just install the PaddlePaddle CPU version directly.

@@ -7,11 +7,35 @@
 ## 环境准备与源码同步
 
 ```bash
-# 1) 获取PaddlePaddle Docker镜像，并安装燧原GCU软件栈
+# 1) 拉取镜像，注意此镜像仅为开发环境，镜像中不包含预编译的飞桨安装包
+#    此镜像的构建脚本与dockerfile位于tools/dockerfile目录下
+#    注意： 此docker正在发布流程中(20241113)
+registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84
 
-# 2) 克隆PaddleCustomDevice源码
+# 2) 参考如下命令启动容器
+docker run --name paddle-gcu-dev -v /home:/home \
+    --network=host --ipc=host -it --privileged \
+    registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
+
+# 3) 克隆PaddleCustomDevice源码
 git clone https://github.com/PaddlePaddle/PaddleCustomDevice
 cd PaddleCustomDevice
+
+# 4) 机器准备，初始化环境(仅用于执行的设备需要)
+# 4a) 驱动获取：docker内提前放置了全量软件包，需拷贝至docker外目录，如：/home/workspace/deps/
+mkdir -p /home/workspace/deps/ && cp /root/TopsRider_i3x_*/TopsRider_i3x_*_deb_amd64.run /home/workspace/deps/
+
+# 4b) 验证机器是否插有燧原S60加速卡，系统环境下查看如下命令是否有输出
+#     注：需Ctrl+D退出docker， 以下初始化环境相关操作均在系统环境下执行
+lspci | grep S60
+
+# 4c) 安装驱动
+cd /home/workspace/deps/
+bash TopsRider_i3x_*_deb_amd64.run --driver --no-auto-load
+
+# 4d) 驱动安装完成后重新进入docker，参考如下命令
+docker start paddle-gcu-dev
+docker exec -it paddle-gcu-dev bash
 ```
 
 ## PaddleCustomDevice安装与运行
@@ -20,7 +44,7 @@ cd PaddleCustomDevice
 
 ```bash
 # 1) 进入硬件后端(燧原GCU)目录
-cd backends/gcu
+cd PaddleCustomDevice/backends/gcu
 
 # 2) 编译之前需确保环境下装有飞桨安装包，直接安装飞桨CPU版本即可
 python -m pip install --pre paddlepaddle -i https://www.paddlepaddle.org.cn/packages/nightly/cpu/
