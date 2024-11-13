@@ -44,7 +44,7 @@ set(GCU_LIBS
     ${TOPSATENOP_LIB}
     -Wl,--as-needed)
 
-set(VERSION_REGEX "( [0-9]+\.[0-9]+\.(RC)?[0-9]*) ")
+set(VERSION_REGEX "( [0-9]+\.[0-9]+\.[0-9]+\.(RC)?[0-9]*) ")
 macro(find_gcu_version component)
   execute_process(
     COMMAND dpkg -l | grep ${component}
@@ -53,7 +53,13 @@ macro(find_gcu_version component)
     RESULT_VARIABLE VERSION_INFO_RESULT
     ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE)
   if(NOT ${SRC_VERSION_INFO})
-    string(REGEX MATCH ${VERSION_REGEX} VERSION_CONTENTS "${SRC_VERSION_INFO}")
+    message(STATUS "${component} SRC_VERSION_INFO is ${SRC_VERSION_INFO}")
+    set(VERSION_REGEX_FILTER
+        "(${component})( +[0-9]+\.[0-9]+\.[0-9]+\.(RC)?[0-9]*) ")
+    string(REGEX MATCH ${VERSION_REGEX_FILTER} VERSION_CONTENTS_FILTER
+                 "${SRC_VERSION_INFO}")
+    string(REGEX MATCH ${VERSION_REGEX} VERSION_CONTENTS
+                 "${VERSION_CONTENTS_FILTER}")
     string(STRIP "${VERSION_CONTENTS}" VERSION_STR)
     set(COMPONENT_VERSION ${VERSION_STR})
   else()
@@ -63,5 +69,5 @@ macro(find_gcu_version component)
   set(TOPS_VERSION ${COMPONENT_VERSION})
 endmacro()
 
-find_gcu_version("tops-sdk")
+find_gcu_version("topsruntime")
 message(STATUS "TOPS_VERSION is ${TOPS_VERSION}")

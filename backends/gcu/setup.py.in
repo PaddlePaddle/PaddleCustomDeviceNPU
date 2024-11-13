@@ -58,7 +58,7 @@ def write_version_py(filename='python/paddle_custom_device/gcu/__init__.py'):
     cnt = '''# THIS FILE IS GENERATED FROM PADDLEPADDLE SETUP.PY
 #
 full_version  = '@OUTPUT_PADDLE_PACKAGE_VERSION@'
-sdk_version  = '@TOPS_VERSION@'
+tops_version  = '@TOPS_VERSION@'
 git_commit_id = '@GIT_HASH@'
 
 __all__ = ['version']
@@ -77,13 +77,13 @@ def version():
             import paddle_custom_device
 
             paddle_custom_device.gcu.version()
-            # version: 0.0.0.9e03b0a
-            # commit: 9e03b0a42a530d07fb60e141ee618fc02595bd96
-            # tops-sdk: 2.5.20231128
+            # version: 3.0.0b1+3.1.0.20241113
+            # commit: f05823682bf607deb1b4adf9a9309f81225958fe
+            # TopsPlatform: 1.2.0.301
     """
     print('version:', full_version)
     print('commit:', git_commit_id)
-    print('tops-sdk:', sdk_version)
+    print('TopsPlatform:', tops_version)
 '''
     dirname = os.path.dirname(filename)
     if not os.path.exists(dirname):

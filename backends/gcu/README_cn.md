@@ -70,9 +70,9 @@ python -c "import paddle; print(paddle.device.get_all_custom_device_type())"
 # 2) 检查当前安装版本
 python -c "import paddle_custom_device; paddle_custom_device.gcu.version()"
 # 预期得到类似以下的输出结果
-version: 0.0.0.9e03b0a
-commit: 9e03b0a42a530d07fb60e141ee618fc02595bd96
-tops-sdk: 2.5.20231128
+version: 3.0.0b1+3.1.0.20241113
+commit: f05823682bf607deb1b4adf9a9309f81225958fe
+TopsPlatform: 1.2.0.301
 
 # 3) 单元测试，带上-DWITH_TESTING=ON编译后在build目录下执行
 ctest
