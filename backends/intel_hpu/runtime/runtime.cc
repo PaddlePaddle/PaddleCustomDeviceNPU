@@ -607,7 +607,7 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
       status == synSuccess, "[RUNTIME] synDeviceMalloc() failed = %d", status);
   *ptr = reinterpret_cast<void *>(p);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-      << "device id = " << runtimeManager.GetDeviceID()
+      << "allocate device mem device id = " << runtimeManager.GetDeviceID()
       << " malloc ptr=" << *ptr << " size=" << size;
 
   return C_SUCCESS;
@@ -615,11 +615,11 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
 
 C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-      << "device id=" << runtimeManager.GetDeviceID() << " free ptr = " << ptr
-      << " size=" << size;
+      << "deallcate device mem device id=" << runtimeManager.GetDeviceID()
+      << " free ptr = " << ptr << " size=" << size;
 
   synStatus status = synDeviceFree(
-      runtimeManager.GetDeviceID(), *reinterpret_cast<uint64_t *>(ptr), 0);
+      runtimeManager.GetDeviceID(), reinterpret_cast<uint64_t>(ptr), 0);
 
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synDeviceFree() failed = %d", status);
@@ -630,6 +630,10 @@ C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
 C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
   synStatus status = synHostMalloc(runtimeManager.GetDeviceID(), size, 0, ptr);
 
+  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+      << "allocate host mem device id=" << runtimeManager.GetDeviceID()
+      << " ptr = " << ptr << " size=" << size;
+
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synHostMalloc() failed = %d", status);
 
@@ -638,6 +642,11 @@ C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
 
 C_Status Deallocate_host(const C_Device device, void *ptr, size_t size) {
   synStatus status = synHostFree(runtimeManager.GetDeviceID(), ptr, 0);
+  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+      << "deallocate host mem "
+      << "device id=" << runtimeManager.GetDeviceID() << " ptr = " << ptr
+      << " size=" << size;
+
   PD_CHECK(status == synSuccess, "[RUNTIME] synHostFree() failed = %d", status);
 
   return C_SUCCESS;
@@ -652,7 +661,7 @@ C_Status CreateStream(const C_Device device, C_Stream *stream) {
 C_Status DestroyStream(const C_Device device, C_Stream stream) {
   runtimeManager.DestroyStream(device, stream);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-      << "device id=" << device->id << " stream=" << stream;
+      << "destroy stream device id=" << device->id << " stream=" << stream;
 
   return C_SUCCESS;
 }
@@ -762,7 +771,14 @@ C_Status DeviceMemStats(const C_Device device,
 }
 
 C_Status DeviceMinChunkSize(const C_Device device, size_t *size) {
-  *size = 1;
+  synDeviceAttribute attribute = DEVICE_ATTRIBUTE_ADDRESS_ALIGNMENT_SIZE;
+  uint64_t constValues = 0;
+  synStatus status =
+      synDeviceTypeGetAttribute(&constValues, &attribute, 1, synDeviceGaudi2);
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] synDeviceTypeGetAttribute() failed = ",
+           status);
+  *size = constValues;
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "min chunksize=" << *size;
 
   return C_SUCCESS;
