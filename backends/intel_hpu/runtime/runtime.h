@@ -18,6 +18,7 @@
 #include "paddle/phi/backends/device_ext.h"
 #include "runtime/flags.h"
 #include "utils/hpu_helper.h"
+#include "utils/hpu_tracer.h"
 
 #define CHECK_HCCL_STATUS(x)                                            \
   {                                                                     \
