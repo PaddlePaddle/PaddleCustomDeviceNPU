@@ -43,4 +43,14 @@ void UpdatePaddingAndDilation(const common::DDim& input_dims,
                               std::vector<int>& paddings,    // NOLINT
                               std::vector<int>& dilations);  // NOLINT
 
+template <typename T>
+bool AreEqual(const T& first, const T& second) {
+  return first == second;
+}
+
+template <typename T, typename... Args>
+bool AreEqual(const T& first, const T& second, const Args&... args) {
+  return first == second && AreEqual(second, args...);
+}
+
 }  // namespace custom_kernel

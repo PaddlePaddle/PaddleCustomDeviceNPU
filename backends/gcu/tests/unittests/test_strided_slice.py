@@ -24,20 +24,21 @@ from api_base import TestAPIBase
 STRIDED_SLICE_CASE = [
     {"x_shape": [2, 4], "x_dtype": np.float32, "axes": [0, 1], "starts": [1, 0], "strides": [1, 1], "ends": [2, 3]},
     {"x_shape": [2, 4], "x_dtype": np.float32, "axes": [0, 1], "starts": [0, 1], "strides": [2, 2], "ends": [-1, 1000]},
-    # {"x_shape": [4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [-3, 0, 2], "strides": [1, 1, 1], "ends": [3, 2, 4]},
-    # {"x_shape": [3, 4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [0, 1, 2], "strides": [1, 1, 1], "ends": [3, 3, 4]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [-3, 0, 2], "strides": [1, 1, 1], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [0, 1, 2], "strides": [1, 1, 1], "ends": [3, 3, 4]},
+    # aten as_stride does not support negative stride
     # {"x_shape": [3, 4, 5, 6], "x_dtype": np.float32, "axes": [0, 1, 2], "starts": [3, 1, 4], "strides": [-1, 1, -1], "ends": [1, 3, 2]},
 
-    # {"x_shape": [2, 4], "x_dtype": np.float16, "axes": [0, 1], "starts": [1, 0], "strides": [1, 1], "ends": [2, 3]},
-    # {"x_shape": [2, 4], "x_dtype": np.float16, "axes": [0, 1], "starts": [0, 1], "strides": [2, 2], "ends": [-1, 1000]},
-    # {"x_shape": [4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [-3, 0, 2], "strides": [1, 1, 1], "ends": [3, 2, 4]},
-    # {"x_shape": [3, 4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [0, 1, 2], "strides": [1, 1, 1], "ends": [3, 3, 4]},
+    {"x_shape": [2, 4], "x_dtype": np.float16, "axes": [0, 1], "starts": [1, 0], "strides": [1, 1], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.float16, "axes": [0, 1], "starts": [0, 1], "strides": [2, 2], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [-3, 0, 2], "strides": [1, 1, 1], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [0, 1, 2], "strides": [1, 1, 1], "ends": [3, 3, 4]},
     # {"x_shape": [3, 4, 5, 6], "x_dtype": np.float16, "axes": [0, 1, 2], "starts": [3, 1, 4], "strides": [-1, 1, -1], "ends": [1, 3, 2]},
 
-    # {"x_shape": [2, 4], "x_dtype": np.int32, "axes": [0, 1], "starts": [1, 0], "strides": [1, 1], "ends": [2, 3]},
-    # {"x_shape": [2, 4], "x_dtype": np.int32, "axes": [0, 1], "starts": [0, 1], "strides": [2, 2], "ends": [-1, 1000]},
-    # {"x_shape": [4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [-3, 0, 2], "strides": [1, 1, 1], "ends": [3, 2, 4]},
-    # {"x_shape": [3, 4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [0, 1, 2], "strides": [1, 1, 1], "ends": [3, 3, 4]},
+    {"x_shape": [2, 4], "x_dtype": np.int32, "axes": [0, 1], "starts": [1, 0], "strides": [1, 1], "ends": [2, 3]},
+    {"x_shape": [2, 4], "x_dtype": np.int32, "axes": [0, 1], "starts": [0, 1], "strides": [2, 2], "ends": [-1, 1000]},
+    {"x_shape": [4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [-3, 0, 2], "strides": [1, 1, 1], "ends": [3, 2, 4]},
+    {"x_shape": [3, 4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [0, 1, 2], "strides": [1, 1, 1], "ends": [3, 3, 4]},
     # {"x_shape": [3, 4, 5, 6], "x_dtype": np.int32, "axes": [0, 1, 2], "starts": [3, 1, 4], "strides": [-1, 1, -1], "ends": [1, 3, 2]},
 ]
 # fmt: on
