@@ -67,10 +67,10 @@ inline phi::DDim GetUnsqueezeShape(const std::vector<int> unsqz_dims,
 }
 
 template <typename T, typename Context>
-void UnsqueezeKernel(const Context& dev_ctx,
-                     const phi::DenseTensor& x,
-                     const phi::IntArray& axes,
-                     phi::DenseTensor* out) {
+void UnsqueezeInferKernel(const Context& dev_ctx,
+                          const phi::DenseTensor& x,
+                          const phi::IntArray& axes,
+                          phi::DenseTensor* out) {
   auto x_dims = x.dims();
   auto out_dims = out->dims();
 
@@ -88,20 +88,21 @@ void UnsqueezeKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void UnsqueezeWithXShapeKernel(const Context& dev_ctx,
-                               const phi::DenseTensor& x,
-                               const phi::IntArray& axes,
-                               phi::DenseTensor* out,
-                               phi::DenseTensor* xshape) {
-  custom_kernel::UnsqueezeKernel<T, Context>(dev_ctx, x, axes, out);
+void UnsqueezeKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::IntArray& axes,
+                     phi::DenseTensor* out,
+                     phi::DenseTensor* xshape) {
+  custom_kernel::UnsqueezeInferKernel<T, Context>(dev_ctx, x, axes, out);
 }
 
 template <typename T, typename Context>
 void UnsqueezeGradMLUKernel(const Context& dev_ctx,
-                            const phi::DenseTensor& x,
+                            const phi::DenseTensor& x_shape,
                             const phi::DenseTensor& dout,
                             phi::DenseTensor* dx) {
-  auto x_dims = dx->dims();
+  auto xshape_dims = x_shape.dims();
+  auto x_dims = phi::slice_ddim(xshape_dims, 1, xshape_dims.size());
 
   dev_ctx.template Alloc<T>(dx);
   custom_kernel::TensorCopy(dev_ctx, dout, true, dx);
@@ -110,10 +111,10 @@ void UnsqueezeGradMLUKernel(const Context& dev_ctx,
 
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(unsqueeze,
+PD_REGISTER_PLUGIN_KERNEL(unsqueeze_infer,
                           mlu,
                           ALL_LAYOUT,
-                          custom_kernel::UnsqueezeKernel,
+                          custom_kernel::UnsqueezeInferKernel,
                           float,
                           double,
                           phi::dtype::bfloat16,
@@ -127,10 +128,10 @@ PD_REGISTER_PLUGIN_KERNEL(unsqueeze,
                           phi::dtype::complex<float>,
                           phi::dtype::complex<double>) {}
 
-PD_REGISTER_PLUGIN_KERNEL(unsqueeze_with_xshape,
+PD_REGISTER_PLUGIN_KERNEL(unsqueeze,
                           mlu,
                           ALL_LAYOUT,
-                          custom_kernel::UnsqueezeWithXShapeKernel,
+                          custom_kernel::UnsqueezeKernel,
                           float,
                           double,
                           phi::dtype::bfloat16,
