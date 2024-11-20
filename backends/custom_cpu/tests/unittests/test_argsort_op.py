@@ -70,7 +70,7 @@ class PyArgsort(object):
 
 
 def create_tensor(np_data, place):
-    tensor = core.LoDTensor()
+    tensor = core.DenseTensor()
     tensor.set(np_data, place)
     return tensor
 
