@@ -666,7 +666,7 @@ class TestSliceApiWithTensorArray(unittest.TestCase):
         main_program = base.Program()
         self.set_program_and_run(main_program, 1)
 
-        self.assertTrue(self.sliced_arr.type == core.VarDesc.VarType.LOD_TENSOR)
+        self.assertTrue(self.sliced_arr.type == core.VarDesc.VarType.DENSE_TENSOR)
         self.assertEqual(self.sliced_arr.shape, self.shape)
         np.testing.assert_array_equal(self.out, self.data)
         np.testing.assert_array_equal(self.g_x0, np.ones_like(self.data))
