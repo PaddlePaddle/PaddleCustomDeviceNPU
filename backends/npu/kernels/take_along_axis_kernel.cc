@@ -18,12 +18,6 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void CastKernel(const Context& dev_ctx,
-                const phi::DenseTensor& x,
-                phi::DataType dtype,
-                phi::DenseTensor* out);
-
-template <typename T, typename Context>
 void AclopTakeAlongAxisKernel(const Context& dev_ctx,
                               const phi::DenseTensor& x,
                               const phi::DenseTensor& index,
@@ -65,26 +59,8 @@ void TakeAlongAxisKernel(const Context& dev_ctx,
                        dev_ctx, x, index, axis, out)));
   dev_ctx.template Alloc<T>(out);
 
-  phi::DenseTensor transformed_x, transformed_out;
-  if (x.dtype() == phi::DataType::FLOAT64) {
-    phi::DenseTensorMeta x_meta = {phi::DataType::FLOAT32, x.dims()};
-    transformed_x.set_meta(x_meta);
-    dev_ctx.template Alloc<float>(&transformed_x);
-    custom_kernel::CastKernel<T, Context>(
-        dev_ctx, x, phi::DataType::FLOAT32, &transformed_x);
-    phi::DenseTensorMeta out_meta = {phi::DataType::FLOAT32, out->dims()};
-    transformed_out.set_meta(out_meta);
-    dev_ctx.template Alloc<float>(&transformed_out);
-  } else {
-    transformed_x = x;
-    transformed_out = *out;
-  }
-  EXEC_NPU_CMD(
-      aclnnGather, dev_ctx, transformed_x, axis, index, transformed_out);
-  if (x.dtype() == phi::DataType::FLOAT64) {
-    custom_kernel::CastKernel<T, Context>(
-        dev_ctx, transformed_out, phi::DataType::FLOAT64, out);
-  }
+  int64_t axis_ = static_cast<int64_t>(axis);
+  EXEC_NPU_CMD(aclnnGather, dev_ctx, x, axis_, index, *out);
 }
 
 template <typename T, typename Context>
@@ -149,14 +125,8 @@ void TakeAlongAxisGradKernel(const Context& dev_ctx,
 
   int64_t reduce = 1;  // add
 
-  EXEC_NPU_CMD(aclnnInplaceScatter,
-               dev_ctx,
-               *x_grad,
-               axis,
-               index,
-               out_grad,
-               reduce,
-               *x_grad);
+  EXEC_NPU_CMD(
+      aclnnInplaceScatter, dev_ctx, *x_grad, axis, index, out_grad, reduce);
 }
 
 }  // namespace custom_kernel
