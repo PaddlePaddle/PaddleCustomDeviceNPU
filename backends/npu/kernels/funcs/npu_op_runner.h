@@ -287,6 +287,84 @@ inline aclTensor* ConvertType(const phi::DenseTensor& at_tensor) {
   return acl_tensor;
 }
 
+template <typename T>
+inline aclTensor* ConvertType(const std::pair<T*,
+  std::vector<int64_t>>& tp_tensor) {
+  // Ptr ConvertType to aclTensor
+  static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
+  if (aclCreateTensor == nullptr) {
+    LOG(WARNING) << "aclCreateTensor execute failed, return nullptr.";
+    return nullptr;
+  }
+  if (tp_tensor.first == nullptr || tp_tensor.second.size() < 1) {
+    LOG(WARNING) << "received nullptr or empty tensor, return nullptr.";
+    return nullptr;
+  }
+  auto at_tensor_dtype = phi::DataType::FLOAT16;
+  if (std::is_same<T, const phi::float16>::value ||
+    std::is_same<T, phi::float16>::value) {
+    at_tensor_dtype = phi::DataType::FLOAT16;
+  } else if (std::is_same<T, const int64_t>::value ||
+    std::is_same<T, int64_t>::value) {
+    at_tensor_dtype = phi::DataType::INT64;
+  } else if (std::is_same<T, const int32_t>::value ||
+    std::is_same<T, int32_t>::value) {
+    at_tensor_dtype = phi::DataType::INT32;
+  } else if (std::is_same<T, const int8_t>::value ||
+    std::is_same<T, int8_t>::value) {
+    at_tensor_dtype = phi::DataType::INT8;
+  }
+  auto acl_data_type = ConvertToNpuDtype(at_tensor_dtype);
+  const auto dimNum =
+    tp_tensor.second.size() == 0 ? 1 : tp_tensor.second.size();
+  std::vector<int64_t> storageDims(dimNum - 1);
+  int64_t tp_tensor_numel = 1;
+  for (auto &num : tp_tensor.second) {
+    tp_tensor_numel *= num;
+  }
+  if (acl_data_type != ACL_STRING) {
+    storageDims.push_back(tp_tensor_numel * sizeof(at_tensor_dtype));
+  }
+  aclFormat format = ACL_FORMAT_ND;
+  switch (dimNum) {
+    case 4:
+      format = ACL_FORMAT_NCHW;
+      break;
+    case 5:
+      format = ACL_FORMAT_NCDHW;
+      break;
+    default:
+      format = ACL_FORMAT_ND;
+  }
+
+  std::vector<int64_t> origin_dims;
+  std::vector<int64_t> origin_strides;
+  if (tp_tensor.second.size() == 2) {
+    origin_dims = phi::vectorize({tp_tensor.second[0], tp_tensor.second[1]});
+    origin_strides = phi::vectorize({tp_tensor.second[1], 1});
+  } else if (tp_tensor.second.size() == 1) {
+    origin_dims = phi::vectorize({tp_tensor.second[0]});
+    origin_strides = phi::vectorize({1});
+  } else {
+    PADDLE_ENFORCE_GE(
+        tp_tensor.second.size(), 2,
+        phi::errors::InvalidArgument("Only support 1-d and 2-d input"));
+        return nullptr;
+  }
+  auto acl_tensor = aclCreateTensor(origin_dims.data(),
+                                    origin_dims.size(),
+                                    acl_data_type,
+                                    origin_strides.data(),
+                                    0,
+                                    format,
+                                    origin_dims.data(),
+                                    storageDims.size(),
+                                    const_cast<void*>(
+                                      static_cast<const void*>(
+                                        tp_tensor.first)));
+  return acl_tensor;
+}
+
 inline aclTensorList *ConvertType(
   const std::vector<const phi::DenseTensor*> &phi_tensor_list) {
   static const auto aclCreateTensorList = GET_OP_API_FUNC(aclCreateTensorList);
