@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <set>
 
 #include "common/gcu_op_runner.h"
 #include "kernels/funcs/gcu_kernel_funcs.h"
@@ -22,9 +23,9 @@ namespace {
 struct SliceInfo {
   explicit SliceInfo(const std::vector<int64_t>& input_dims)
       : input_dims_(input_dims), ends_(input_dims), output_dims_(input_dims) {
-    size_t rank = input_dims.size();
-    starts_.resize(rank, 0);
-    steps_.resize(rank, 1);
+    auto rank = input_dims.size();
+    starts_ = std::vector<int64_t>(rank, 0);
+    steps_ = std::vector<int64_t>(rank, 1);
   }
 
   std::vector<int64_t> input_dims_;
@@ -34,89 +35,59 @@ struct SliceInfo {
   std::vector<int64_t> output_dims_;
 };
 
-template <typename T>
-T clamp(T value, T min, T max) {
-  return std::max(min, std::min(value, max));
-}
+void PrepareSliceInfo(const std::vector<int64_t>& raw_starts,
+                      const std::vector<int64_t>& raw_ends,
+                      const std::vector<int64_t>& raw_steps,
+                      const std::vector<int>& raw_axes,
+                      SliceInfo& slice_info) {  // NOLINT
+  std::vector<int64_t> axes{raw_axes.begin(), raw_axes.end()};
 
-inline void PrepareSliceInfo(const std::vector<int64_t>& raw_starts,
-                             const std::vector<int64_t>& raw_ends,
-                             const std::vector<int64_t>& raw_steps,
-                             const std::vector<int64_t>& raw_axes,
-                             SliceInfo& slice_info) {  // NOLINT
-  std::vector<int64_t> axes;
-  if (raw_axes.empty()) {
-    axes.resize(raw_starts.size());
-    std::iota(axes.begin(), axes.end(), 0);
-  } else {
-    axes.assign(raw_axes.begin(), raw_axes.end());
-  }
-
-  const auto axes_count = axes.size();
-  std::unordered_set<int64_t> unique_axes;
-  unique_axes.reserve(axes_count);
-
-  const int64_t input_rank = slice_info.input_dims_.size();
-  for (size_t axis_index = 0; axis_index < axes_count; ++axis_index) {
-    const auto axis =
-        axes[axis_index] < 0 ? axes[axis_index] + input_rank : axes[axis_index];
-    PADDLE_ENFORCE_EQ(axis >= 0 && axis < input_rank,
-                      true,
-                      phi::errors::InvalidArgument(
-                          "'axes' has an axis outside of the input rank"));
-
-    auto p = unique_axes.insert(axis);
-    PADDLE_ENFORCE_EQ(
-        p.second, true, phi::errors::InvalidArgument("'axes' has duplicates"));
-
-    // 1. process step
-    int64_t step = axis_index < raw_steps.size() ? raw_steps[axis_index] : 1L;
-    PADDLE_ENFORCE_NE(
-        step, 0, phi::errors::InvalidArgument("'axes' value cannot be 0"));
-
-    const int64_t dim_value = slice_info.input_dims_[axis];
-    if (dim_value == 0) {
-      // shape with empty dim. only output_dims_ matters but set everything for
-      // completeness.
-      slice_info.steps_[axis] = step;
-      slice_info.starts_[axis] = 0;
-      slice_info.ends_[axis] = 0;
-      slice_info.output_dims_[axis] = 0;
+  // positive
+  std::for_each(axes.begin(), axes.end(), [&slice_info](int64_t& axis) {
+    axis = axis < 0 ? (axis + slice_info.input_dims_.size()) : axis;
+  });
+  // unique
+  std::set<int> unique_axes;
+  int64_t axis = 0;
+  for (int i = 0; i < axes.size(); i++) {
+    if (unique_axes.count(axes[i]) != 0) {
       continue;
     }
-
-    // clamp step to avoid overflow if there's a stupidly large value (which
-    // will be multiplied in Slice) as long as the clamped value is >= the size
-    // of the dimension a single step will push us past the end
-    step = clamp(step, -dim_value, dim_value);
-    slice_info.steps_[axis] = step;
-
-    // 2. process start
-    auto start = raw_starts[axis_index];
-    start = start < 0 ? start + dim_value : start;
+    unique_axes.insert(axes[i]);
+    // positive and limit to max shape
+    axis = axes[i];
+    int64_t dim_value = slice_info.input_dims_.at(axis);
     slice_info.starts_[axis] =
-        clamp(start, 0L, step < 0 ? dim_value - 1 : dim_value);
-
-    // 3. process end
-    auto end = raw_ends[axis_index];
-    // INT_MAX has a special meaning for end according to spec
-    // equivalent to 'None' in numpy
-    // it represent slicing to the end of the dimension
-    if (end == std::numeric_limits<int32_t>::max() ||
-        end == std::numeric_limits<int64_t>::max()) {
-      end = step < 0 ? -1 : dim_value;
+        raw_starts[i] >= 0
+            ? (raw_starts[i] <= dim_value ? raw_starts[i] : dim_value)
+            : raw_starts[i] + dim_value;
+    slice_info.steps_[axis] = raw_steps[i];
+    slice_info.ends_[axis] =
+        raw_ends[i] >= 0 ? (raw_ends[i] <= dim_value ? raw_ends[i] : dim_value)
+                         : raw_ends[i] + dim_value;
+    // infer out shape
+    auto out_dim = (slice_info.ends_[axis] - slice_info.starts_[axis]) /
+                   slice_info.steps_[axis];
+    int counter = 0;
+    int64_t tmp = slice_info.starts_[axis];
+    if (slice_info.steps_[axis] >= 0) {
+      while (tmp < slice_info.ends_[axis]) {
+        if (tmp < dim_value) {
+          counter += 1;
+        }
+        tmp += slice_info.steps_[axis];
+      }
     } else {
-      end = end < 0 ? end + dim_value : end;
-      end = clamp(end, step < 0 ? -1L : 0L, dim_value);
+      while (tmp > slice_info.ends_[axis]) {
+        if (tmp < dim_value) {
+          counter += 1;
+        }
+        tmp += slice_info.steps_[axis];
+      }
     }
-    slice_info.ends_[axis] = end;
 
-    // find output dim value for this axis: tf use (e - b + s - 1) / s
-    const auto temp = static_cast<int64_t>(
-        ceil(1.0 * (slice_info.ends_[axis] - slice_info.starts_[axis]) / step));
-    slice_info.output_dims_[axis] = temp < 0LL ? 0LL : temp;
+    slice_info.output_dims_[axis] = counter;
   }
-
   return;
 }
 }  // namespace
@@ -285,71 +256,81 @@ void StridedSliceKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    std::vector<int64_t> axes64(axes.begin(), axes.end());
+    auto rank = x.dims().size();
+    PADDLE_ENFORCE_EQ(
+        AreEqual(starts.size(), ends.size(), strides.size(), axes.size()),
+        true,
+        phi::errors::InvalidArgument(
+            "stridedslice axes[%lu] starts[%lu] ends[%lu] "
+            "strides[%lu] rank should be same!",
+            axes.size(),
+            starts.size(),
+            ends.size(),
+            strides.size()));
+    PADDLE_ENFORCE_LE(starts.size(),
+                      rank,
+                      phi::errors::InvalidArgument(
+                          "starts rank should be less equal than x rank!"));
+    VLOG(6) << "=== StridedSlice Debug Infos ===";
+    VLOG(6) << " - origin axes: ";
+    for (const auto& axis : axes) {
+      VLOG(6) << "  - " << axis;
+    }
+    VLOG(6) << " - origin input dims:" << x.dims();
+    VLOG(6) << " - origin starts:" << common::make_ddim(starts.GetData());
+    VLOG(6) << " - origin ends:" << common::make_ddim(ends.GetData());
+    VLOG(6) << " - origin strides:" << common::make_ddim(strides.GetData());
+    VLOG(6) << " - origin output dims:" << out->dims();
 
     SliceInfo slice_info(common::vectorize(x.dims()));
-    PrepareSliceInfo(starts.GetData(),
-                     ends.GetData(),
-                     strides.GetData(),
-                     axes64,
-                     slice_info);
+    PrepareSliceInfo(
+        starts.GetData(), ends.GetData(), strides.GetData(), axes, slice_info);
+    // debug
+    VLOG(6) << "======== After PrepareSliceInfo =================";
+    VLOG(6) << " - computed start dims:"
+            << common::make_ddim(slice_info.starts_);
+    VLOG(6) << " - computed step dims:" << common::make_ddim(slice_info.steps_);
+    VLOG(6) << " - computed end dims:" << common::make_ddim(slice_info.ends_);
+    VLOG(6) << " - computed output dims:"
+            << common::make_ddim(slice_info.output_dims_);
 
     // output->Resize(Shape(slice_info.output_dims_));
     if (LIKELY(out->numel() != 0)) {
-      std::vector<int64_t> dimensions_to_reverse;
-      std::vector<int64_t> slice_begin, slice_end, slice_step;
-      for (size_t i = 0; i < slice_info.steps_.size(); ++i) {
-        if (slice_info.steps_[i] > 0) {
-          slice_begin.push_back(slice_info.starts_[i]);
-          slice_end.push_back(slice_info.ends_[i]);
-          slice_step.push_back(slice_info.steps_[i]);
-        } else {
-          dimensions_to_reverse.push_back(i);
-
-          int64_t b = x.dims().at(i) - slice_info.starts_[i] - 1;
-          int64_t e = std::max(x.dims().at(i) - slice_info.ends_[i] - 1,
-                               x.dims().at(i) - slice_info.starts_[i] - 1);
-          int64_t s = -slice_info.steps_[i];
-          slice_begin.push_back(b);
-          slice_end.push_back(e);
-          slice_step.push_back(s);
-        }
+      // output shape should be same as the result after preparing slice_info
+      PADDLE_ENFORCE_EQ(
+          out->dims(),
+          common::make_ddim(slice_info.output_dims_),
+          phi::errors::Fatal("output dims should be same as the result after "
+                             "preparing slice_info"));
+      // calc new_strides:tuple(x_stride[d] * strides[d] for d in
+      // range(len(x.shape)))
+      std::vector<int64_t> x_strides = common::vectorize(x.meta().strides);
+      std::vector<int64_t> new_strides(x_strides.size(), 0);
+      for (size_t i = 0; i < x_strides.size(); i++) {
+        new_strides[i] = x_strides[i] * slice_info.steps_[i];
       }
-
-      auto reverse_input = x;
-      if (!dimensions_to_reverse.empty()) {
-        phi::DenseTensor reverse_input =
-            custom_kernel::TensorEmpty(dev_ctx, x.meta());
-        dev_ctx.template Alloc<T>(&reverse_input);
-
-        LAUNCH_TOPSATENOP(
-            topsatenFlip, dev_ctx, reverse_input, x, dimensions_to_reverse);
-      }
-
-      std::vector<int64_t> sizes(slice_info.output_dims_);
-      std::vector<int64_t> strides = common::vectorize(x.meta().strides);
+      // calc offset:sum(b * s for b, s in zip(starts, x_stride))
       int64_t offset = 0;
-      for (size_t i = 0; i < slice_info.input_dims_.size(); ++i) {
-        offset += starts[i] * strides[i];
-      }
-
-      for (size_t i = 0; i < slice_info.input_dims_.size(); ++i) {
-        strides[i] *= slice_info.steps_[i];
+      for (size_t i = 0; i < x_strides.size(); i++) {
+        offset += slice_info.starts_[i] * x_strides[i];
       }
 
       phi::DenseTensor as_strides_out;
-      auto x_tensor = CreateTopsatenTensor(reverse_input);
+      auto x_tensor = CreateTopsatenTensor(x);
       auto out_tensor = CreateTopsatenTensor(*out);
       auto view_out_tensor = CreateTopsatenTensor(as_strides_out);
-      auto aten_sizes = IntArrayToTopsatenSize(sizes);
-      auto aten_strides = IntArrayToTopsatenSize(strides);
+      topsatenSize_t aten_sizes{
+          slice_info.output_dims_.data(),
+          static_cast<int64_t>(slice_info.output_dims_.size())};
+      topsatenSize_t aten_strides{new_strides.data(),
+                                  static_cast<int64_t>(new_strides.size())};
 
       std::string abstract_info =
           custom_kernel::GetAbstractInfo("StridedSlice_topsatenAsStrided",
                                          as_strides_out,
-                                         reverse_input,
-                                         sizes,
-                                         strides,
+                                         x,
+                                         slice_info.output_dims_,
+                                         new_strides,
                                          offset);
       LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenAsStrided,
                                           dev_ctx,
@@ -369,6 +350,7 @@ void StridedSliceKernel(const Context& dev_ctx,
                                           view_out_tensor,
                                           false);
     }
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["Input"] = {"x"};

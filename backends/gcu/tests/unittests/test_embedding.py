@@ -27,12 +27,12 @@ EMBEDDING_CASE = [
     {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float16, "padding_idx": None},
     {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": None},
     # Topsaten only support padding_idx-none now
-    # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float32, "padding_idx": -1},
-    # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float32, "padding_idx": -1},
-    # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float16, "padding_idx": -1},
-    # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": -1},
-    # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": 0},
-    # {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": 1},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float32, "padding_idx": -1},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float32, "padding_idx": -1},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int32, "w_dtype": np.float16, "padding_idx": -1},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": -1},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": 0},
+    {"bsz": 6, "seqlen": 8, "vocab": 10, "emb_size": 20, "ids_dtype": np.int64, "w_dtype": np.float16, "padding_idx": 1},
 ]
 # fmt: on
 
@@ -67,8 +67,12 @@ class TestEmbedding(TestAPIBase):
             out = self.calc_result(self.forward, "cpu")
         else:
             out = self.w[self.x]
-            if self.padding_idx != -1:
-                out[np.squeeze(self.x == self.padding_idx)] = np.zeros(self.emb_size)
+            if self.padding_idx is not None:
+                if self.padding_idx < 0:
+                    self.padding_idx = self.vocab + self.padding_idx
+                indices = np.argwhere(self.x == self.padding_idx)
+                for i, j in indices:
+                    out[i, j] = 0
         return out
 
     @data(*EMBEDDING_CASE)
