@@ -1,5 +1,3 @@
-# Test CI
-
 # PaddlePaddle Custom Device Implementation for Enflame GCU
 
 English | [简体中文](./README_cn.md)
