@@ -32,4 +32,4 @@ make -j $(nproc)
 
 python -m pip install --force-reinstall -U dist/paddle_custom_gcu*.whl
 
-ctest
+ctest -j4
