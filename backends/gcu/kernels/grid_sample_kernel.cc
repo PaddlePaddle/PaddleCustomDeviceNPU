@@ -103,10 +103,10 @@ void GridSampleKernel(const Context& dev_ctx,
 }
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(grid_sample,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::GridSampleKernel,
-                          float,
-                          double,
-                          phi::dtype::float16) {}
+// PD_REGISTER_PLUGIN_KERNEL(grid_sample,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::GridSampleKernel,
+//                           float,
+//                           double,
+//                           phi::dtype::float16) {}
