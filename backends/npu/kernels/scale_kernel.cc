@@ -171,11 +171,21 @@ void ScaleKernel(const Context& dev_ctx,
     custom_kernel::CastKernel<T, Context>(dev_ctx, mid_out, out->dtype(), out);
 
   } else {
-    phi::DenseTensor scale_tensor, bias_tensor;
-    scale_tensor.set_meta(x.meta());
+    phi::DenseTensor scale_tensor, bias_tensor, x_tmp;
+
+#if (CANN_VERSION_CODE >= 803000)
+    x_tmp.set_meta(x.meta());
+    dev_ctx.template Alloc<T>(&x_tmp);
+    TensorCopy(dev_ctx, x, false, &x_tmp);
+    x_tmp.Resize({1});
+#else
+    x_tmp = x;
+#endif
+
+    scale_tensor.set_meta(x_tmp.meta());
     dev_ctx.template Alloc<T>(&scale_tensor);
 
-    aclDataType acl_data_type = ConvertToNpuDtype(x.dtype());
+    aclDataType acl_data_type = ConvertToNpuDtype(x_tmp.dtype());
     static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
 
     auto scale_scalar = static_cast<T>(scale);
@@ -184,7 +194,7 @@ void ScaleKernel(const Context& dev_ctx,
         aclnnInplaceFillScalar, dev_ctx, scale_tensor, acl_scale_scalar);
 
     if (bias != 0) {
-      bias_tensor.set_meta(x.meta());
+      bias_tensor.set_meta(x_tmp.meta());
       dev_ctx.template Alloc<T>(&bias_tensor);
 
       auto bias_scalar = static_cast<T>(bias);
@@ -197,15 +207,36 @@ void ScaleKernel(const Context& dev_ctx,
     int64_t num_axes = -1;
     bool scale_from_blob = false;
     dev_ctx.template Alloc<T>(out);
+
+#if (CANN_VERSION_CODE >= 803000)
+    phi::DenseTensor mid_out;
+    mid_out.set_meta(x_tmp.meta());
+    dev_ctx.template Alloc<T>(&mid_out);
+
     EXEC_NPU_CMD(aclnnScale,
                  dev_ctx,
-                 x,
+                 x_tmp,
+                 scale_tensor,
+                 bias_tensor,
+                 axis,
+                 num_axes,
+                 scale_from_blob,
+                 mid_out);
+
+    auto out_dims = out->dims();
+    TensorCopy(dev_ctx, mid_out, false, out);
+    out->Resize(out_dims);
+#else
+    EXEC_NPU_CMD(aclnnScale,
+                 dev_ctx,
+                 x_tmp,
                  scale_tensor,
                  bias_tensor,
                  axis,
                  num_axes,
                  scale_from_blob,
                  *out);
+#endif
   }
 }
 
