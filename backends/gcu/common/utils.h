@@ -66,7 +66,7 @@ std::ostream& PrintTensor(std::ostream& os, const phi::DenseTensor& tensor) {
   } else {
     cpu_tensor = tensor;
   }
-  os << "LoDTensor<";
+  os << "DenseTensor<";
   if (tensor.initialized()) {
     os << phi::DataTypeToString(tensor.dtype()) << ", ";
     os << tensor.place() << ", ";

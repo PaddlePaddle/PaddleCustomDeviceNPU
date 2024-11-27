@@ -97,7 +97,7 @@ void FullBatchSizeLikeKernel(const Context& dev_ctx,
                              int out_batch_size_dim,
                              phi::DenseTensor* out) {
   if (x.lod().size() && x_batch_size_dim == 0) {
-    // set the correct batch size for the LoDTensor.
+    // set the correct batch size for the DenseTensor.
     auto odims = out->dims();
     odims[out_batch_size_dim] = static_cast<int>(x.lod().back().size()) - 1;
     custom_kernel::FullKernel<T, Context>(
