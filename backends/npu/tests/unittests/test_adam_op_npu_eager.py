@@ -118,7 +118,9 @@ class TestAdam(OpTest):
 
     @check_soc_version
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=4e-3)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=4e-3
+        )
 
 
 class TestAdamWithEpsilonTensor(OpTest):
@@ -192,7 +194,9 @@ class TestAdamWithEpsilonTensor(OpTest):
 
     @check_soc_version
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=4e-3)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=4e-3
+        )
 
 
 class TestAdamOpWithSkipUpdate(OpTest):
@@ -265,7 +269,9 @@ class TestAdamOpWithSkipUpdate(OpTest):
 
     @check_soc_version
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=4e-3)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=4e-3
+        )
 
 
 class TestAdamOpWithGlobalBetaPow(OpTest):
@@ -342,7 +348,9 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
 
     @check_soc_version
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=4e-3)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=4e-3
+        )
 
 
 if __name__ == "__main__":

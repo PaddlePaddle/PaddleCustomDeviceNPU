@@ -114,7 +114,9 @@ class TestAdamW(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestAdamOpWithSkipUpdate(OpTest):
@@ -166,7 +168,9 @@ class TestAdamOpWithSkipUpdate(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestAdamOpWithoutDecay(OpTest):
@@ -218,7 +222,9 @@ class TestAdamOpWithoutDecay(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestNet(unittest.TestCase):

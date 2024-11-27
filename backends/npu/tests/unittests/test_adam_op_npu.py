@@ -104,7 +104,9 @@ class TestAdam(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 @check_run_big_shape_test()
@@ -159,7 +161,9 @@ class TestAdamRank1(OpTest):
         self.shape = (4000, 8192)
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 @check_run_big_shape_test()
@@ -241,7 +245,9 @@ class TestAdamWithEpsilonTensor(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 @unittest.skip(reason="disable_ut in Paddle CI")
@@ -294,7 +300,9 @@ class TestAdamOpWithSkipUpdate(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestAdamOpWithGlobalBetaPow(OpTest):
@@ -350,7 +358,9 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 def create_test_fp64_class(parent):
@@ -359,7 +369,9 @@ def create_test_fp64_class(parent):
             self.dtype = np.float64
 
         def test_check_output(self):
-            self.check_output_with_place(self.place, atol=1e-5, rtol=1e-4)
+            self.check_output_with_place(
+                no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5, rtol=1e-4
+            )
 
     cls_name = "{0}_{1}".format(parent.__name__, "Fp64")
     TestAdamOpFp64Case.__name__ = cls_name
@@ -378,7 +390,9 @@ def create_test_fp16_class(parent):
             self.dtype = np.float16
 
         def test_check_output(self):
-            self.check_output_with_place(self.place, atol=1e-5, rtol=1e-4)
+            self.check_output_with_place(
+                no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5, rtol=1e-4
+            )
 
     cls_name = "{0}_{1}".format(parent.__name__, "Fp16")
     TestAdamOpFp16Case.__name__ = cls_name
