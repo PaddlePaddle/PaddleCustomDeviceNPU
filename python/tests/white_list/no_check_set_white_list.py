@@ -37,4 +37,6 @@ no_check_set_white_list = [
     "class_center_sample",
     "einsum",
     "rmsprop",
+    "adam",  # AMSGrad variant no check moment2 max output
+    "adamw",  # AMSGrad variant no check moment2 max output
 ]
