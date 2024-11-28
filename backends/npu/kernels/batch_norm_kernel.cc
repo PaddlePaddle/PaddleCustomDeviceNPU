@@ -33,6 +33,13 @@ void TransposeKernel(const Context& dev_ctx,
                      phi::DenseTensor* out);
 
 template <typename T, typename Context>
+void FullLikeKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    const phi::Scalar& val,
+                    phi::DataType dtype,
+                    phi::DenseTensor* out);
+
+template <typename T, typename Context>
 void AclopBatchNormKernel(const Context& dev_ctx,
                           const phi::DenseTensor& x,
                           const phi::DenseTensor& running_mean,
@@ -536,18 +543,24 @@ void BatchNormKernel(const Context& dev_ctx,
         aclnnInplaceAdd, dev_ctx, *variance_out, *saved_variance, momentum_p);
     auto stream = dev_ctx.stream();
 
-    const auto& adds_runner =
-        NpuOpRunner("Adds",
-                    {*saved_variance},
-                    {*saved_variance},
-                    {{"value", static_cast<float>(epsilon)}});
-    adds_runner.Run(stream);
-    const auto& inv_runner =
-        NpuOpRunner("Inv", {*saved_variance}, {*saved_variance}, {});
-    inv_runner.Run(stream);
-    const auto& sqrt_ruuner =
-        NpuOpRunner("Sqrt", {*saved_variance}, {*saved_variance}, {});
-    sqrt_ruuner.Run(stream);
+    phi::Scalar epsilon_scalar = static_cast<float>(epsilon);
+
+    phi::DenseTensor ones;
+    ones.set_meta(saved_variance->meta());
+    custom_kernel::FullLikeKernel<T, Context>(dev_ctx,
+                                              *saved_variance,
+                                              phi::Scalar(1.0),
+                                              saved_variance->dtype(),
+                                              &ones);
+
+    EXEC_NPU_CMD(aclnnAdds,
+                 dev_ctx,
+                 *saved_variance,
+                 ones,
+                 epsilon_scalar,
+                 *saved_variance);
+
+    EXEC_NPU_CMD(aclnnInplaceRsqrt, dev_ctx, *saved_variance);
   }
 }
 
