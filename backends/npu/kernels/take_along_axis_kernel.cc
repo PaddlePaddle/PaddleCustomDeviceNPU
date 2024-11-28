@@ -18,6 +18,13 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
+void GatherKernel(const Context& dev_ctx,
+                  const phi::DenseTensor& x,
+                  const phi::DenseTensor& index,
+                  const phi::Scalar& axis,
+                  phi::DenseTensor* out);
+
+template <typename T, typename Context>
 void AclopTakeAlongAxisKernel(const Context& dev_ctx,
                               const phi::DenseTensor& x,
                               const phi::DenseTensor& index,
@@ -54,13 +61,16 @@ void TakeAlongAxisKernel(const Context& dev_ctx,
                          const phi::DenseTensor& index,
                          int axis,
                          phi::DenseTensor* out) {
-  DO_COMPATIBILITY(aclnnGather,
+  DO_COMPATIBILITY(aclnnGatherV2,
                    (custom_kernel::AclopTakeAlongAxisKernel<T, Context>(
                        dev_ctx, x, index, axis, out)));
-  dev_ctx.template Alloc<T>(out);
 
-  int64_t axis_ = static_cast<int64_t>(axis);
-  EXEC_NPU_CMD(aclnnGather, dev_ctx, x, axis_, index, *out);
+  phi::DenseTensor index_share(index);
+  phi::DenseTensorMeta index_share_meta = {index.dtype(),
+                                           phi::make_ddim({index.numel()})};
+  index_share.set_meta(index_share_meta);
+  index_share.Resize({index.numel()});
+  custom_kernel::GatherKernel<T, Context>(dev_ctx, x, index_share, axis, out);
 }
 
 template <typename T, typename Context>
