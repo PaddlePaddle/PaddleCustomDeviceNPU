@@ -182,15 +182,6 @@ void ScaleKernel(const Context& dev_ctx,
       x_tmp = x;
     }
 
-    if (x.dims().size() == 0) {
-      x_tmp.set_meta(x.meta());
-      dev_ctx.template Alloc<T>(&x_tmp);
-      TensorCopy(dev_ctx, x, false, &x_tmp);
-      x_tmp.Resize({1});
-    } else {
-      x_tmp = x;
-    }
-
     scale_tensor.set_meta(x_tmp.meta());
     dev_ctx.template Alloc<T>(&scale_tensor);
 
