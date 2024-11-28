@@ -173,7 +173,6 @@ void ScaleKernel(const Context& dev_ctx,
   } else {
     phi::DenseTensor scale_tensor, bias_tensor, x_tmp;
 
-#if (CANN_VERSION_CODE >= 803000)
     if (x.dims().size() == 0) {
       x_tmp.set_meta(x.meta());
       dev_ctx.template Alloc<T>(&x_tmp);
@@ -182,9 +181,6 @@ void ScaleKernel(const Context& dev_ctx,
     } else {
       x_tmp = x;
     }
-#else
-    x_tmp = x;
-#endif
 
     if (x.dims().size() == 0) {
       x_tmp.set_meta(x.meta());
@@ -221,7 +217,6 @@ void ScaleKernel(const Context& dev_ctx,
     bool scale_from_blob = false;
     dev_ctx.template Alloc<T>(out);
 
-#if (CANN_VERSION_CODE >= 803000)
     if (x.dims().size() == 0) {
       phi::DenseTensor mid_out;
       mid_out.set_meta(x_tmp.meta());
@@ -251,17 +246,6 @@ void ScaleKernel(const Context& dev_ctx,
                    scale_from_blob,
                    *out);
     }
-#else
-    EXEC_NPU_CMD(aclnnScale,
-                 dev_ctx,
-                 x_tmp,
-                 scale_tensor,
-                 bias_tensor,
-                 axis,
-                 num_axes,
-                 scale_from_blob,
-                 *out);
-#endif
   }
 }
 
