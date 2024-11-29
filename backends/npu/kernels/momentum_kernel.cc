@@ -49,8 +49,7 @@ void MomentumKernel(const Context& dev_ctx,
     dev_ctx.template Alloc<T>(&regularized_grad);
 
     phi::Scalar regularization_coeff_scalar = regularization_coeff;
-
-    EXEC_NPU_CMD(aclnnAdds,
+    EXEC_NPU_CMD(aclnnAdd,
                  dev_ctx,
                  grad,
                  param,
