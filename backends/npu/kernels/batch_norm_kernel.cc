@@ -543,21 +543,22 @@ void BatchNormKernel(const Context& dev_ctx,
         aclnnInplaceAdd, dev_ctx, *variance_out, *saved_variance, momentum_p);
     auto stream = dev_ctx.stream();
 
-    phi::Scalar epsilon_scalar = static_cast<float>(epsilon);
+    phi::Scalar one_scalar = static_cast<float>(1.0);
 
-    phi::DenseTensor ones;
-    ones.set_meta(saved_variance->meta());
-    custom_kernel::FullLikeKernel<T, Context>(dev_ctx,
-                                              *saved_variance,
-                                              phi::Scalar(1.0),
-                                              saved_variance->dtype(),
-                                              &ones);
+    phi::DenseTensor epsilon_tensor;
+    epsilon_tensor.set_meta(saved_variance->meta());
+    custom_kernel::FullLikeKernel<T, Context>(
+        dev_ctx,
+        *saved_variance,
+        phi::Scalar(static_cast<float>(epsilon)),
+        saved_variance->dtype(),
+        &epsilon_tensor);
 
-    EXEC_NPU_CMD(aclnnAdds,
+    EXEC_NPU_CMD(aclnnAdd,
                  dev_ctx,
                  *saved_variance,
-                 ones,
-                 epsilon_scalar,
+                 epsilon_tensor,
+                 one_scalar,
                  *saved_variance);
 
     EXEC_NPU_CMD(aclnnInplaceRsqrt, dev_ctx, *saved_variance);

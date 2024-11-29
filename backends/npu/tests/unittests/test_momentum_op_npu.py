@@ -13,10 +13,7 @@
 # limitations under the License.
 
 from __future__ import print_function
-import sys
 
-sys.path.append("/ssd1/jll/codes/PaddleCustomDevice_npu80_rc3/python/")
-sys.path.append("/ssd1/jll/codes/PaddleCustomDevice_npu80_rc3/python/tests")
 import unittest
 
 import numpy as np
