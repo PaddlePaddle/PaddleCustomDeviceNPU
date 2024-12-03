@@ -30,9 +30,9 @@ def index_copy_torch(input, dim, index, source, dtype):
         "int32": torch.int32,
     }
     torch_dtype = dtype_map[dtype]
-    input_tensor = torch.tensor(input, dtype=torch_dtype)
-    index_tensor = torch.tensor(index, dtype=torch.int64)
-    source_tensor = torch.tensor(source, dtype=torch_dtype)
+    input_tensor = torch.tensor(input).clone().detach().to(dtype=torch_dtype)
+    index_tensor = torch.tensor(index).clone().detach().to(dtype=torch.int64)
+    source_tensor = torch.tensor(source).clone().detach().to(dtype=torch_dtype)
     output = torch.index_copy(
         input=input_tensor, dim=dim, index=index_tensor, source=source_tensor
     )
@@ -72,13 +72,13 @@ class TestIndexCopyOpFP32(unittest.TestCase):
         np.testing.assert_allclose(torch_res, ops_res, rtol=rtol, atol=atol)
 
     def index_copy_custom(self, input, dim, index, source):
-        input_tensor = paddle.to_tensor(input, dtype=self.dtype)
-        index_tensor = paddle.to_tensor(index, dtype="int64")
-        source_tensor = paddle.to_tensor(source, dtype=self.dtype)
-        out = paddlenlp_ops.index_copy(
+        input_tensor = paddle.to_tensor(input, dtype=self.dtype).clone()
+        index_tensor = paddle.to_tensor(index, dtype="int64").clone()
+        source_tensor = paddle.to_tensor(source, dtype=self.dtype).clone()
+        paddlenlp_ops.index_copy(
             input=input_tensor, dim=dim, index=index_tensor, source=source_tensor
         )
-        return out
+        return input_tensor
 
     def prepare_input(
         self, batch_size=16, num_heads=32, seq_length=256, head_dim=64, dim=0, index=0
@@ -118,26 +118,26 @@ class TestIndexCopyOpFP32(unittest.TestCase):
         input, index, source, dim = self.prepare_input(dim=0, index=0)
         custom_res = self.index_copy_custom(input, dim, index, source)
         torch_res = index_copy_torch(input, dim, index, source, dtype=self.dtype)
-        self.check_result(torch_res.numpy(), custom_res.numpy())
+        self.check_result(torch_res.numpy(), custom_res)
 
     def test_index_copy_dim0_index1(self):
         input, index, source, dim = self.prepare_input(dim=0, index=1)
         custom_res = self.index_copy_custom(input, dim, index, source)
         torch_res = index_copy_torch(input, dim, index, source, dtype=self.dtype)
-        self.check_result(torch_res.numpy(), custom_res.numpy())
+        self.check_result(torch_res.numpy(), custom_res)
 
     def test_index_copy_dim0_index_max(self):
         index = max(self.num_heads - 1, 0)
         input, index, source, dim = self.prepare_input(dim=0, index=index)
         custom_res = self.index_copy_custom(input, dim, index, source)
         torch_res = index_copy_torch(input, dim, index, source, dtype=self.dtype)
-        self.check_result(torch_res.numpy(), custom_res.numpy())
+        self.check_result(torch_res.numpy(), custom_res)
 
     def test_index_copy_dim1_index0(self):
         input, index, source, dim = self.prepare_input(dim=1, index=0)
         custom_res = self.index_copy_custom(input, dim, index, source)
         torch_res = index_copy_torch(input, dim, index, source, dtype=self.dtype)
-        self.check_result(torch_res.numpy(), custom_res.numpy())
+        self.check_result(torch_res.numpy(), custom_res)
 
     def test_index_copy_dim1_index1(self):
         input, index, source, dim = self.prepare_input(dim=1, index=1)

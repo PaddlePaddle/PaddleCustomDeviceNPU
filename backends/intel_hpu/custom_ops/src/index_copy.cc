@@ -29,23 +29,35 @@ class IndexCopy : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = createSection();
+
     std::vector<synTensor> syn_inputs;
-    for (size_t i = 0; i < inputs.size(); i++) {
-      syn_inputs.push_back(createTensor(inputs[i].dims.size(),
-                                        inputs[i].type,
-                                        inputs[i].dims,
-                                        true,
-                                        inputs[i].name));
-    }
+    syn_inputs.push_back(createTensor(inputs[0].dims.size(),
+                                      inputs[0].type,
+                                      inputs[0].dims,
+                                      true,
+                                      inputs[0].name,
+                                      section));
+
+    syn_inputs.push_back(createTensor(inputs[1].dims.size(),
+                                      inputs[1].type,
+                                      inputs[1].dims,
+                                      true,
+                                      inputs[1].name));
+
+    syn_inputs.push_back(createTensor(inputs[2].dims.size(),
+                                      inputs[2].type,
+                                      inputs[2].dims,
+                                      true,
+                                      inputs[2].name));
 
     std::vector<synTensor> syn_outputs;
-    for (size_t i = 0; i < outputs.size(); i++) {
-      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
-                                         outputs[i].type,
-                                         outputs[i].dims,
-                                         true,
-                                         outputs[i].name));
-    }
+    syn_outputs.push_back(createTensor(outputs[0].dims.size(),
+                                       outputs[0].type,
+                                       outputs[0].dims,
+                                       true,
+                                       outputs[0].name,
+                                       section));
 
     std::string guid = guid_ + "_" + SynDataTypeToStr(outputs[0].type);
     synStatus status = synNodeCreate(graphHandle_,
@@ -73,19 +85,13 @@ void IndexCopyKernel(const Context& dev_ctx,
                      const phi::DenseTensor& input,
                      const phi::Scalar& dim,
                      const phi::DenseTensor& index,
-                     const phi::DenseTensor& source,
-                     phi::DenseTensor* out) {
-  dev_ctx.template Alloc<T>(out);
-  if (out->numel() == 0) {
-    return;
-  }
-
+                     const phi::DenseTensor& source) {
   ConvertTensors ct;
   ct.Add(input);
   ct.Add(index);
   ct.Add(source);
 
-  ct.Add(out, false);
+  ct.Add(input, false);
 
   std::vector<DIMS> inputs_dims = ct.GetDims();
   ns_IndexCopy::Params params{};
@@ -117,26 +123,24 @@ void CallIndexCopyKernel(const Context& dev_ctx,
                          const phi::DenseTensor& input,
                          const phi::Scalar& dim,
                          const phi::DenseTensor& index,
-                         const phi::DenseTensor& source,
-                         phi::DenseTensor* out) {
+                         const phi::DenseTensor& source) {
   if (input.dtype() == phi::DataType::FLOAT32) {
-    custom_kernel::IndexCopyKernel<float>(
-        dev_ctx, input, dim, index, source, out);
+    custom_kernel::IndexCopyKernel<float>(dev_ctx, input, dim, index, source);
   } else if (input.dtype() == phi::DataType::FLOAT16) {
     custom_kernel::IndexCopyKernel<phi::dtype::float16>(
-        dev_ctx, input, dim, index, source, out);
+        dev_ctx, input, dim, index, source);
   } else if (input.dtype() == phi::DataType::BFLOAT16) {
     custom_kernel::IndexCopyKernel<phi::dtype::bfloat16>(
-        dev_ctx, input, dim, index, source, out);
+        dev_ctx, input, dim, index, source);
   } else {
     throw std::runtime_error("Unsupported data type for IndexCopyKernel");
   }
 }
 
-std::vector<paddle::Tensor> IndexCopyForward(const paddle::Tensor& input,
-                                             const int dim,
-                                             const paddle::Tensor& index,
-                                             const paddle::Tensor& source) {
+void IndexCopyForward(const paddle::Tensor& input,
+                      const int dim,
+                      const paddle::Tensor& index,
+                      const paddle::Tensor& source) {
   auto dev_ctx = static_cast<const phi::CustomContext*>(
       paddle::experimental::DeviceContextPool::Instance().Get(input.place()));
 
@@ -144,21 +148,14 @@ std::vector<paddle::Tensor> IndexCopyForward(const paddle::Tensor& input,
   auto index_tensor = static_cast<const phi::DenseTensor*>(index.impl().get());
   auto source_tensor =
       static_cast<const phi::DenseTensor*>(source.impl().get());
-  auto out_tensor = std::make_shared<phi::DenseTensor>();
-  out_tensor->Resize(input_tensor->dims());
 
-  CallIndexCopyKernel(*dev_ctx,
-                      *input_tensor,
-                      phi::Scalar(dim),
-                      *index_tensor,
-                      *source_tensor,
-                      out_tensor.get());
-
-  return {paddle::Tensor(out_tensor)};
+  CallIndexCopyKernel(
+      *dev_ctx, *input_tensor, phi::Scalar(dim), *index_tensor, *source_tensor);
 }
 
 PD_BUILD_OP(index_copy)
     .Inputs({"input", "index", "source"})
     .Outputs({"out"})
     .Attrs({"dim: int"})
+    .SetInplaceMap({{"input", "out"}})
     .SetKernelFn(PD_KERNEL(IndexCopyForward));

@@ -13,16 +13,20 @@
 # limitations under the License.
 
 import paddle
+import paddlenlp_ops
 
 paddle.set_device("intel_hpu")
 # paddle.set_device("cpu")
 
 
 class KVCache(paddle.nn.Layer):
-    def __init__(self):
+    def __init__(self, cache=None, inp_seq_len=-1):
         super(KVCache, self).__init__()
-        self.cache = None
-        self.inp_seq_len = -1
+        print(
+            f"`Paddle KVCache init` cache: {cache.shape if cache is not None else 'None'}, inp_seq_len: {inp_seq_len}"
+        )
+        self.cache = cache
+        self.inp_seq_len = inp_seq_len
 
     def allocate(self, inp_seq_len, dtype, shape):
         if self.cache is None or self.cache.shape != shape:
@@ -49,20 +53,7 @@ class KVCache(paddle.nn.Layer):
             return orig_cur
         if idx is not None:
             # prev.index_copy_(dim, idx - 1, cur)
-            if dim == 0:
-                prev.scatter_(idx, cur)
-            else:
-                times, temp_shape, temp_index = (
-                    paddle.prod(paddle.to_tensor(prev.shape[:dim])),
-                    prev.shape,
-                    idx,
-                )
-                prev, new_t = prev.reshape([-1] + temp_shape[dim + 1 :]), cur.reshape(
-                    [-1] + temp_shape[dim + 1 :]
-                )
-                for i in range(1, times):
-                    temp_index = paddle.concat([temp_index, idx + temp_shape[dim] * i])
-                prev.scatter_(temp_index, new_t).reshape_(temp_shape)
+            paddlenlp_ops.index_copy(input=prev, dim=dim, index=idx - 1, source=cur)
             return prev
         else:
             return paddle.concat((prev, cur), dim=dim)
@@ -77,35 +68,34 @@ class KVCache(paddle.nn.Layer):
 
 
 batch_size = 1
-num_key_value_heads = 32
-max_seq_len = 1024
-head_dim = 128
+num_key_value_heads = 2
+max_seq_len = 16
+head_dim = 4
 
 # paddle case
 cache_shape = (batch_size, num_key_value_heads, max_seq_len, head_dim)
 dtype = "float32"
 
-inp_seq_len = 128
+inp_seq_len = 2
 
-k_cache = KVCache()
-k_cache.allocate(inp_seq_len, dtype, cache_shape)
+static_cache = paddle.zeros(cache_shape, dtype=dtype)
+k_cache = KVCache(static_cache, inp_seq_len)
+# k_cache = KVCache()
+# k_cache.allocate(inp_seq_len, dtype, cache_shape)
 
-key_states = paddle.rand(
-    (batch_size, num_key_value_heads, inp_seq_len, head_dim), dtype=dtype
+key_states = paddle.full(
+    (batch_size, num_key_value_heads, inp_seq_len, head_dim), -1, dtype=dtype
 )
-
 token_idx = paddle.to_tensor([0], dtype="int64")
-prefill = k_cache(key_states, 2, token_idx)
+prefill = k_cache(cur=key_states, dim=2, idx=token_idx)
+print(f"Paddle KVCache prefill:{prefill}")
 
-print((prefill == k_cache.cache[:, :, :inp_seq_len, :]).all())
+for i in range(inp_seq_len + 1, max_seq_len + 1):
+    token_idx = paddle.to_tensor([i], dtype="int64")
+    key_state = paddle.ones((batch_size, num_key_value_heads, 1, head_dim), dtype=dtype)
+    decode = k_cache(cur=key_state, dim=2, idx=token_idx)
+    print(f"Paddle KVCache decode:{decode}")
 
-inp_seq_len = 1
-token_idx = paddle.to_tensor([128], dtype="int64")
-key_state = paddle.ones(
-    (batch_size, num_key_value_heads, inp_seq_len, head_dim), dtype=dtype
-)
-decode = k_cache(key_state, 2, token_idx)
-print((key_state == decode[:, :, token_idx, :]).all())
 
 if 0:
     # torch case
