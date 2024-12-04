@@ -33,8 +33,8 @@ if [ $(uname -i) == 'x86_64' ]; then
        --build-arg http_proxy=${proxy} \
        --build-arg https_proxy=${proxy} \
        --build-arg no_proxy=bcebos.com \
-       -t registry.baidubce.com/device/paddle-gcu:topsrider${TOPS_RIDER_VERSION}-ubuntu20-x86_64-gcc84 .
-#   docker push registry.baidubce.com/device/paddle-gcu:topsrider${TOPS_RIDER_VERSION}-ubuntu20-x86_64-gcc84
+       -t ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-gcu:topsrider${TOPS_RIDER_VERSION}-ubuntu20-x86_64-gcc84 .
+#   docker push ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-gcu:topsrider${TOPS_RIDER_VERSION}-ubuntu20-x86_64-gcc84
 else
   echo "Os $(uname -i) is not supported."
 fi

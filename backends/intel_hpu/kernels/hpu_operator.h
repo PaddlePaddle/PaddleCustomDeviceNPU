@@ -93,11 +93,22 @@ class HpuOperator {
 
   virtual ~HpuOperator() {}
 
+  synSectionHandle createSection() {
+    synStatus status;
+    synSectionHandle sectionHandle = nullptr;
+    status = synSectionCreate(&sectionHandle, 0, graphHandle_);
+
+    PD_CHECK(status == synSuccess, "synSectionCreate() failed = ", status);
+    sectons_.push_back(sectionHandle);
+    return sectionHandle;
+  }
+
   synTensor createTensor(unsigned dims,
                          synDataType data_type,
                          DIMS tensor_size,
                          bool is_presist,
-                         std::string name) {
+                         std::string name,
+                         synSectionHandle section = nullptr) {
     synStatus status;
     synTensorDescriptor desc{};
     // input
@@ -111,17 +122,17 @@ class HpuOperator {
       VLOG(6) << "name = " << name << ", " << tensor_size[dims - 1 - i];
     }
 
-    synSectionHandle sectionHandle = nullptr;
-    if (is_presist) {
+    synSectionHandle sectionHandle = section;
+    if (is_presist && sectionHandle == nullptr) {
       status = synSectionCreate(&sectionHandle, 0, graphHandle_);
 
-      PD_CHECK(status == synSuccess, "synSectionCreate() failed = %d", status);
+      PD_CHECK(status == synSuccess, "synSectionCreate() failed = ", status);
       sectons_.push_back(sectionHandle);
     }
 
     synTensor tensor = nullptr;
     status = synTensorCreate(&tensor, &desc, sectionHandle, 0);
-    PD_CHECK(status == synSuccess, "synTensorCreate() failed = %d", status);
+    PD_CHECK(status == synSuccess, "synTensorCreate() failed = ", status);
     tensors_.insert({name, tensor});
     return tensor;
   }
@@ -156,8 +167,7 @@ class RecipeRunner {
     }
     synStatus status =
         synTensorRetrieveIds(recipe, tensorNames, tensorIds, totalNumOfTensors);
-    PD_CHECK(
-        status == synSuccess, "synTensorRetrieveIds() failed = %d", status);
+    PD_CHECK(status == synSuccess, "synTensorRetrieveIds() failed = ", status);
     for (i = 0; i < totalNumOfTensors; i++) {
       tensorInfo[i].tensorId = tensorIds[i];
     }
@@ -167,7 +177,7 @@ class RecipeRunner {
     uint64_t request_workspace_size = 0;
     synStatus status =
         synWorkspaceGetSize(&request_workspace_size, recipeHandle_);
-    PD_CHECK(status == synSuccess, "synWorkspaceGetSize() failed = %d", status);
+    PD_CHECK(status == synSuccess, "synWorkspaceGetSize() failed = ", status);
 
     if (request_workspace_size > cached_workspaceSize) {
       if (cached_workspaceSize != 0) {
@@ -176,17 +186,17 @@ class RecipeRunner {
         status =
             synStreamSynchronize(reinterpret_cast<synStreamHandle>(stream));
         PD_CHECK(
-            status == synSuccess, "synStreamSynchronize() failed = %d", status);
+            status == synSuccess, "synStreamSynchronize() failed = ", status);
 
         status = synDeviceFree(0, cached_workspaceAddress, 0);
-        PD_CHECK(status == synSuccess, "synDeviceFree() failed = %d", status);
+        PD_CHECK(status == synSuccess, "synDeviceFree() failed = ", status);
       }
 
       cached_workspaceSize = request_workspace_size;
       VLOG(6) << "malloc device workspace " << cached_workspaceSize;
       status = synDeviceMalloc(
           0, cached_workspaceSize, 0, 0, &cached_workspaceAddress);
-      PD_CHECK(status == synSuccess, "synDeviceMalloc() failed = %d", status);
+      PD_CHECK(status == synSuccess, "synDeviceMalloc() failed = ", status);
     }
 
     VLOG(6) << "workspace size = " << cached_workspaceSize
@@ -204,7 +214,8 @@ class RecipeRunner {
                        recipeHandle_,
                        0);
 
-    PD_CHECK(status == synSuccess, "synLaunch() failed = %d", status);
+    PD_CHECK(status == synSuccess, "synLaunch() failed = ", status);
+    VLOG(6) << "synLaunch called ";
   }
 
  protected:

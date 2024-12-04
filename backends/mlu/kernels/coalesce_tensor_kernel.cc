@@ -119,7 +119,7 @@ struct FillConstantVisitor {
 };
 
 void GetMemSizeAndDtype(
-    const std::vector<const phi::DenseTensor *> &lod_tensors,
+    const std::vector<const phi::DenseTensor *> &dense_tensors,
     size_t *numel,
     const size_t &size_of_dtype,
     const phi::Place &place,
@@ -128,8 +128,8 @@ void GetMemSizeAndDtype(
   *numel = 0;
   std::stringstream ss;
   ss << "alloc_space_for_vars: ";
-  for (size_t i = 0; i < lod_tensors.size(); ++i) {
-    auto size = lod_tensors[i]->numel();
+  for (size_t i = 0; i < dense_tensors.size(); ++i) {
+    auto size = dense_tensors[i]->numel();
     PADDLE_ENFORCE_GT(size,
                       0,
                       phi::errors::InvalidArgument(
@@ -141,9 +141,10 @@ void GetMemSizeAndDtype(
                                size_of_dtype
                          : static_cast<size_t>(size);
     const void *ptr =
-        lod_tensors[i]->initialized() ? lod_tensors[i]->data() : nullptr;
+        dense_tensors[i]->initialized() ? dense_tensors[i]->data() : nullptr;
     VLOG(4) << size << " " << len;
-    ss << "input(" << i << "-th tensor) dim:(" << lod_tensors[i]->dims() << ") "
+    ss << "input(" << i << "-th tensor) dim:(" << dense_tensors[i]->dims()
+       << ") "
        << " addres:" << ptr << " len: " << len << ", ";
     *numel += len;
   }
@@ -178,7 +179,7 @@ void CoalesceTensorKernel(const Context &dev_ctx,
                         input.size(),
                         output.size()));
 
-  // Input & Output check: only support LoDTensor
+  // Input & Output check: only support DenseTensor
   bool has_not_init_in_vars = false;
   for (size_t i = 0; i < input.size(); ++i) {
     PADDLE_ENFORCE_NOT_NULL(

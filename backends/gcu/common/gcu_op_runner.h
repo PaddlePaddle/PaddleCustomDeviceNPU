@@ -27,11 +27,11 @@ namespace custom_kernel {
 
 constexpr char kEmptyVarName[] = "@EMPTY@";
 
-using LoDTensor = phi::DenseTensor;
+using DenseTensor = phi::DenseTensor;
 using DenseTensor = phi::DenseTensor;
 using TensorNameMap = std::map<std::string, std::vector<std::string>>;
-using TensorValueMap = std::map<std::string, std::vector<LoDTensor*>>;
-using TensorNameValuePair = std::pair<std::string, LoDTensor*>;
+using TensorValueMap = std::map<std::string, std::vector<DenseTensor*>>;
+using TensorNameValuePair = std::pair<std::string, DenseTensor*>;
 using GcuAttributeMap = backend::GcuAttributeMap;
 using GcuAttribute = backend::GcuAttribute;
 using GcuOp = ::builder::Op;
@@ -134,7 +134,7 @@ class GcuExecutionContext {
     return var != nullptr;
   }
 
-  const LoDTensor* InputTensor(const std::string& name) const {
+  const DenseTensor* InputTensor(const std::string& name) const {
     auto it = inputs_.find(name);
     if (it == inputs_.end()) return nullptr;
 
@@ -148,7 +148,7 @@ class GcuExecutionContext {
     return it->second.empty() ? nullptr : it->second[0];
   }
 
-  LoDTensor* OutputTensor(const std::string& name) const {
+  DenseTensor* OutputTensor(const std::string& name) const {
     auto it = outputs_.find(name);
     if (it == outputs_.end()) return nullptr;
 
@@ -196,7 +196,7 @@ class GcuExecutionContext {
     return iter->second;
   }
 
-  const std::vector<LoDTensor*> MultiInputTensor(
+  const std::vector<DenseTensor*> MultiInputTensor(
       const std::string& name) const {
     auto it = inputs_.find(name);
     if (it == inputs_.end()) {
@@ -205,7 +205,7 @@ class GcuExecutionContext {
     return {it->second.begin(), it->second.end()};
   }
 
-  std::vector<LoDTensor*> MultiOutputTensor(const std::string& name) const {
+  std::vector<DenseTensor*> MultiOutputTensor(const std::string& name) const {
     auto it = outputs_.find(name);
     if (it == outputs_.end()) {
       return {};
@@ -248,19 +248,19 @@ class GcuOpRunner {
                      const std::vector<TensorNameValuePair>& input_vars,
                      const std::vector<TensorNameValuePair>& output_vars,
                      bool tensor_split);
-  GcuOpPtr AddGteOp(const LoDTensor* tensor,
+  GcuOpPtr AddGteOp(const DenseTensor* tensor,
                     const std::string& tensor_name,
                     const GcuOpPtr& input);
   void CompileExecutable(const GcuExecutionContext& ctx,
                          const std::string& program_key_in,
-                         const std::vector<LoDTensor*>& inputs,
-                         const std::vector<LoDTensor*>& outputs,
+                         const std::vector<DenseTensor*>& inputs,
+                         const std::vector<DenseTensor*>& outputs,
                          const std::vector<std::string>& input_names,
                          const std::vector<std::string>& output_names);
   void RunExecutableSync(const GcuExecutionContext& ctx,
                          const std::string& program_key,
-                         const std::vector<LoDTensor*>& inputs,
-                         const std::vector<LoDTensor*>& outputs,
+                         const std::vector<DenseTensor*>& inputs,
+                         const std::vector<DenseTensor*>& outputs,
                          const std::vector<std::string>& input_names,
                          const std::vector<std::string>& output_names,
                          bool tensor_split);

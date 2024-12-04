@@ -517,7 +517,7 @@ class TestSliceApiEager(unittest.TestCase):
 # kernels_iter == all_op_kernels.end().] (at /home/gta/chaofanl/PaddleIntelGPUDevice/
 # Paddle/paddle/base/framework/operator.cc:1893)
 # [operator < slice > error]
-# class TestSliceApiWithLoDTensorArray(unittest.TestCase):
+# class TestSliceApiWithDenseTensorArray(unittest.TestCase):
 #     def setUp(self):
 #         self.shape = (3, 4)
 #         self.data = np.random.random(size=self.shape).astype('float32')

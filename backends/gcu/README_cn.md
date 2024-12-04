@@ -9,13 +9,12 @@
 ```bash
 # 1) 拉取镜像，注意此镜像仅为开发环境，镜像中不包含预编译的飞桨安装包
 #    此镜像的构建脚本与dockerfile位于tools/dockerfile目录下
-#    注意： 此docker正在发布流程中(20241113)
-registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84
+ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
 
 # 2) 参考如下命令启动容器
 docker run --name paddle-gcu-dev -v /home:/home \
     --network=host --ipc=host -it --privileged \
-    registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
+    ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
 
 # 3) 克隆PaddleCustomDevice源码
 git clone https://github.com/PaddlePaddle/PaddleCustomDevice

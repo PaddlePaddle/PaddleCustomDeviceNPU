@@ -173,14 +173,14 @@ void ScaleKernel(const Context& dev_ctx,
   } else {
     phi::DenseTensor scale_tensor, bias_tensor, x_tmp;
 
-#if (CANN_VERSION_CODE >= 803000)
-    x_tmp.set_meta(x.meta());
-    dev_ctx.template Alloc<T>(&x_tmp);
-    TensorCopy(dev_ctx, x, false, &x_tmp);
-    x_tmp.Resize({1});
-#else
-    x_tmp = x;
-#endif
+    if (x.dims().size() == 0) {
+      x_tmp.set_meta(x.meta());
+      dev_ctx.template Alloc<T>(&x_tmp);
+      TensorCopy(dev_ctx, x, false, &x_tmp);
+      x_tmp.Resize({1});
+    } else {
+      x_tmp = x;
+    }
 
     scale_tensor.set_meta(x_tmp.meta());
     dev_ctx.template Alloc<T>(&scale_tensor);
@@ -208,35 +208,35 @@ void ScaleKernel(const Context& dev_ctx,
     bool scale_from_blob = false;
     dev_ctx.template Alloc<T>(out);
 
-#if (CANN_VERSION_CODE >= 803000)
-    phi::DenseTensor mid_out;
-    mid_out.set_meta(x_tmp.meta());
-    dev_ctx.template Alloc<T>(&mid_out);
+    if (x.dims().size() == 0) {
+      phi::DenseTensor mid_out;
+      mid_out.set_meta(x_tmp.meta());
+      dev_ctx.template Alloc<T>(&mid_out);
 
-    EXEC_NPU_CMD(aclnnScale,
-                 dev_ctx,
-                 x_tmp,
-                 scale_tensor,
-                 bias_tensor,
-                 axis,
-                 num_axes,
-                 scale_from_blob,
-                 mid_out);
+      EXEC_NPU_CMD(aclnnScale,
+                   dev_ctx,
+                   x_tmp,
+                   scale_tensor,
+                   bias_tensor,
+                   axis,
+                   num_axes,
+                   scale_from_blob,
+                   mid_out);
 
-    auto out_dims = out->dims();
-    TensorCopy(dev_ctx, mid_out, false, out);
-    out->Resize(out_dims);
-#else
-    EXEC_NPU_CMD(aclnnScale,
-                 dev_ctx,
-                 x_tmp,
-                 scale_tensor,
-                 bias_tensor,
-                 axis,
-                 num_axes,
-                 scale_from_blob,
-                 *out);
-#endif
+      auto out_dims = out->dims();
+      TensorCopy(dev_ctx, mid_out, false, out);
+      out->Resize(out_dims);
+    } else {
+      EXEC_NPU_CMD(aclnnScale,
+                   dev_ctx,
+                   x_tmp,
+                   scale_tensor,
+                   bias_tensor,
+                   axis,
+                   num_axes,
+                   scale_from_blob,
+                   *out);
+    }
   }
 }
 

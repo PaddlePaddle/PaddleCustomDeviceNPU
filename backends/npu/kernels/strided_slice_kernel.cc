@@ -610,7 +610,8 @@ void StridedSliceCompute(const Context& dev_ctx,
         in_tensor.numel(),
         0,
         phi::errors::PreconditionNotMet(
-            "The input LoDTensorArray Input[%d] holds no memory.", in_offset));
+            "The input DenseTensorArray Input[%d] holds no memory.",
+            in_offset));
     auto& out_tensor = out->at(out_offset);
     out_tensor.Resize(in_tensor.dims());
 
@@ -931,7 +932,7 @@ void StridedSliceGradCompute(const Context& dev_ctx,
           in_tensor.numel(),
           0,
           phi::errors::PreconditionNotMet(
-              "The input LoDTensorArray Input[%d] holds no memory.",
+              "The input DenseTensorArray Input[%d] holds no memory.",
               in_offset));
 
       phi::Copy<Context>(

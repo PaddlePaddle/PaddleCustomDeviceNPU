@@ -29,13 +29,118 @@ void TransposeKernel(const Context &dev_ctx,
 
 class FSDPA : public HpuOperator {
  public:
-  explicit FSDPA(std::string guid_prefix) : HpuOperator(guid_prefix, false) {}
+  explicit FSDPA(std::string guid_prefix, synDataType dtype)
+      : HpuOperator(guid_prefix), dtype_(dtype) {}
   void AddNode(ConvertTensors &ct, ns_Sdpa::ParamsV2 params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    std::vector<int64_t> q_dims = std::vector<int64_t>(inputs[0].dims);
+    std::vector<int64_t> qt_dims(q_dims.cbegin(), q_dims.cend());
+    std::vector<int64_t> kv_dims = std::vector<int64_t>(inputs[1].dims);
+    std::vector<int64_t> kvt_dims(kv_dims.cbegin(), kv_dims.cend());
+
+    int rank = q_dims.size();
+
+    std::vector<int> axis = {0, 2, 1, 3};
+    synTransposeParams trans_params;
+    for (size_t i = 0; i < axis.size(); i++) {
+      trans_params.permutation[i] =
+          static_cast<TransposePermutationDim>(axis[i]);
+    }
+    trans_params.tensorDim = rank;
+
+    qt_dims[rank - 3] = q_dims[rank - 2];
+    qt_dims[rank - 2] = q_dims[rank - 3];
+    kvt_dims[rank - 3] = kv_dims[rank - 2];
+    kvt_dims[rank - 2] = kv_dims[rank - 3];
+
+    synTensor q_transpose_inputs[1] = {createTensor(inputs[0].dims.size(),
+                                                    inputs[0].type,
+                                                    inputs[0].dims,
+                                                    true,
+                                                    inputs[0].name)};
+
+    synTensor q_transpose_outputs[1] = {createTensor(
+        inputs[0].dims.size(), inputs[0].type, qt_dims, false, "q_t")};
+
+    synTensor k_transpose_inputs[1] = {createTensor(inputs[1].dims.size(),
+                                                    inputs[1].type,
+                                                    inputs[1].dims,
+                                                    true,
+                                                    inputs[1].name)};
+
+    synTensor k_transpose_outputs[1] = {createTensor(
+        inputs[1].dims.size(), inputs[1].type, kvt_dims, false, "k_t")};
+
+    synTensor v_transpose_inputs[1] = {createTensor(inputs[2].dims.size(),
+                                                    inputs[2].type,
+                                                    inputs[2].dims,
+                                                    true,
+                                                    inputs[2].name)};
+
+    synTensor v_transpose_outputs[1] = {createTensor(
+        inputs[2].dims.size(), inputs[2].type, kvt_dims, false, "v_t")};
+
+    std::string trans = "transpose";
+    if (dtype_ == syn_type_fp16) {
+      trans = trans + "_f16";
+    } else if (dtype_ == syn_type_bf16) {
+      trans = trans + "_bf16";
+    } else if (dtype_ == syn_type_single) {
+      trans = trans + "_f32";
+    }
+
+    synStatus status = synNodeCreate(graphHandle_,
+                                     q_transpose_inputs,
+                                     q_transpose_outputs,
+                                     1,
+                                     1,
+                                     &trans_params,
+                                     sizeof(trans_params),
+                                     trans.c_str(),
+                                     "q_transpose",
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FSDPA q_transpose synNodeCreate () failed = ",
+             status);
+
+    status = synNodeCreate(graphHandle_,
+                           k_transpose_inputs,
+                           k_transpose_outputs,
+                           1,
+                           1,
+                           &trans_params,
+                           sizeof(trans_params),
+                           trans.c_str(),
+                           "k_transpose",
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FSDPA k_transpose synNodeCreate () failed = ",
+             status);
+
+    status = synNodeCreate(graphHandle_,
+                           v_transpose_inputs,
+                           v_transpose_outputs,
+                           1,
+                           1,
+                           &trans_params,
+                           sizeof(trans_params),
+                           trans.c_str(),
+                           "v_transpose",
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FSDPA v_transpose synNodeCreate () failed = ",
+             status);
+
     std::vector<synTensor> syn_inputs;
-    for (size_t i = 0; i < inputs.size(); i++) {
+    syn_inputs.push_back(q_transpose_outputs[0]);
+    syn_inputs.push_back(k_transpose_outputs[0]);
+    syn_inputs.push_back(v_transpose_outputs[0]);
+    for (size_t i = 3; i < inputs.size(); i++) {
       syn_inputs.push_back(createTensor(inputs[i].dims.size(),
                                         inputs[i].type,
                                         inputs[i].dims,
@@ -44,13 +149,11 @@ class FSDPA : public HpuOperator {
     }
 
     std::vector<synTensor> syn_outputs;
-    for (size_t i = 0; i < 1; i++) {
-      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
-                                         outputs[i].type,
-                                         outputs[i].dims,
-                                         true,
-                                         outputs[i].name));
-    }
+
+    synTensor attn_outputs[1] = {createTensor(
+        inputs[0].dims.size(), inputs[0].type, qt_dims, false, "attn_t")};
+    syn_outputs.push_back(attn_outputs[0]);
+
     if (!params.is_inference) {
       for (size_t i = 1; i < outputs.size(); i++) {
         syn_outputs.push_back(createTensor(outputs[i].dims.size(),
@@ -61,20 +164,46 @@ class FSDPA : public HpuOperator {
       }
     }
 
-    synStatus status = synNodeCreate(graphHandle_,
-                                     syn_inputs.data(),
-                                     syn_outputs.data(),
-                                     syn_inputs.size(),
-                                     syn_outputs.size(),
-                                     &params,
-                                     sizeof(params),
-                                     guid_.c_str(),
-                                     "FSDPA",
-                                     nullptr,
-                                     nullptr);
-    PD_CHECK(
-        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    status = synNodeCreate(graphHandle_,
+                           syn_inputs.data(),
+                           syn_outputs.data(),
+                           syn_inputs.size(),
+                           syn_outputs.size(),
+                           &params,
+                           sizeof(params),
+                           guid_.c_str(),
+                           "FSDPA",
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FSDPA sdpa_recomp_fwd synNodeCreate () failed = ",
+             status);
+
+    synTensor attn_transpose_outputs[1] = {createTensor(outputs[0].dims.size(),
+                                                        outputs[0].type,
+                                                        outputs[0].dims,
+                                                        true,
+                                                        outputs[0].name)};
+
+    status = synNodeCreate(graphHandle_,
+                           attn_outputs,
+                           attn_transpose_outputs,
+                           1,
+                           1,
+                           &trans_params,
+                           sizeof(trans_params),
+                           trans.c_str(),
+                           "attn_transpose",
+                           nullptr,
+                           nullptr);
+
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FSDPA attn_transpose synNodeCreate () failed = ",
+             status);
   }
+
+ protected:
+  synDataType dtype_;
 };
 
 template <typename T, typename Context>
@@ -83,61 +212,29 @@ void FusedDotProductAttentionKernel(
     const phi::DenseTensor &q,
     const phi::DenseTensor &k,
     const phi::DenseTensor &v,
-    const phi::DenseTensor &mask,
-    // const paddle::optional<phi::DenseTensor> &attention_mask,
-    // const paddle::optional<phi::DenseTensor> &cu_seqlen_q,
-    // const paddle::optional<phi::DenseTensor> &cu_seqlen_kv,
+    const paddle::optional<phi::DenseTensor> &attention_mask,
+    const paddle::optional<phi::DenseTensor> &cu_seqlen_q,
+    const paddle::optional<phi::DenseTensor> &cu_seqlen_kv,
     float scaling_factor,
     float dropout_probability,
     bool is_training,
-    bool is_causal_masking,
-    // const std::string &mask_type_str,
-    // const std::string &bias_type_str,
+    const std::string &mask_type_str,
+    const std::string &bias_type_str,
     phi::DenseTensor *out,
     phi::DenseTensor *softmax_out,
     phi::DenseTensor *rng_state) {
-  std::vector<int> axis = {0, 2, 1, 3};
-  phi::DenseTensor qt;
-  // auto q_dims = q.dims();
-  std::vector<int64_t> q_dims = phi::vectorize<int64_t>(q.dims());
-  std::vector<int64_t> qt_dims(q_dims.cbegin(), q_dims.cend());
-
-  int rank = q_dims.size();
-  qt_dims[rank - 3] = q_dims[rank - 2];
-  qt_dims[rank - 2] = q_dims[rank - 3];
-
-  phi::DenseTensorMeta qt_meta({q.dtype(), phi::make_ddim(qt_dims)});
-  qt.set_meta(qt_meta);
-  custom_kernel::TransposeKernel<T, Context>(dev_ctx, q, axis, &qt);
-
-  phi::DenseTensor kt;
-  phi::DenseTensor vt;
-  std::vector<int64_t> kv_dims = phi::vectorize<int64_t>(k.dims());
-  std::vector<int64_t> kvt_dims(kv_dims.cbegin(), kv_dims.cend());
-  kvt_dims[rank - 3] = kv_dims[rank - 2];
-  kvt_dims[rank - 2] = kv_dims[rank - 3];
-  phi::DenseTensorMeta kvt_meta({k.dtype(), phi::make_ddim(kvt_dims)});
-  kt.set_meta(kvt_meta);
-  vt.set_meta(kvt_meta);
-  custom_kernel::TransposeKernel<T, Context>(dev_ctx, k, axis, &kt);
-  custom_kernel::TransposeKernel<T, Context>(dev_ctx, v, axis, &vt);
-
-  out->Resize(phi::make_ddim(qt_dims));
   dev_ctx.template Alloc<T>(out);
   if (is_training) {
     dev_ctx.template Alloc<T>(softmax_out);
   }
 
   ConvertTensors ct;
-  ct.Add(qt);
-  ct.Add(kt);
-  ct.Add(vt);
-  ct.Add(mask);
-  /*
+  ct.Add(q);
+  ct.Add(k);
+  ct.Add(v);
   if (attention_mask.get_ptr()) {
     ct.Add(attention_mask.get_ptr());
   }
-  */
   ct.Add(out, false);
   if (is_training) {
     ct.Add(softmax_out, false);
@@ -149,8 +246,7 @@ void FusedDotProductAttentionKernel(
   ns_Sdpa::ParamsV2 params;
   memset(reinterpret_cast<void *>(&params), 0x00, sizeof(ns_Sdpa::ParamsV2));
   params.scale = scaling_factor;
-  params.is_causal = is_causal_masking;
-  // params.is_causal = (mask_type_str == "causal");
+  params.is_causal = (mask_type_str == "causal");
   params.dropout.ratio = dropout_probability;
   params.dropout.disableMaskOut = false;
   params.is_inference = !is_training;
@@ -163,7 +259,7 @@ void FusedDotProductAttentionKernel(
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
-    FSDPA op(op_info.guid_);
+    FSDPA op(op_info.guid_, op_info.datatype_);
 
     op.AddNode(ct, params);
     op.Compile();

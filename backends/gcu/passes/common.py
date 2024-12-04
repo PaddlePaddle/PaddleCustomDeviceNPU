@@ -99,7 +99,7 @@ def inference_passes(use_pir=True, name="common"):
     }
     if name not in PASS_MAP.keys():
         print(
-            "[ERROR] Not found passes for {}, common passes will be used instead.".format(
+            "[INFO] Not found passes for {}, common passes will be used instead.".format(
                 name
             ),
             flush=True,

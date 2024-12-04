@@ -516,7 +516,7 @@ class TestSliceApiWithTensor(unittest.TestCase):
 #             self.assertTrue(np.allclose(a_1.numpy(), a[-3:3, 0:2, 2:4]))
 
 
-class TestSliceApiWithLoDTensorArray(unittest.TestCase):
+class TestSliceApiWithDenseTensorArray(unittest.TestCase):
     def setUp(self):
         self.shape = (3, 4)
         self.data = np.random.random(size=self.shape).astype("float32")
