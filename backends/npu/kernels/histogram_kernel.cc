@@ -25,7 +25,6 @@ void HistogramKernel(const Context& dev_ctx,
                      float max,
                      bool density,
                      phi::DenseTensor* output) {
-
   PADDLE_ENFORCE_EQ(
       weight || density,
       false,
