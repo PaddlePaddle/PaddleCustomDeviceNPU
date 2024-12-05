@@ -240,6 +240,9 @@ class RuntimeManager {
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synStreamSynchronize(stream_h2d) failed = %d",
                status);
+      status = synHostUnmap(device->id, src);
+      LOG_IF(ERROR, status != synSuccess)
+          << "[RUNTIME] synHostUnmap() failed = " << status;
 
     } else if (flag == 1) {
       if (stream_d2h == nullptr) {
@@ -264,6 +267,9 @@ class RuntimeManager {
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synStreamSynchronize() failed = %d",
                status);
+      status = synHostUnmap(device->id, dst);
+      LOG_IF(ERROR, status != synSuccess)
+          << "[RUNTIME] synHostUnmap() failed = " << status;
 
     } else if (flag == 2) {
       if (stream_d2d == nullptr) {
@@ -392,8 +398,9 @@ class RuntimeManager {
       // not found, map and cache
       status = synHostMap(device->id, size, ptr);
       LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synHostMap() failed = " << status;
-      hostMappedAddress[ptr] = size;
+          << "[RUNTIME] synHostMap() failed = " << status << " ptr=" << ptr
+          << " size=" << size;
+      // hostMappedAddress[ptr] = size;
     } else {
       if (it->second != size) {
         // found but size not equal
@@ -405,7 +412,7 @@ class RuntimeManager {
         status = synHostMap(device->id, size, ptr);
         LOG_IF(ERROR, status != synSuccess)
             << "[RUNTIME] synHostMap() failed = " << status;
-        hostMappedAddress[ptr] = size;
+        // hostMappedAddress[ptr] = size;
       }
     }
   }

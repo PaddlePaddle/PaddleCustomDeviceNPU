@@ -28,6 +28,7 @@ setup(
         CppExtension(
             sources=[
                 "./src/index_copy.cc",
+                "./src/fake_gpu_kernels.cc",
             ],
             include_dirs=[
                 "../",
