@@ -18,6 +18,20 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
+void ScaleKernel(const Context& dev_ctx,
+                 const phi::DenseTensor& x,
+                 const phi::Scalar& in_scale,
+                 float bias,
+                 bool bias_after_scale,
+                 phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void AddKernel(const Context& dev_ctx,
+               const phi::DenseTensor& x,
+               const phi::DenseTensor& y,
+               phi::DenseTensor* out);
+
+template <typename T, typename Context>
 void MomentumKernel(const Context& dev_ctx,
                     const phi::DenseTensor& param,
                     const phi::DenseTensor& grad,
@@ -48,12 +62,12 @@ void MomentumKernel(const Context& dev_ctx,
     regularized_grad.Resize(grad.dims());
     dev_ctx.template Alloc<T>(&regularized_grad);
 
-    const auto& runner1 = NpuOpRunner(
-        "Muls", {param}, {regularized_grad}, {{"value", regularization_coeff}});
-    runner1.Run(dev_ctx.stream());
-    const auto& runner2 =
-        NpuOpRunner("Add", {regularized_grad, grad}, {regularized_grad}, {});
-    runner2.Run(dev_ctx.stream());
+    phi::Scalar in_scale = regularization_coeff;
+    custom_kernel::ScaleKernel<T, Context>(
+        dev_ctx, param, in_scale, 0.0f, false, &regularized_grad);
+
+    custom_kernel::AddKernel<T, Context>(
+        dev_ctx, grad, regularized_grad, &regularized_grad);
   } else {
     regularized_grad = grad;
   }
