@@ -19,7 +19,7 @@ file(
 string(REPLACE ".py" "" TEST_FUSE_PASSES "${TEST_FUSE_PASSES}")
 
 foreach(TEST_PASS ${TEST_FUSE_PASSES})
-  py_test_modules(${TEST_PASS} true MODULES ${TEST_PASS})
+  py_test_modules(${TEST_PASS} false MODULES fuse_pass/${TEST_PASS}.py)
   message(STATUS "with fuse pass: ${TEST_PASS}")
 endforeach()
 

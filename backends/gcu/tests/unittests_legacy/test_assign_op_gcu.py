@@ -52,7 +52,7 @@ class TestAssignFloat64Op(TestAssignOp):
 
 
 class TestAssignOApi(unittest.TestCase):
-    def test_assign_LoDTensorArray(self):
+    def test_assign_DenseTensorArray(self):
         paddle.enable_static()
         x = paddle.static.data(name="x", shape=[100, 10], dtype="float32")
         x.stop_gradient = False

@@ -18,11 +18,11 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void TakeAlongAxisKernel(const Context& dev_ctx,
-                         const phi::DenseTensor& x,
-                         const phi::DenseTensor& index,
-                         int axis,
-                         phi::DenseTensor* out) {
+void AclopTakeAlongAxisKernel(const Context& dev_ctx,
+                              const phi::DenseTensor& x,
+                              const phi::DenseTensor& index,
+                              int axis,
+                              phi::DenseTensor* out) {
   dev_ctx.template Alloc<T>(out);
   auto stream = dev_ctx.stream();
   NPUAttributeMap attr_input = {{"dim", axis}};
@@ -49,12 +49,27 @@ void TakeAlongAxisKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void TakeAlongAxisGradKernel(const Context& dev_ctx,
-                             const phi::DenseTensor& x,
-                             const phi::DenseTensor& index,
-                             const phi::DenseTensor& out_grad,
-                             int axis,
-                             phi::DenseTensor* x_grad) {
+void TakeAlongAxisKernel(const Context& dev_ctx,
+                         const phi::DenseTensor& x,
+                         const phi::DenseTensor& index,
+                         int axis,
+                         phi::DenseTensor* out) {
+  DO_COMPATIBILITY(aclnnGather,
+                   (custom_kernel::AclopTakeAlongAxisKernel<T, Context>(
+                       dev_ctx, x, index, axis, out)));
+  dev_ctx.template Alloc<T>(out);
+
+  int64_t axis_ = static_cast<int64_t>(axis);
+  EXEC_NPU_CMD(aclnnGather, dev_ctx, x, axis_, index, *out);
+}
+
+template <typename T, typename Context>
+void AclopTakeAlongAxisGradKernel(const Context& dev_ctx,
+                                  const phi::DenseTensor& x,
+                                  const phi::DenseTensor& index,
+                                  const phi::DenseTensor& out_grad,
+                                  int axis,
+                                  phi::DenseTensor* x_grad) {
   dev_ctx.template Alloc<T>(x_grad);
   FillNpuTensorWithConstant<T>(x_grad, dev_ctx, static_cast<T>(0));
   x_grad->Resize(x.dims());
@@ -93,6 +108,27 @@ void TakeAlongAxisGradKernel(const Context& dev_ctx,
   }
 }
 
+template <typename T, typename Context>
+void TakeAlongAxisGradKernel(const Context& dev_ctx,
+                             const phi::DenseTensor& x,
+                             const phi::DenseTensor& index,
+                             const phi::DenseTensor& out_grad,
+                             int axis,
+                             phi::DenseTensor* x_grad) {
+  DO_COMPATIBILITY(aclnnInplaceScatter,
+                   (custom_kernel::AclopTakeAlongAxisGradKernel<T, Context>(
+                       dev_ctx, x, index, out_grad, axis, x_grad)));
+
+  dev_ctx.template Alloc<T>(x_grad);
+  FillNpuTensorWithConstant<T>(x_grad, dev_ctx, static_cast<T>(0));
+  x_grad->Resize(x.dims());
+
+  int64_t reduce = 1;  // add
+
+  EXEC_NPU_CMD(
+      aclnnInplaceScatter, dev_ctx, *x_grad, axis, index, out_grad, reduce);
+}
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(take_along_axis,
@@ -101,6 +137,8 @@ PD_REGISTER_PLUGIN_KERNEL(take_along_axis,
                           custom_kernel::TakeAlongAxisKernel,
                           int,
                           int64_t,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16,
                           float,
                           double) {}
 
@@ -110,5 +148,7 @@ PD_REGISTER_PLUGIN_KERNEL(take_along_axis_grad,
                           custom_kernel::TakeAlongAxisGradKernel,
                           int,
                           int64_t,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16,
                           float,
                           double) {}

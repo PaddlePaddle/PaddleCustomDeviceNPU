@@ -334,13 +334,13 @@ void SumKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void SumGradKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::DenseTensor& out_grad,
-                   const phi::IntArray& dims_array,
-                   bool keep_dim,
-                   bool reduce_all,
-                   phi::DenseTensor* x_grad) {
+void AclopSumGradKernel(const Context& dev_ctx,
+                        const phi::DenseTensor& x,
+                        const phi::DenseTensor& out_grad,
+                        const phi::IntArray& dims_array,
+                        bool keep_dim,
+                        bool reduce_all,
+                        phi::DenseTensor* x_grad) {
   dev_ctx.Alloc(x_grad, x_grad->dtype());
   auto stream = dev_ctx.stream();
 
@@ -400,6 +400,88 @@ void SumGradKernel(const Context& dev_ctx,
         .AddInput(dev_ctx, phi::vectorize(x.dims()))
         .AddOutput(*x_grad);
     runner.Run(stream);
+  }
+}
+
+template <typename T, typename Context>
+void SumGradKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::DenseTensor& out_grad,
+                   const phi::IntArray& dims_array,
+                   bool keep_dim,
+                   bool reduce_all,
+                   phi::DenseTensor* x_grad) {
+  DO_COMPATIBILITY(
+      aclnnExpand,
+      (custom_kernel::AclopSumGradKernel<T, Context>(
+          dev_ctx, x, out_grad, dims_array, keep_dim, reduce_all, x_grad)));
+  dev_ctx.Alloc(x_grad, x_grad->dtype());
+
+  phi::DenseTensor out_grad_tmp;
+  phi::DenseTensor x_grad_out;
+  if (x_grad->dtype() == phi::DataType::FLOAT64) {
+    // phi::DenseTensorMeta meta = {x_grad->dtype(), out_grad.dims()};
+    // out_grad_tmp.set_meta(meta);
+    out_grad_tmp.Resize(out_grad.dims());
+    dev_ctx.Alloc(&out_grad_tmp, phi::DataType::FLOAT32);
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, out_grad, out_grad_tmp.dtype(), &out_grad_tmp);
+
+    x_grad_out.Resize(x_grad->dims());
+    dev_ctx.Alloc(&x_grad_out, phi::DataType::FLOAT32);
+
+  } else if (x_grad->dtype() != out_grad.dtype()) {
+    phi::DenseTensorMeta meta = {x_grad->dtype(), out_grad.dims()};
+    out_grad_tmp.set_meta(meta);
+    dev_ctx.Alloc(&out_grad_tmp, out_grad_tmp.dtype());
+
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, out_grad, x_grad->dtype(), &out_grad_tmp);
+    x_grad_out = *x_grad;
+  } else {
+    out_grad_tmp = out_grad;
+    x_grad_out = *x_grad;
+  }
+
+  if (x.dims().size() == 0) {
+    TensorCopy(dev_ctx, out_grad_tmp, true, x_grad);
+    return;
+  }
+
+  auto keep_dims = keep_dim;
+
+  auto dims = dims_array.GetData();
+
+  // The dims has full dim, set the reduce_all is True
+  const auto& input_dim_size = x.dims().size();
+  std::set<int> dims_set(dims.begin(), dims.end());
+  bool full_dim = true;
+  for (auto i = 0; i < input_dim_size; i++) {
+    if (dims_set.find(i) == dims_set.end()) {
+      full_dim = false;
+      break;
+    }
+  }
+  reduce_all = (reduce_all || full_dim || dims.size() == 0);
+
+  if (keep_dims || reduce_all) {
+    auto x_dims = phi::vectorize(x.dims());
+    EXEC_NPU_CMD(aclnnExpand, dev_ctx, out_grad_tmp, x_dims, x_grad_out);
+
+  } else {
+    phi::DDim out_dims;
+    out_dims = GetOutputShape(dims, out_grad.dims());
+    out_grad_tmp.Resize(out_dims);
+
+    auto x_dims = phi::vectorize(x.dims());
+    EXEC_NPU_CMD(aclnnExpand, dev_ctx, out_grad_tmp, x_dims, x_grad_out);
+  }
+
+  if (x_grad->dtype() == phi::DataType::FLOAT64) {
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, x_grad_out, x_grad->dtype(), x_grad);
+  } else {
+    x_grad = &x_grad_out;
   }
 }
 

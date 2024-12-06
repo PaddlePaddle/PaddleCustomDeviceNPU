@@ -12,8 +12,85 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <set>
+
 #include "common/gcu_op_runner.h"
 #include "kernels/funcs/gcu_kernel_funcs.h"
+
+namespace {
+
+struct SliceInfo {
+  explicit SliceInfo(const std::vector<int64_t>& input_dims)
+      : input_dims_(input_dims), ends_(input_dims), output_dims_(input_dims) {
+    auto rank = input_dims.size();
+    starts_ = std::vector<int64_t>(rank, 0);
+    steps_ = std::vector<int64_t>(rank, 1);
+  }
+
+  std::vector<int64_t> input_dims_;
+  std::vector<int64_t> starts_;
+  std::vector<int64_t> ends_;
+  std::vector<int64_t> steps_;
+  std::vector<int64_t> output_dims_;
+};
+
+void PrepareSliceInfo(const std::vector<int64_t>& raw_starts,
+                      const std::vector<int64_t>& raw_ends,
+                      const std::vector<int64_t>& raw_steps,
+                      const std::vector<int>& raw_axes,
+                      SliceInfo& slice_info) {  // NOLINT
+  std::vector<int64_t> axes{raw_axes.begin(), raw_axes.end()};
+
+  // positive
+  std::for_each(axes.begin(), axes.end(), [&slice_info](int64_t& axis) {
+    axis = axis < 0 ? (axis + slice_info.input_dims_.size()) : axis;
+  });
+  // unique
+  std::set<int> unique_axes;
+  int64_t axis = 0;
+  for (int i = 0; i < axes.size(); i++) {
+    if (unique_axes.count(axes[i]) != 0) {
+      continue;
+    }
+    unique_axes.insert(axes[i]);
+    // positive and limit to max shape
+    axis = axes[i];
+    int64_t dim_value = slice_info.input_dims_.at(axis);
+    slice_info.starts_[axis] =
+        raw_starts[i] >= 0
+            ? (raw_starts[i] <= dim_value ? raw_starts[i] : dim_value)
+            : raw_starts[i] + dim_value;
+    slice_info.steps_[axis] = raw_steps[i];
+    slice_info.ends_[axis] =
+        raw_ends[i] >= 0 ? (raw_ends[i] <= dim_value ? raw_ends[i] : dim_value)
+                         : raw_ends[i] + dim_value;
+    // infer out shape
+    auto out_dim = (slice_info.ends_[axis] - slice_info.starts_[axis]) /
+                   slice_info.steps_[axis];
+    int counter = 0;
+    int64_t tmp = slice_info.starts_[axis];
+    if (slice_info.steps_[axis] >= 0) {
+      while (tmp < slice_info.ends_[axis]) {
+        if (tmp < dim_value) {
+          counter += 1;
+        }
+        tmp += slice_info.steps_[axis];
+      }
+    } else {
+      while (tmp > slice_info.ends_[axis]) {
+        if (tmp < dim_value) {
+          counter += 1;
+        }
+        tmp += slice_info.steps_[axis];
+      }
+    }
+
+    slice_info.output_dims_[axis] = counter;
+  }
+  return;
+}
+}  // namespace
 
 namespace custom_kernel {
 static void StridedSliceOutDims(const std::vector<int64_t>& starts,
@@ -179,15 +256,101 @@ void StridedSliceKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
 
   if (LaunchAOTKernel()) {
-    std::vector<int64_t> axes64(axes.begin(), axes.end());
-    LAUNCH_TOPSCLOP(strided_slice,
-                    dev_ctx,
-                    *out,
-                    x,
-                    axes64,
-                    starts.GetData(),
-                    ends.GetData(),
-                    strides.GetData());
+    auto rank = x.dims().size();
+    PADDLE_ENFORCE_EQ(
+        AreEqual(starts.size(), ends.size(), strides.size(), axes.size()),
+        true,
+        phi::errors::InvalidArgument(
+            "stridedslice axes[%lu] starts[%lu] ends[%lu] "
+            "strides[%lu] rank should be same!",
+            axes.size(),
+            starts.size(),
+            ends.size(),
+            strides.size()));
+    PADDLE_ENFORCE_LE(starts.size(),
+                      rank,
+                      phi::errors::InvalidArgument(
+                          "starts rank should be less equal than x rank!"));
+    VLOG(6) << "=== StridedSlice Debug Infos ===";
+    VLOG(6) << " - origin axes: ";
+    for (const auto& axis : axes) {
+      VLOG(6) << "  - " << axis;
+    }
+    VLOG(6) << " - origin input dims:" << x.dims();
+    VLOG(6) << " - origin starts:" << common::make_ddim(starts.GetData());
+    VLOG(6) << " - origin ends:" << common::make_ddim(ends.GetData());
+    VLOG(6) << " - origin strides:" << common::make_ddim(strides.GetData());
+    VLOG(6) << " - origin output dims:" << out->dims();
+
+    SliceInfo slice_info(common::vectorize(x.dims()));
+    PrepareSliceInfo(
+        starts.GetData(), ends.GetData(), strides.GetData(), axes, slice_info);
+    // debug
+    VLOG(6) << "======== After PrepareSliceInfo =================";
+    VLOG(6) << " - computed start dims:"
+            << common::make_ddim(slice_info.starts_);
+    VLOG(6) << " - computed step dims:" << common::make_ddim(slice_info.steps_);
+    VLOG(6) << " - computed end dims:" << common::make_ddim(slice_info.ends_);
+    VLOG(6) << " - computed output dims:"
+            << common::make_ddim(slice_info.output_dims_);
+
+    // output->Resize(Shape(slice_info.output_dims_));
+    if (LIKELY(out->numel() != 0)) {
+      // output shape should be same as the result after preparing slice_info
+      PADDLE_ENFORCE_EQ(
+          out->dims(),
+          common::make_ddim(slice_info.output_dims_),
+          phi::errors::Fatal("output dims should be same as the result after "
+                             "preparing slice_info"));
+      // calc new_strides:tuple(x_stride[d] * strides[d] for d in
+      // range(len(x.shape)))
+      std::vector<int64_t> x_strides = common::vectorize(x.meta().strides);
+      std::vector<int64_t> new_strides(x_strides.size(), 0);
+      for (size_t i = 0; i < x_strides.size(); i++) {
+        new_strides[i] = x_strides[i] * slice_info.steps_[i];
+      }
+      // calc offset:sum(b * s for b, s in zip(starts, x_stride))
+      int64_t offset = 0;
+      for (size_t i = 0; i < x_strides.size(); i++) {
+        offset += slice_info.starts_[i] * x_strides[i];
+      }
+
+      phi::DenseTensor as_strides_out;
+      auto x_tensor = CreateTopsatenTensor(x);
+      auto out_tensor = CreateTopsatenTensor(*out);
+      auto view_out_tensor = CreateTopsatenTensor(as_strides_out);
+      topsatenSize_t aten_sizes{
+          slice_info.output_dims_.data(),
+          static_cast<int64_t>(slice_info.output_dims_.size())};
+      topsatenSize_t aten_strides{new_strides.data(),
+                                  static_cast<int64_t>(new_strides.size())};
+
+      std::string abstract_info =
+          custom_kernel::GetAbstractInfo("StridedSlice_topsatenAsStrided",
+                                         as_strides_out,
+                                         x,
+                                         slice_info.output_dims_,
+                                         new_strides,
+                                         offset);
+      LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenAsStrided,
+                                          dev_ctx,
+                                          abstract_info,
+                                          view_out_tensor,
+                                          x_tensor,
+                                          aten_sizes,
+                                          aten_strides,
+                                          offset);
+
+      abstract_info = custom_kernel::GetAbstractInfo(
+          "StridedSlice_topsatenCopy", *out, as_strides_out, false);
+      LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenCopy,
+                                          dev_ctx,
+                                          abstract_info,
+                                          out_tensor,
+                                          view_out_tensor,
+                                          false);
+    }
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["Input"] = {"x"};

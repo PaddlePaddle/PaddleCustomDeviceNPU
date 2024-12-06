@@ -35,7 +35,7 @@ model = AutoModelForCausalLM.from_pretrained(
     model,
     tensor_parallel_degree=2,
     tensor_parallel_rank=tensor_parallel_rank,
-    dtype="float32",
+    dtype="bfloat16",
 )
 input_features = tokenizer("I am a student", return_tensors="pd")
 

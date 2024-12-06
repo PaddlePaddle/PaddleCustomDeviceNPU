@@ -891,6 +891,8 @@ void FloorKernel(const Context& dev_ctx,
 template <typename T, typename Context>
 void RoundKernel(const Context& dev_ctx,
                  const phi::DenseTensor& x,
+                 const int decimals
+                     UNUSED,  // add decimals, Now it's just for CI
                  phi::DenseTensor* out) {
   dev_ctx.template Alloc<T>(out);
 

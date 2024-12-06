@@ -26,24 +26,24 @@ void TakeAlongAxisKernel(const Context& dev_ctx,
   PADDLE_GCU_KERNEL_TRACE("take_along_axis");
   if (LaunchAOTKernel()) {
     dev_ctx.template Alloc<T>(out);
-    LAUNCH_TOPSCLOP(take_along_axis, dev_ctx, *out, x, index, axis)
-  } else {  // kernel impl base on JIT
-    THROW_JIT_UNIMPLEMENTED();
-  }
-}
 
-template <typename T, typename Context>
-void UnStackKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   int axis,
-                   int num,
-                   std::vector<phi::DenseTensor*> outs) {
-  PADDLE_GCU_KERNEL_TRACE("unstack");
-  if (LaunchAOTKernel()) {
-    for (auto y : outs) {
-      dev_ctx.template Alloc<T>(y);
-    }
-    LAUNCH_TOPSCLOP(unstack, dev_ctx, &outs, x, axis)
+    const auto x_shape = x.dims();
+    const auto x_rank = x_shape.size();
+    axis = axis < 0 ? axis + x_rank : axis;
+
+    // check valid
+    // average divide if num_split has only one value
+    PADDLE_ENFORCE_GT(axis,
+                      0,
+                      phi::errors::InvalidArgument(
+                          "axis should be in [-%zu, %zu)!", x_rank, x_rank));
+
+    int64_t axis_64 = axis;
+    phi::DenseTensor out_tmp = custom_kernel::TensorEmpty(dev_ctx, x.meta());
+    LAUNCH_TOPSATENOP(
+        topsatenGather, dev_ctx, out_tmp, x, index, axis_64, false);
+
+    LAUNCH_TOPSATENOP(topsatenCopy, dev_ctx, *out, x, false);
   } else {  // kernel impl base on JIT
     THROW_JIT_UNIMPLEMENTED();
   }

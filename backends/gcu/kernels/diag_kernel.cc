@@ -24,7 +24,52 @@ void DiagKernel(const Context& dev_ctx,
                 DenseTensor* out) {
   PADDLE_GCU_KERNEL_TRACE("diag");
   dev_ctx.template Alloc<T>(out);
-  LAUNCH_TOPSCLOP(diag, dev_ctx, *out, x, offset, padding_value);
+
+  if (LaunchAOTKernel()) {
+    auto rank = x.dims().size();
+    PADDLE_ENFORCE_LE(
+        rank, 2, phi::errors::InvalidArgument("x must be a 1D or 2D tensor"));
+    if (rank == 1) {
+      if (abs(padding_value) < 1e-6) {
+        LAUNCH_TOPSATENOP(topsatenDiag, dev_ctx, *out, x, offset);
+      } else {
+        LAUNCH_TOPSATENOP(topsatenDiag, dev_ctx, *out, x, offset);
+
+        phi::DenseTensor mask_tmp = custom_kernel::TensorEmpty(
+            dev_ctx, {phi::DataType::BOOL, out->dims()});
+
+        phi::DenseTensor cpu_tensor;
+        phi::DenseTensorMeta cpu_meta = {phi::DataType::BOOL, out->dims()};
+        cpu_tensor.set_meta(cpu_meta);
+        bool* host_mask = dev_ctx.template HostAlloc<bool>(&cpu_tensor);
+        for (size_t i = 0; i < mask_tmp.numel(); i++) {
+          host_mask[i] = true;
+        }
+        int64_t stride_w = 1;
+        int64_t stride_h = mask_tmp.dims()[0];
+        bool* start =
+            host_mask + (offset >= 0 ? offset * stride_w : -offset * stride_h);
+        for (size_t i = 0; i < mask_tmp.numel(); i = i + stride_h + stride_w) {
+          *(start + i) = false;
+        }
+
+        // copy mask to device
+        TensorCopy(dev_ctx, cpu_tensor, true, &mask_tmp);
+
+        // call mask_fill
+        LAUNCH_TOPSATENOP(topsatenMasked_fill,
+                          dev_ctx,
+                          *out,
+                          *out,
+                          mask_tmp,
+                          phi::Scalar(padding_value));
+      }
+    } else {
+      LAUNCH_TOPSATENOP(topsatenDiag, dev_ctx, *out, x, offset);
+    }
+  } else {  // kernel impl base on JIT
+    THROW_JIT_UNIMPLEMENTED();
+  }
 }
 }  // namespace custom_kernel
 

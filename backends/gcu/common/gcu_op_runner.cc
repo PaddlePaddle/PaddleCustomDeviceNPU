@@ -205,8 +205,8 @@ void GcuOpRunner::CompileAndRun(
 
   auto program_key = std::to_string(hasher(signature + ctx.Type()));
 
-  std::vector<LoDTensor*> inputs;
-  std::vector<LoDTensor*> outputs;
+  std::vector<DenseTensor*> inputs;
+  std::vector<DenseTensor*> outputs;
   std::vector<std::string> input_names;
   std::vector<std::string> output_names;
 
@@ -241,7 +241,7 @@ void GcuOpRunner::CompileAndRun(
   VLOG(3) << "op " << ctx.Type() << " run program finished.";
 }
 
-GcuOpPtr GcuOpRunner::AddGteOp(const LoDTensor* tensor,
+GcuOpPtr GcuOpRunner::AddGteOp(const DenseTensor* tensor,
                                const std::string& tensor_name,
                                const GcuOpPtr& input) {
   auto attr_out_var_names = input->GetAttribute(backend::kAttrOpOutVarName);
@@ -270,15 +270,15 @@ GcuOpPtr GcuOpRunner::AddGteOp(const LoDTensor* tensor,
 void GcuOpRunner::CompileExecutable(
     const GcuExecutionContext& ctx,
     const std::string& program_key_in,
-    const std::vector<LoDTensor*>& inputs,
-    const std::vector<LoDTensor*>& outputs,
+    const std::vector<DenseTensor*>& inputs,
+    const std::vector<DenseTensor*>& outputs,
     const std::vector<std::string>& input_names,
     const std::vector<std::string>& output_names) {  // NOLINT
   auto op_type = ctx.Type();
   VLOG(3) << "OpType " << op_type << " start to compile. ";
   std::string program_key = program_key_in;
   std::map<std::string, GcuOpPtr> gcu_op_cache;
-  std::map<std::string, LoDTensor*> tensor_cache;
+  std::map<std::string, DenseTensor*> tensor_cache;
 
   GcuBuilderPtr builder = std::make_shared<GcuBuilder>();
   PADDLE_ENFORCE_NE(
@@ -653,8 +653,8 @@ void GcuOpRunner::CompileExecutable(
 void GcuOpRunner::RunExecutableSync(
     const GcuExecutionContext& ctx,
     const std::string& program_key,
-    const std::vector<LoDTensor*>& inputs,
-    const std::vector<LoDTensor*>& outputs,
+    const std::vector<DenseTensor*>& inputs,
+    const std::vector<DenseTensor*>& outputs,
     const std::vector<std::string>& input_names,
     const std::vector<std::string>& output_names,
     bool tensor_split) {

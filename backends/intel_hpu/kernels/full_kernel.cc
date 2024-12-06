@@ -14,7 +14,7 @@
 #include "habanalabs/perf_lib_layer_params.h"
 #include "kernels/funcs.h"
 #include "kernels/hpu_operator.h"
-#include "utils/utills.h"
+#include "utils/utils.h"
 
 namespace custom_kernel {
 
@@ -25,7 +25,7 @@ struct FullParams {
 
 class Full : public HpuOperator {
  public:
-  Full() : HpuOperator("constant_") {}
+  Full() : HpuOperator("constant_", false) {}
 
   void AddNode(ConvertTensors& ct, FullParams params) {
     auto outputs = ct.GetTensors(false);

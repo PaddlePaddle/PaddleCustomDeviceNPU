@@ -36,4 +36,21 @@ using TensorValueMap = std::map<std::string, std::vector<DenseTensor*>>;
 std::string GradVarName(const std::string& var_name);
 std::vector<int> GetIntList(const phi::IntArray& int_array);
 
+void UpdatePaddingAndDilation(const common::DDim& input_dims,
+                              const common::DDim& filter_dims,
+                              const std::string& padding_algorithm,
+                              const std::vector<int>& strides,
+                              std::vector<int>& paddings,    // NOLINT
+                              std::vector<int>& dilations);  // NOLINT
+
+template <typename T>
+bool AreEqual(const T& first, const T& second) {
+  return first == second;
+}
+
+template <typename T, typename... Args>
+bool AreEqual(const T& first, const T& second, const Args&... args) {
+  return first == second && AreEqual(second, args...);
+}
+
 }  // namespace custom_kernel

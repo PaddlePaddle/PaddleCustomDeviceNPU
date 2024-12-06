@@ -18,10 +18,10 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void FlipKernel(const Context& dev_ctx,
-                const phi::DenseTensor& x,
-                const std::vector<int>& axis,
-                phi::DenseTensor* out) {
+void AclopFlipKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const std::vector<int>& axis,
+                     phi::DenseTensor* out) {
   dev_ctx.template Alloc<T>(out);
   auto stream = dev_ctx.stream();
 
@@ -38,6 +38,19 @@ void FlipKernel(const Context& dev_ctx,
       .AddInput(dev_ctx, std::move(axis_trans))
       .AddOutput(*out);
   runner.Run(stream);
+}
+
+template <typename T, typename Context>
+void FlipKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                const std::vector<int>& axis,
+                phi::DenseTensor* out) {
+  DO_COMPATIBILITY(
+      aclnnFlip,
+      (custom_kernel::AclopFlipKernel<T, Context>(dev_ctx, x, axis, out)));
+  dev_ctx.template Alloc<T>(out);
+  std::vector<int64_t> axis_trans(axis.begin(), axis.end());
+  EXEC_NPU_CMD(aclnnFlip, dev_ctx, x, axis_trans, *out);
 }
 
 }  // namespace custom_kernel

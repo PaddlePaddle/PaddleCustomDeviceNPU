@@ -1,0 +1,44 @@
+# Docker Image for PaddlePaddle GCU
+
+FROM registry.baidubce.com/device/paddle-cpu:ubuntu20-x86_64-gcc84-py310
+LABEL maintainer="PaddlePaddle Authors <paddle-dev@baidu.com>"
+
+# version and link for gcu packages
+ARG TOPS_RIDER_VERSION
+ARG TOPS_RIDER_PACKAGE_LINK
+
+# install base packages
+RUN apt-get update -y && apt-get install -y zlib1g zlib1g-dev libsqlite3-dev openssl libssl-dev libffi-dev libbz2-dev \
+    libxslt1-dev unzip pciutils net-tools libblas-dev gfortran libblas3 liblapack-dev liblapack3 libopenblas-dev
+
+RUN pip install --upgrade pip setuptools wheel && pip install ddt
+
+# install Enflame GCU development kit
+RUN rm -rf /tmp/TopsRider_i3x_*.run && mkdir -p ~/TopsRider_i3x_${TOPS_RIDER_VERSION} && \
+    cd /tmp && wget ${TOPS_RIDER_PACKAGE_LINK} && \
+    bash TopsRider_i3x_${TOPS_RIDER_VERSION}_deb_amd64.run -x && \
+    cd TopsRider_i3x_${TOPS_RIDER_VERSION}_deb_amd64 && \
+    find -name TopsPlatform_*_deb_amd64.run -exec bash '{}' --no-auto-load -y ';' && \
+    dpkg -i ./sdk/topsfactor_*.deb ./sdk/tops-sdk_*.deb && \
+    dpkg -i ./parallel_communication_toolkit/eccl_*.deb ./ai_hpc_sdk/topsaten_*.deb && \
+    cd /tmp && \
+    mv TopsRider_i3x_${TOPS_RIDER_VERSION}_deb_amd64.run ~/TopsRider_i3x_${TOPS_RIDER_VERSION} && \
+    rm -rf TopsRider_i3x_${TOPS_RIDER_VERSION}_deb_amd64
+
+# udpate envs
+ENV TOPS_HOME=/opt/tops
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$TOPS_HOME/lib
+
+# environment for paddlepaddle-gcu
+ENV FLAGS_use_stride_kernel=false
+ENV FLAGS_allocator_strategy=auto_growth
+ENV FLAGS_auto_growth_chunk_size_in_mb=512
+ENV FLAGS_use_stream_safe_cuda_allocator=false
+ENV PADDLE_XCCL_BACKEND=gcu
+ENV PADDLE_RUN_ASYNC=true
+
+# Clean
+RUN apt-get clean -y
+RUN pip cache purge
+
+EXPOSE 22

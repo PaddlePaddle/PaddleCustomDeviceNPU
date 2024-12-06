@@ -38,7 +38,7 @@ include_directories(${PADDLE_INC_DIR} ${CMAKE_SOURCE_DIR}
                     ${CMAKE_SOURCE_DIR}/kernels /usr/include/habanalabs)
 link_directories(${PADDLE_LIB_DIR} /usr/lib/habanalabs)
 
-add_definitions(-std=c++14)
+add_definitions(-std=c++17)
 
 file(
   GLOB_RECURSE PLUGIN_SRCS

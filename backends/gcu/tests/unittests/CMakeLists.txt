@@ -19,7 +19,7 @@ file(
 string(REPLACE ".py" "" TEST_OPS "${TEST_OPS}")
 
 foreach(TEST_OP ${TEST_OPS})
-  py_test_modules(${TEST_OP} false MODULES ${TEST_OP})
+  py_test_modules(${TEST_OP} false MODULES unittests/${TEST_OP}.py)
   message(STATUS "with op unittest: ${TEST_OP}")
 endforeach()
 

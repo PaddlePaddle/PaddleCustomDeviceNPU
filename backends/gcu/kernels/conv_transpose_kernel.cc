@@ -145,6 +145,16 @@ void Conv2dTransposeBiasKernel(const Context& dev_ctx,
     phi::DenseTensor output =
         MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
 
+    // update paddings and dilations according to padding_algorithm
+    std::vector<int> paddings_vec = paddings;
+    std::vector<int> dilations_vec = dilations;
+    custom_kernel::UpdatePaddingAndDilation(x.dims(),
+                                            filter.dims(),
+                                            padding_algorithm,
+                                            strides,
+                                            paddings_vec,
+                                            dilations_vec);
+
     if (EnableTransposeOptimize()) {
       PADDLE_ENFORCE_EQ(data_format,
                         "NCHW",
@@ -188,10 +198,16 @@ void Conv2dTransposeBiasKernel(const Context& dev_ctx,
     }
 
     std::vector<int64_t> strides_v = {strides.begin(), strides.end()};
-    std::vector<int64_t> paddings_v = {paddings.begin(), paddings.end()};
-    // std::vector<int64_t> output_padding_v = {output_padding.begin(),
-    //                                          output_padding.end()};
-    std::vector<int64_t> dilations_v = {dilations.begin(), dilations.end()};
+    std::vector<int64_t> paddings_v = {paddings_vec.begin(),
+                                       paddings_vec.end()};
+    std::vector<int64_t> output_padding_v = {output_padding.begin(),
+                                             output_padding.end()};
+    std::vector<int64_t> dilations_v = {dilations_vec.begin(),
+                                        dilations_vec.end()};
+
+    if (output_padding_v.empty()) {
+      output_padding_v = std::vector<int64_t>({0, 0});
+    }
 
     int64_t groups_64 = groups;
     LAUNCH_TOPSATENOP(topsatenConvTranspose2d,
@@ -202,7 +218,7 @@ void Conv2dTransposeBiasKernel(const Context& dev_ctx,
                       input_bias,
                       strides_v,
                       paddings_v,
-                      paddings_v,
+                      output_padding_v,
                       groups_64,
                       dilations_v);
 
@@ -329,6 +345,16 @@ void Conv3dTransposeKernel(const Context& dev_ctx,
     // filter); phi::DenseTensor output =
     //     MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
 
+    // // update paddings and dilations according to padding_algorithm
+    // std::vector<int> paddings_vec = paddings;
+    // std::vector<int> dilations_vec = dilations;
+    // custom_kernel::UpdatePaddingAndDilation(x.dims(),
+    //                                         filter.dims(),
+    //                                         padding_algorithm,
+    //                                         strides,
+    //                                         paddings_vec,
+    //                                         dilations_vec);
+
     // if (EnableTransposeOptimize()) {
     //   PADDLE_ENFORCE_EQ(data_format, "NCHW",
     //                     phi::errors::InvalidArgument(
@@ -367,8 +393,10 @@ void Conv3dTransposeKernel(const Context& dev_ctx,
     // auto bias = TensorZeros(dev_ctx, meta);
 
     // std::vector<int64_t> strides_v = {strides.begin(), strides.end()};
-    // std::vector<int64_t> paddings_v = {paddings.begin(), paddings.end()};
-    // std::vector<int64_t> dilations_v = {dilations.begin(), dilations.end()};
+    // std::vector<int64_t> paddings_v = {paddings_vec.begin(),
+    //                                    paddings_vec.end()};
+    // std::vector<int64_t> dilations_v = {dilations_vec.begin(),
+    //                                     dilations_vec.end()};
     // std::vector<int64_t> output_padding_v = {output_padding.begin(),
     //                                          output_padding.end()};
 

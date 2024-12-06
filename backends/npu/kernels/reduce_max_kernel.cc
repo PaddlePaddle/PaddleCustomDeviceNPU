@@ -98,14 +98,14 @@ void MaxKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void MaxGradKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::DenseTensor& out,
-                   const phi::DenseTensor& out_grad,
-                   const phi::IntArray& reduce_dims_in,
-                   bool keep_dim,
-                   bool reduce_all,
-                   phi::DenseTensor* x_grad) {
+void AclopMaxGradKernel(const Context& dev_ctx,
+                        const phi::DenseTensor& x,
+                        const phi::DenseTensor& out,
+                        const phi::DenseTensor& out_grad,
+                        const phi::IntArray& reduce_dims_in,
+                        bool keep_dim,
+                        bool reduce_all,
+                        phi::DenseTensor* x_grad) {
   auto reduce_dims = reduce_dims_in.GetData();
   auto stream = dev_ctx.stream();
   dev_ctx.template Alloc<T>(x_grad);
@@ -173,6 +173,83 @@ void MaxGradKernel(const Context& dev_ctx,
   const auto& r_sel = NpuOpRunner(
       "SelectV2", {equal_cond, transformed_out_grad, t_zero}, {*x_grad}, {});
   r_sel.Run(stream);
+}
+
+template <typename T, typename Context>
+void MaxGradKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::DenseTensor& out,
+                   const phi::DenseTensor& out_grad,
+                   const phi::IntArray& reduce_dims_in,
+                   bool keep_dim,
+                   bool reduce_all,
+                   phi::DenseTensor* x_grad) {
+  DO_COMPATIBILITY(
+      aclnnExpand,
+      (custom_kernel::AclopMaxGradKernel<T, Context>(dev_ctx,
+                                                     x,
+                                                     out,
+                                                     out_grad,
+                                                     reduce_dims_in,
+                                                     keep_dim,
+                                                     reduce_all,
+                                                     x_grad)));
+
+  auto reduce_dims = reduce_dims_in.GetData();
+  auto stream = dev_ctx.stream();
+  dev_ctx.template Alloc<T>(x_grad);
+  if (x.dims().size() == 0) {
+    TensorCopy(dev_ctx, out_grad, true, x_grad);
+    return;
+  }
+
+  // broadcast
+  auto x_dims_vec = phi::vectorize(x.dims());
+  if (reduce_all) {
+    reduce_dims.clear();
+    for (size_t d = 0; d < x_dims_vec.size(); ++d) {
+      reduce_dims.push_back(static_cast<int>(d));
+    }
+  }
+
+  phi::DenseTensor tmp_out(out), tmp_out_grad(out_grad);
+  auto tmp_out_dims_vec = x_dims_vec;
+  for (auto d : reduce_dims) {
+    if (d < 0) {
+      d += x_dims_vec.size();
+    }
+    tmp_out_dims_vec[d] = 1;
+  }
+  tmp_out.Resize(phi::make_ddim(tmp_out_dims_vec));
+  tmp_out_grad.Resize(phi::make_ddim(tmp_out_dims_vec));
+
+  phi::DenseTensor transformed_out;
+  phi::DenseTensorMeta meta = {x.dtype(), phi::make_ddim(x_dims_vec)};
+  transformed_out.set_meta(meta);
+  dev_ctx.template Alloc<T>(&transformed_out);
+  EXEC_NPU_CMD(aclnnExpand, dev_ctx, tmp_out, x_dims_vec, transformed_out);
+
+  phi::DenseTensor transformed_out_grad;
+  phi::DenseTensorMeta grad_meta = {x.dtype(), phi::make_ddim(x_dims_vec)};
+  transformed_out_grad.set_meta(grad_meta);
+  dev_ctx.template Alloc<T>(&transformed_out_grad);
+  EXEC_NPU_CMD(
+      aclnnExpand, dev_ctx, tmp_out_grad, x_dims_vec, transformed_out_grad);
+
+  // compare
+  phi::DenseTensor equal_cond;
+  equal_cond.Resize(x_grad->dims());
+  dev_ctx.template Alloc<bool>(&equal_cond);
+  EXEC_NPU_CMD(aclnnEqTensor, dev_ctx, x, transformed_out, equal_cond);
+
+  // select
+  phi::DenseTensor t_zero;
+  t_zero.Resize(x_grad->dims());
+  dev_ctx.template Alloc<T>(&t_zero);
+  EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, t_zero);
+  t_zero.Resize(x_grad->dims());
+  EXEC_NPU_CMD(
+      aclnnSWhere, dev_ctx, equal_cond, transformed_out_grad, t_zero, *x_grad);
 }
 
 }  // namespace custom_kernel

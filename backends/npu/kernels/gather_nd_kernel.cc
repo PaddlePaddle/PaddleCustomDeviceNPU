@@ -75,10 +75,8 @@ void GatherNdKernel(const Context &dev_ctx,
       aclnnGatherNd,
       (custom_kernel::AclopGatherNdKernel<T, Context>(dev_ctx, x, index, out)));
 
-  dev_ctx.template Alloc<T>(out);
-  auto stream = dev_ctx.stream();
-
   if (x.numel() == 0) return;
+  dev_ctx.template Alloc<T>(out);
 
   if (index.numel() == 0) {
     int diff = out->dims().size() - x.dims().size();
@@ -93,12 +91,8 @@ void GatherNdKernel(const Context &dev_ctx,
       phi::DenseTensor x_tmp(x);
       x_tmp.Resize(phi::make_ddim(new_dims));
 
-      NpuOpRunner runner;
-      runner.SetType("BroadcastTo")
-          .AddInput(x_tmp)
-          .AddInput(dev_ctx, phi::vectorize(out->dims()))
-          .AddOutput(*out);
-      runner.Run(stream);
+      auto out_dims = phi::vectorize(out->dims());
+      EXEC_NPU_CMD(aclnnExpand, dev_ctx, x_tmp, out_dims, *out);
     }
     return;
   }

@@ -128,7 +128,65 @@ void UnStackKernel(const Context& dev_ctx,
     for (auto y : outs) {
       dev_ctx.template Alloc<T>(y);
     }
-    LAUNCH_TOPSCLOP(unstack, dev_ctx, &outs, x, axis)
+
+    const auto x_dims = x.dims();
+    const auto x_rank = x_dims.size();
+    axis = axis < 0 ? axis + x_rank : axis;
+
+    // check valid
+    // average divide if num_split has only one value
+    PADDLE_ENFORCE_GE(axis,
+                      0,
+                      phi::errors::InvalidArgument(
+                          "axis should be in [-%zu, %zu)!", x_rank, x_rank));
+    PADDLE_ENFORCE_GT(
+        x_dims.at(axis),
+        0,
+        phi::errors::InvalidArgument("axis should be greater than 0!"));
+    PADDLE_ENFORCE_EQ(
+        outs.size(),
+        x_dims.at(axis),
+        phi::errors::InvalidArgument(
+            "outputs num[%zu] should be same as val's %dth dim[%ld]!",
+            outs.size(),
+            axis,
+            x_dims.at(axis)));
+
+    phi::DenseTensor as_strides_out;
+    auto x_tensor = CreateTopsatenTensor(x);
+    std::vector<topsatenTensor> split_outs;
+    std::string abstract_info =
+        custom_kernel::GetAbstractInfo("Unstack_topsatenSplit", x, axis);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+        topsatenSplit, dev_ctx, abstract_info, split_outs, x_tensor, 1, axis);
+
+    PADDLE_ENFORCE_EQ(
+        split_outs.size(),
+        outs.size(),
+        phi::errors::InvalidArgument(
+            "aten split outputs num should be same as user outputs num!"));
+
+    // because of aten ask rank must be same when call atencopy
+    for (int i = 0; i < split_outs.size(); i++) {
+      phi::DenseTensor& output = *(outs.at(i));
+      int32_t output_dims_size = output.dims().size() + 1;
+      int64_t new_dim = axis >= 0 ? axis : axis + output_dims_size;
+      auto dims_org = output.dims();
+      auto dims_vec = common::vectorize(dims_org);
+      dims_vec.insert(dims_vec.begin() + new_dim, 1);
+      output.Resize(phi::make_ddim(dims_vec));
+
+      auto out_tensor = CreateTopsatenTensor(output);
+      abstract_info = custom_kernel::GetAbstractInfo(
+          "Unstack_topsatenCopy", out_tensor, false);
+      LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenCopy,
+                                          dev_ctx,
+                                          abstract_info,
+                                          out_tensor,
+                                          split_outs[i],
+                                          false);
+      output.Resize(dims_org);
+    }
   } else {  // kernel impl base on JIT
     THROW_JIT_UNIMPLEMENTED();
   }
@@ -144,7 +202,65 @@ void UnbindKernel(const Context& dev_ctx,
     for (auto y : outs) {
       dev_ctx.template Alloc<T>(y);
     }
-    LAUNCH_TOPSCLOP(unstack, dev_ctx, &outs, x, axis)
+
+    const auto x_dims = x.dims();
+    const auto x_rank = x_dims.size();
+    axis = axis < 0 ? axis + x_rank : axis;
+
+    // check valid
+    // average divide if num_split has only one value
+    PADDLE_ENFORCE_GE(axis,
+                      0,
+                      phi::errors::InvalidArgument(
+                          "axis should be in [-%zu, %zu)!", x_rank, x_rank));
+    PADDLE_ENFORCE_GT(
+        x_dims.at(axis),
+        0,
+        phi::errors::InvalidArgument("axis should be greater than 0!"));
+    PADDLE_ENFORCE_EQ(
+        outs.size(),
+        x_dims.at(axis),
+        phi::errors::InvalidArgument(
+            "outputs num[%zu] should be same as val's %dth dim[%ld]!",
+            outs.size(),
+            axis,
+            x_dims.at(axis)));
+
+    phi::DenseTensor as_strides_out;
+    auto x_tensor = CreateTopsatenTensor(x);
+    std::vector<topsatenTensor> split_outs;
+    std::string abstract_info =
+        custom_kernel::GetAbstractInfo("Unbind_topsatenSplit", x, axis);
+    LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(
+        topsatenSplit, dev_ctx, abstract_info, split_outs, x_tensor, 1, axis);
+
+    PADDLE_ENFORCE_EQ(
+        split_outs.size(),
+        outs.size(),
+        phi::errors::InvalidArgument(
+            "aten split outputs num should be same as user outputs num!"));
+
+    // because of aten ask rank must be same when call atencopy
+    for (int i = 0; i < split_outs.size(); i++) {
+      phi::DenseTensor& output = *(outs.at(i));
+      int32_t output_dims_size = output.dims().size() + 1;
+      int64_t new_dim = axis >= 0 ? axis : axis + output_dims_size;
+      auto dims_org = output.dims();
+      auto dims_vec = common::vectorize(dims_org);
+      dims_vec.insert(dims_vec.begin() + new_dim, 1);
+      output.Resize(phi::make_ddim(dims_vec));
+
+      auto out_tensor = CreateTopsatenTensor(output);
+      abstract_info = custom_kernel::GetAbstractInfo(
+          "Unbind_topsatenCopy", out_tensor, false);
+      LAUNCH_TOPSATENOP_WITH_RAW_ATEN_DEF(topsatenCopy,
+                                          dev_ctx,
+                                          abstract_info,
+                                          out_tensor,
+                                          split_outs[i],
+                                          false);
+      output.Resize(dims_org);
+    }
   } else {  // kernel impl base on JIT
     THROW_JIT_UNIMPLEMENTED();
   }

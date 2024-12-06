@@ -17,29 +17,7 @@ cmake_minimum_required(VERSION 3.10)
 project(paddle-custom-gcu CXX C)
 set(CUSTOM_GCU_NAME "paddle-custom-gcu")
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-message(STATUS "CMAKE_DEBUG CMAKE_MODULE_PATH is: ${CMAKE_MODULE_PATH}")
-option(VERSION_WITH_GIT "Use git hash to PACKAGE_VERSION" FALSE)
-
-set(TOPS_RELEASE_VERSION 3.1.0)
-if((NOT DEFINED PACKAGE_VERSION)
-   OR ("${PACKAGE_VERSION}" STREQUAL "")
-   OR ("${PACKAGE_VERSION}" STREQUAL "123.456"))
-  if(VERSION_WITH_GIT)
-    # get Paddle-custom git hash
-    execute_process(
-      COMMAND git log -1 --abbrev=7 --format=%h
-      WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
-      OUTPUT_VARIABLE _tag
-      OUTPUT_STRIP_TRAILING_WHITESPACE)
-    message(STATUS "git hash: ${_tag}")
-  else()
-    string(TIMESTAMP _tag "%Y%m%d")
-  endif()
-  set(PACKAGE_VERSION ${TOPS_RELEASE_VERSION}.${_tag})
-endif()
-
-message(STATUS "package version: ${PACKAGE_VERSION}")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 if(DEFINED PY_VERSION)
   message(STATUS "User define PY_VERSION: ${PY_VERSION}")
@@ -51,22 +29,15 @@ set(PYTHON_VERSION ${PY_VERSION})
 set(Python_EXECUTABLE "python${PY_VERSION}")
 message(STATUS "Python_EXECUTABLE: ${Python_EXECUTABLE}")
 
-if(NOT DEFINED ENV{PADDLE_VERSION})
-  set(ENV{PADDLE_VERSION} 3.0.0-beta1)
-endif()
-
 include(paddle)
 include(version)
 include(generic)
 include(external/gcu)
 include(external/topscc)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_SOURCE_DIR})
 include_directories(/opt/tops/include)
 
-set(OUTPUT_PADDLE_PACKAGE_VERSION ${PADDLE_VERSION}+${PACKAGE_VERSION})
-string(REPLACE "-beta" "b" OUTPUT_PADDLE_PACKAGE_VERSION
-               "${OUTPUT_PADDLE_PACKAGE_VERSION}")
 option(WITH_KERNELS "compile with custom kernels" ON)
 option(WITH_TESTING "compile with unit testing" OFF)
 option(WITH_MKL "compile with mkl support" ON)
@@ -205,13 +176,10 @@ message(STATUS "Git commit id is: ${GIT_HASH}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in
                ${CMAKE_CURRENT_BINARY_DIR}/setup.py)
 
-message(STATUS "CMAKE_DEBUG Git commit id is: ${GIT_HASH}")
-message(STATUS "CMAKE_DEBUG CUSTOM_GCU_SRCS is: ${CUSTOM_GCU_SRCS}")
-message(STATUS "CMAKE_DEBUG GCU_LIBS is: ${GCU_LIBS}")
-
+# packing wheel package
 add_custom_command(
-  OUTPUT
-    ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/lib${CUSTOM_GCU_NAME}.so
+  TARGET ${CUSTOM_GCU_NAME}
+  POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_CURRENT_BINARY_DIR}/python/
   COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/python/
   COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -220,16 +188,13 @@ add_custom_command(
     ${CMAKE_COMMAND} -E copy_if_different
     ${CMAKE_CURRENT_BINARY_DIR}/lib${CUSTOM_GCU_NAME}.so
     ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/
-  COMMENT "Creating custom device directories------>>>"
-  DEPENDS ${CUSTOM_GCU_NAME})
-add_custom_target(
-  CUSTOM_GCU_NAME_shared_lib_copy ALL
-  DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/lib${CUSTOM_GCU_NAME}.so
-)
+  COMMENT "Creating custom device directories------>>>")
 
 set(topscc_kernel_lib_targets "")
 unset(topscc_kernel_lib_targets)
+set(_passes_target_dir
+    "${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu")
+file(MAKE_DIRECTORY ${_passes_target_dir})
 foreach(topscc_kernel_lib ${TOPSCC_LIBS})
   get_filename_component(topscc_kernel_lib_name ${topscc_kernel_lib} NAME_WLE)
   get_filename_component(topscc_kernel_lib_target_name ${topscc_kernel_lib}
@@ -250,29 +215,17 @@ foreach(topscc_kernel_lib ${TOPSCC_LIBS})
 endforeach()
 add_custom_target(topscc_targets ALL DEPENDS ${topscc_kernel_lib_targets})
 
-set(whl_file
-    "${CMAKE_CURRENT_BINARY_DIR}/dist/paddle_custom_gcu-${OUTPUT_PADDLE_PACKAGE_VERSION}-cp${PY_VERSION_NO_DOT}-cp${PY_VERSION_NO_DOT}-linux_x86_64.whl"
-)
-set(_passes_target_dir
-    "${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes")
-file(MAKE_DIRECTORY ${_passes_target_dir})
-file(GLOB passes_srcs "${CMAKE_CURRENT_SOURCE_DIR}/passes/*")
-foreach(passes_src IN LISTS passes_srcs)
-  get_filename_component(passes_file_name ${passes_src} NAME)
-  add_custom_command(
-    OUTPUT ${_passes_target_dir}/${passes_file_name}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${passes_src}
-            ${_passes_target_dir}
-    DEPENDS ${passes_src})
-  list(APPEND passes_bin_files_list "${_passes_target_dir}/${passes_file_name}")
-endforeach()
 add_custom_command(
-  OUTPUT ${whl_file}
+  OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/python/.timestamp
+  COMMAND ${CMAKE_COMMAND} -E remove -f
+          ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes
+  COMMAND ${CMAKE_COMMAND} -E make_directory
+          ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/passes/*
+          ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes
   COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py bdist_wheel
-  # COMMAND rename 's/_${TOPS_RELEASE_VERSION}/-${TOPS_RELEASE_VERSION}/g'
-  # ${CMAKE_CURRENT_BINARY_DIR}/dist/*.whl
-  DEPENDS ${CUSTOM_GCU_NAME} CUSTOM_GCU_NAME_shared_lib_copy topscc_targets
-          ${CMAKE_CURRENT_BINARY_DIR}/setup.py ${passes_bin_files_list}
+  DEPENDS ${CUSTOM_GCU_NAME}
   COMMENT "Packing whl packages------>>>")
 
-add_custom_target(python_package ALL DEPENDS ${whl_file})
+add_custom_target(python_package ALL
+                  DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/python/.timestamp)

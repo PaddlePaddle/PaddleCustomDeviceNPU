@@ -18,7 +18,8 @@ import unittest
 
 import numpy as np
 import paddle
-from tests.op_test import OpTest
+from tests.op_test import OpTest, convert_float_to_uint16
+from npu_utils import check_soc_version
 
 paddle.enable_static()
 
@@ -83,6 +84,51 @@ class TestCaseDouble(TestTakeAlongAxisOp):
 
     def test_check_grad(self):
         self.check_grad_with_place(self.place, ["Input"], "Result")
+
+
+class TestCaseFloat16(TestTakeAlongAxisOp):
+    def init_data(self):
+        self.x_type = np.float16
+        self.x_shape = (5, 5, 5)
+        self.index_type = "int32"
+        self.index = np.array([[[0, 1, 2, 1, 4]]]).astype(self.index_type)
+        self.axis = 0
+        self.axis_type = "int64"
+
+
+class TestCaseBFloat16(TestTakeAlongAxisOp):
+    def setUp(self):
+        self.set_npu()
+        self.init_data()
+        self.op_type = "take_along_axis"
+        self.xnp = np.random.random(self.x_shape).astype(np.float32)
+        self.target = np.take_along_axis(self.xnp, self.index, self.axis)
+        broadcast_shape_list = list(self.x_shape)
+        broadcast_shape_list[self.axis] = 1
+        self.braodcast_shape = tuple(broadcast_shape_list)
+        self.index_broadcast = np.broadcast_to(self.index, self.braodcast_shape)
+        self.inputs = {
+            "Input": convert_float_to_uint16(self.xnp),
+            "Index": self.index_broadcast,
+        }
+        self.attrs = {"Axis": self.axis}
+        self.outputs = {"Result": convert_float_to_uint16(self.target)}
+
+    @check_soc_version
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+    @check_soc_version
+    def test_check_grad(self):
+        self.check_grad_with_place(self.place, ["Input"], "Result")
+
+    def init_data(self):
+        self.x_type = "bfloat16"
+        self.x_shape = (5, 5, 5)
+        self.index_type = "int32"
+        self.index = np.array([[[0, 1, 2, 1, 4]]]).astype(self.index_type)
+        self.axis = 0
+        self.axis_type = "int64"
 
 
 class TestTakeAlongAxisAPI(unittest.TestCase):

@@ -134,14 +134,17 @@ void MaskedSelectKernel(const Context& dev_ctx,
         dev_ctx, mask, phi::DataType::INT32, &mask_int32);
     mask_int32.Resize({mask_int32.numel()});
 
-    NpuOpRunner sum_runner;
-    sum_runner.SetType("ReduceSum");
-    sum_runner.AddInput(mask_int32);
-    sum_runner.AddInput(dev_ctx, std::vector<int32_t>(1, 0));
-    sum_runner.AddOutput(out_size);
-    sum_runner.AddAttr("keep_dims", false);
-    sum_runner.Run(stream);
+    auto dim_vec_acl = std::vector<int64_t>(1, 0);
+    bool keep_dim = false;
+    int aclDtype = ConvertToNpuDtype(out_size.dtype());
 
+    EXEC_NPU_CMD(aclnnReduceSum,
+                 dev_ctx,
+                 mask_int32,
+                 dim_vec_acl,
+                 keep_dim,
+                 aclDtype,
+                 out_size);
     TensorToVector(dev_ctx, out_size, dev_ctx, &out_size_vec);
   }
 
@@ -149,11 +152,11 @@ void MaskedSelectKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void MaskedSelectGradKernel(const Context& dev_ctx,
-                            const phi::DenseTensor& x,
-                            const phi::DenseTensor& mask,
-                            const phi::DenseTensor& out_grad,
-                            phi::DenseTensor* x_grad) {
+void AclopMaskedSelectGradKernel(const Context& dev_ctx,
+                                 const phi::DenseTensor& x,
+                                 const phi::DenseTensor& mask,
+                                 const phi::DenseTensor& out_grad,
+                                 phi::DenseTensor* x_grad) {
   dev_ctx.template Alloc<T>(x_grad);
 
   auto stream = dev_ctx.stream();
@@ -225,6 +228,71 @@ void MaskedSelectGradKernel(const Context& dev_ctx,
   }
 }
 
+template <typename T, typename Context>
+void MaskedSelectGradKernel(const Context& dev_ctx,
+                            const phi::DenseTensor& x,
+                            const phi::DenseTensor& mask,
+                            const phi::DenseTensor& out_grad,
+                            phi::DenseTensor* x_grad) {
+  DO_COMPATIBILITY(aclnnTopk,
+                   (custom_kernel::AclopMaskedSelectGradKernel<T, Context>(
+                       dev_ctx, x, mask, out_grad, x_grad)));
+  dev_ctx.template Alloc<T>(x_grad);
+
+  phi::DenseTensor mask_int64;
+  mask_int64.Resize(mask.dims());
+  dev_ctx.template Alloc<int64_t>(&mask_int64);
+  custom_kernel::CastKernel<T, Context>(
+      dev_ctx, mask, phi::DataType::INT64, &mask_int64);
+  mask_int64.Resize({mask_int64.numel()});
+
+  int64_t k = out_grad.numel();
+  int64_t dim = 0;
+  bool true_value = true;
+  bool false_value = false;
+
+  phi::DenseTensor topkv2_out;
+  phi::DenseTensor indices;
+  topkv2_out.Resize({k});
+  indices.Resize({k});
+  dev_ctx.template Alloc<int64_t>(&topkv2_out);
+  dev_ctx.template Alloc<int64_t>(&indices);
+
+  EXEC_NPU_CMD(aclnnTopk,
+               dev_ctx,
+               mask_int64,
+               k,
+               dim,
+               true_value,
+               false_value,
+               topkv2_out,
+               indices);
+
+  EXEC_NPU_CMD(aclnnTopk,
+               dev_ctx,
+               indices,
+               k,
+               dim,
+               false_value,
+               true_value,
+               topkv2_out,
+               indices);
+
+  topkv2_out.Resize({k, 1});
+  x_grad->Resize({x_grad->numel()});
+
+  auto stream = dev_ctx.stream();
+  NpuOpRunner scatter_runner;
+  scatter_runner.SetType("ScatterNd");
+  scatter_runner.AddInput(topkv2_out);
+  scatter_runner.AddInput(out_grad);
+  scatter_runner.AddInput(
+      dev_ctx, std::vector<int32_t>(1, static_cast<int32_t>(x_grad->numel())));
+  scatter_runner.AddOutput(*x_grad);
+  scatter_runner.Run(stream);
+
+  x_grad->Resize(mask.dims());
+}
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(masked_select,

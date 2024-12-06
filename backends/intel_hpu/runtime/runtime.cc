@@ -240,6 +240,9 @@ class RuntimeManager {
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synStreamSynchronize(stream_h2d) failed = %d",
                status);
+      status = synHostUnmap(device->id, src);
+      LOG_IF(ERROR, status != synSuccess)
+          << "[RUNTIME] synHostUnmap() failed = " << status;
 
     } else if (flag == 1) {
       if (stream_d2h == nullptr) {
@@ -264,6 +267,9 @@ class RuntimeManager {
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synStreamSynchronize() failed = %d",
                status);
+      status = synHostUnmap(device->id, dst);
+      LOG_IF(ERROR, status != synSuccess)
+          << "[RUNTIME] synHostUnmap() failed = " << status;
 
     } else if (flag == 2) {
       if (stream_d2d == nullptr) {
@@ -392,8 +398,9 @@ class RuntimeManager {
       // not found, map and cache
       status = synHostMap(device->id, size, ptr);
       LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synHostMap() failed = " << status;
-      hostMappedAddress[ptr] = size;
+          << "[RUNTIME] synHostMap() failed = " << status << " ptr=" << ptr
+          << " size=" << size;
+      // hostMappedAddress[ptr] = size;
     } else {
       if (it->second != size) {
         // found but size not equal
@@ -405,7 +412,7 @@ class RuntimeManager {
         status = synHostMap(device->id, size, ptr);
         LOG_IF(ERROR, status != synSuccess)
             << "[RUNTIME] synHostMap() failed = " << status;
-        hostMappedAddress[ptr] = size;
+        // hostMappedAddress[ptr] = size;
       }
     }
   }
@@ -460,6 +467,24 @@ class RuntimeManager {
     return C_SUCCESS;
   }
 
+  bool profileHabana() {
+    auto env = std::getenv("HABANA_PROFILE");
+    return (env != nullptr) && (std::string_view(env) != "0");
+  }
+
+  void initParser() {
+    uint64_t hpu_start_time_ns;
+    synProfilerGetCurrentTimeNS(&hpu_start_time_ns);
+    parser = std::make_unique<HpuTraceParser>(hpu_start_time_ns);
+  }
+
+  void exportTrace(C_Profiler prof,
+                   synTraceEvent *events_ptr,
+                   size_t num_events,
+                   uint64_t start_ns) {
+    parser->Export(prof, events_ptr, num_events - 1, start_ns);
+  }
+
  private:
   synModuleId moduleID = 0;
   std::string busID = "";
@@ -480,6 +505,9 @@ class RuntimeManager {
 
   // cache
   std::unordered_map<const void *, size_t> hostMappedAddress;
+
+  // trace parser
+  std::unique_ptr<HpuTraceParser> parser;
 };
 
 static RuntimeManager runtimeManager;
@@ -607,7 +635,7 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
       status == synSuccess, "[RUNTIME] synDeviceMalloc() failed = %d", status);
   *ptr = reinterpret_cast<void *>(p);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-      << "device id = " << runtimeManager.GetDeviceID()
+      << "allocate device mem device id = " << runtimeManager.GetDeviceID()
       << " malloc ptr=" << *ptr << " size=" << size;
 
   return C_SUCCESS;
@@ -615,11 +643,11 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
 
 C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-      << "device id=" << runtimeManager.GetDeviceID() << " free ptr = " << ptr
-      << " size=" << size;
+      << "deallcate device mem device id=" << runtimeManager.GetDeviceID()
+      << " free ptr = " << ptr << " size=" << size;
 
   synStatus status = synDeviceFree(
-      runtimeManager.GetDeviceID(), *reinterpret_cast<uint64_t *>(ptr), 0);
+      runtimeManager.GetDeviceID(), reinterpret_cast<uint64_t>(ptr), 0);
 
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synDeviceFree() failed = %d", status);
@@ -630,6 +658,10 @@ C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
 C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
   synStatus status = synHostMalloc(runtimeManager.GetDeviceID(), size, 0, ptr);
 
+  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+      << "allocate host mem device id=" << runtimeManager.GetDeviceID()
+      << " ptr = " << ptr << " size=" << size;
+
   PD_CHECK(
       status == synSuccess, "[RUNTIME] synHostMalloc() failed = %d", status);
 
@@ -638,6 +670,11 @@ C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
 
 C_Status Deallocate_host(const C_Device device, void *ptr, size_t size) {
   synStatus status = synHostFree(runtimeManager.GetDeviceID(), ptr, 0);
+  LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+      << "deallocate host mem "
+      << "device id=" << runtimeManager.GetDeviceID() << " ptr = " << ptr
+      << " size=" << size;
+
   PD_CHECK(status == synSuccess, "[RUNTIME] synHostFree() failed = %d", status);
 
   return C_SUCCESS;
@@ -652,7 +689,7 @@ C_Status CreateStream(const C_Device device, C_Stream *stream) {
 C_Status DestroyStream(const C_Device device, C_Stream stream) {
   runtimeManager.DestroyStream(device, stream);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
-      << "device id=" << device->id << " stream=" << stream;
+      << "destroy stream device id=" << device->id << " stream=" << stream;
 
   return C_SUCCESS;
 }
@@ -762,7 +799,14 @@ C_Status DeviceMemStats(const C_Device device,
 }
 
 C_Status DeviceMinChunkSize(const C_Device device, size_t *size) {
-  *size = 1;
+  synDeviceAttribute attribute = DEVICE_ATTRIBUTE_ADDRESS_ALIGNMENT_SIZE;
+  uint64_t constValues = 0;
+  synStatus status =
+      synDeviceTypeGetAttribute(&constValues, &attribute, 1, synDeviceGaudi2);
+  PD_CHECK(status == synSuccess,
+           "[RUNTIME] synDeviceTypeGetAttribute() failed = ",
+           status);
+  *size = constValues;
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "min chunksize=" << *size;
 
   return C_SUCCESS;
@@ -930,21 +974,44 @@ C_Status ProfilerFinalize(C_Profiler prof, void *user_data) {
 C_Status ProfilerPrepare(C_Profiler prof, void *user_data) { return C_SUCCESS; }
 
 C_Status ProfilerStart(C_Profiler prof, void *user_data) {
-  // auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
-  // synStatus status = synProfilerStart(type, runtimeManager.GetDeviceID());
-  // PD_CHECK(status == synSuccess,
-  //          "[RUNTIME] start intel hpu profiling failed  = %d",
-  //          status);
+  if (runtimeManager.profileHabana()) {
+    uint32_t bytes_req = 0;
+    synStatus status = synProfilerQueryRequiredMemory(0, &bytes_req);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] query required memory of intel hpu profiler failed  = ",
+             status);
+    if (bytes_req > 0) {
+      uint64_t data_ptr{0};
+      synStatus status = synDeviceMalloc(0, bytes_req, 0, 0, &data_ptr);
+      PD_CHECK(status == synSuccess,
+               "[RUNTIME] allocate intel hpu profiler user buffer failed  = %d",
+               status);
+      status = synProfilerSetUserBuffer(0, reinterpret_cast<void *>(data_ptr));
+      PD_CHECK(status == synSuccess,
+               "[RUNTIME] set intel hpu profiler user buffer failed  = %d",
+               status);
+    }
+
+    auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
+    status = synProfilerStart(type, 0);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] start intel hpu profiling failed  = %d",
+             status);
+
+    runtimeManager.initParser();
+  }
 
   return C_SUCCESS;
 }
 
 C_Status ProfilerStop(C_Profiler prof, void *user_data) {
-  // auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
-  // synStatus status = synProfilerStop(type, runtimeManager.GetDeviceID());
-  // PD_CHECK(status == synSuccess,
-  //          "[RUNTIME] stop intel hpu profiling failed  = %d",
-  //          status);
+  if (runtimeManager.profileHabana()) {
+    auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
+    synStatus status = synProfilerStop(type, 0);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] stop intel hpu profiling failed  = %d",
+             status);
+  }
 
   return C_SUCCESS;
 }
@@ -952,6 +1019,26 @@ C_Status ProfilerStop(C_Profiler prof, void *user_data) {
 C_Status ProfilerCollectData(C_Profiler prof,
                              uint64_t start_ns,
                              void *user_data) {
+  if (runtimeManager.profileHabana()) {
+    size_t size, count;
+    auto status = synProfilerGetTrace(
+        synTraceAll, 0, synTraceFormatTEF, nullptr, &size, &count);
+    PD_CHECK(
+        status == synSuccess,
+        "[RUNTIME] get intel hpu profiler trace size and count failed  = %d",
+        status);
+
+    auto events = std::make_unique<unsigned char[]>(size);
+    status = synProfilerGetTrace(
+        synTraceAll, 0, synTraceFormatTEF, events.get(), &size, &count);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] get intel hpu profiler trace content  = %d",
+             status);
+
+    runtimeManager.exportTrace(
+        prof, reinterpret_cast<synTraceEvent *>(events.get()), count, start_ns);
+  }
+
   return C_SUCCESS;
 }
 

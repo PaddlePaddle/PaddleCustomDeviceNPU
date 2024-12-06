@@ -48,12 +48,13 @@ void MomentumKernel(const Context& dev_ctx,
     regularized_grad.Resize(grad.dims());
     dev_ctx.template Alloc<T>(&regularized_grad);
 
-    const auto& runner1 = NpuOpRunner(
-        "Muls", {param}, {regularized_grad}, {{"value", regularization_coeff}});
-    runner1.Run(dev_ctx.stream());
-    const auto& runner2 =
-        NpuOpRunner("Add", {regularized_grad, grad}, {regularized_grad}, {});
-    runner2.Run(dev_ctx.stream());
+    phi::Scalar regularization_coeff_scalar = regularization_coeff;
+    EXEC_NPU_CMD(aclnnAdd,
+                 dev_ctx,
+                 grad,
+                 param,
+                 regularization_coeff_scalar,
+                 regularized_grad);
   } else {
     regularized_grad = grad;
   }

@@ -39,14 +39,15 @@ void *GcuDataPtr(const phi::DenseTensor &tensor) {
 
 std::string TensorToString(const phi::DenseTensor &tensor) {
   std::stringstream ss;
-  ss << "LoDTensor<";
+  ss << "DenseTensor<";
+  ss << phi::DataTypeToString(tensor.dtype()) << ", ";
+  ss << "Shape(" << tensor.dims() << "), ";
+  ss << "layout:" << tensor.layout() << ", ";
   if (tensor.initialized()) {
-    ss << phi::DataTypeToString(tensor.dtype()) << ", ";
     ss << tensor.place() << ", ";
-    ss << "Shape(" << tensor.dims() << "), ";
-    ss << "layout:" << tensor.layout();
+    ss << "data:" << GcuDataPtr(tensor);
   } else {
-    ss << "NOT_INITED";
+    ss << "data: NOT_INITED";
   }
   ss << ">";
   return ss.str();
@@ -69,7 +70,7 @@ std::string TensorVectorToString(const std::vector<phi::DenseTensor> &tensors) {
 
 std::string TensorDetailsToString(const phi::DenseTensor &tensor) {
   std::stringstream ss;
-  ss << "LoDTensor<";
+  ss << "DenseTensor<";
   if (tensor.initialized()) {
     ss << phi::DataTypeToString(tensor.dtype()) << ", ";
     ss << tensor.place() << ", ";

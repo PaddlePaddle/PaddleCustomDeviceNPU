@@ -19,16 +19,22 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void SetTensorValueNPUImplKernel(const Context& dev_ctx,
-                                 const phi::DenseTensor& x,
-                                 const phi::DenseTensor& value,
-                                 const phi::IntArray& starts,
-                                 const phi::IntArray& ends,
-                                 const phi::IntArray& steps,
-                                 const std::vector<int64_t>& axes,
-                                 const std::vector<int64_t>& decrease_axes,
-                                 const std::vector<int64_t>& none_axes,
-                                 phi::DenseTensor* out) {
+void CastKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                phi::DataType dtype,
+                phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void AclopSetTensorValueNPUImplKernel(const Context& dev_ctx,
+                                      const phi::DenseTensor& x,
+                                      const phi::DenseTensor& value,
+                                      const phi::IntArray& starts,
+                                      const phi::IntArray& ends,
+                                      const phi::IntArray& steps,
+                                      const std::vector<int64_t>& axes,
+                                      const std::vector<int64_t>& decrease_axes,
+                                      const std::vector<int64_t>& none_axes,
+                                      phi::DenseTensor* out) {
   auto stream = dev_ctx.stream();
   auto in_dims = x.dims();
   // Unsqueeze and Pad x in the last dim from 1 to 8/16.
@@ -233,6 +239,226 @@ void SetTensorValueNPUImplKernel(const Context& dev_ctx,
       .AddOutput(*out)
       .Run(stream);
 
+  out->Resize(in_dims);
+}
+
+template <typename T, typename Context>
+void SetTensorValueNPUImplKernel(const Context& dev_ctx,
+                                 const phi::DenseTensor& x,
+                                 const phi::DenseTensor& value,
+                                 const phi::IntArray& starts,
+                                 const phi::IntArray& ends,
+                                 const phi::IntArray& steps,
+                                 const std::vector<int64_t>& axes,
+                                 const std::vector<int64_t>& decrease_axes,
+                                 const std::vector<int64_t>& none_axes,
+                                 phi::DenseTensor* out) {
+  DO_COMPATIBILITY(aclnnStridedSliceAssignV2,
+                   (custom_kernel::AclopSetTensorValueNPUImplKernel<T, Context>(
+                       dev_ctx,
+                       x,
+                       value,
+                       starts,
+                       ends,
+                       steps,
+                       axes,
+                       decrease_axes,
+                       none_axes,
+                       out)));
+
+  auto stream = dev_ctx.stream();
+  auto in_dims = x.dims();
+  // Unsqueeze and Pad x in the last dim from 1 to 8/16.
+  // StridedSliceAssign op only support the last dim of
+  // the input greater than 8 for 4 bytes input and 16
+  // for 8 bytes input.
+  std::vector<int64_t> in_dims_arr = phi::vectorize<int64_t>(x.dims());
+  std::vector<int64_t> pad_in_dims_arr = phi::vectorize<int64_t>(x.dims());
+
+  in_dims_arr.push_back(1);
+#if (CANN_VERSION_CODE >= 700000)
+  if (x.dtype() == phi::DataType::FLOAT16) {
+    pad_in_dims_arr.push_back(16);
+  } else {
+    pad_in_dims_arr.push_back(8);
+  }
+#else
+  pad_in_dims_arr.push_back(8);
+#endif
+
+  phi::DenseTensor x_tmp(x);
+  x_tmp.Resize(phi::make_ddim(in_dims_arr));
+  phi::DenseTensor pad_last_dim_x;
+  pad_last_dim_x.Resize(phi::make_ddim(pad_in_dims_arr));
+  dev_ctx.template Alloc<T>(&pad_last_dim_x);
+  EXEC_NPU_CMD(aclnnExpand, dev_ctx, x_tmp, pad_in_dims_arr, pad_last_dim_x);
+
+  std::vector<int64_t> starts_local = starts.GetData();
+  std::vector<int64_t> ends_local = ends.GetData();
+  std::vector<int64_t> steps_local = steps.GetData();
+  custom_kernel::CheckAndUpdateSliceAttrs(
+      in_dims, axes, &starts_local, &ends_local, &steps_local);
+  auto slice_dims = custom_kernel::GetSliceDims(
+      in_dims, axes, starts_local, ends_local, &steps_local);
+  auto decrease_slice_dims =
+      custom_kernel::GetDecreasedDims(slice_dims, decrease_axes);
+  auto slice_dims_for_assign = decrease_slice_dims;
+
+  if (!none_axes.empty()) {
+    std::vector<int64_t> slice_dims_with_none;
+
+    size_t none_axes_cur = 0, decrease_axes_cur = 0;
+    for (int i = 0; i < slice_dims.size(); ++i) {
+      while (none_axes_cur < none_axes.size() &&
+             none_axes[none_axes_cur] <= i) {
+        slice_dims_with_none.push_back(1);
+        none_axes_cur++;
+      }
+      if (decrease_axes_cur < decrease_axes.size() &&
+          decrease_axes[decrease_axes_cur] == i) {
+        decrease_axes_cur++;
+      } else {
+        slice_dims_with_none.push_back(slice_dims[i]);
+      }
+    }
+    while (none_axes_cur < none_axes.size()) {
+      slice_dims_with_none.push_back(1);
+      none_axes_cur++;
+    }
+
+    slice_dims_for_assign = phi::make_ddim(slice_dims_with_none);
+  }
+
+  auto starts_indices = std::vector<int64_t>(in_dims.size(), 0);
+  auto ends_indices = std::vector<int64_t>(in_dims.size(), 0);
+  auto strides_indices = std::vector<int64_t>(in_dims.size(), 0);
+  std::vector<int64_t> flip_axis;
+
+  for (int i = 0; i < in_dims.size(); ++i) {
+    starts_indices[i] = 0;
+    ends_indices[i] = slice_dims[i];
+    strides_indices[i] = 1;
+  }
+  for (size_t i = 0; i < axes.size(); i++) {
+    int axis_index = axes[i];
+    starts_indices[axis_index] = starts_local[i];
+    ends_indices[axis_index] = ends_local[i];
+    strides_indices[axis_index] = steps_local[i];
+  }
+
+  // Because StridedSliceAssign does not support the case
+  // of stride < 0 temporarily, the coordinates of
+  // starts_indices, ends_indices and strides_indices
+  // need to be converted.
+  bool need_flip = false;
+  for (size_t i = 0; i < in_dims.size(); ++i) {
+    if (strides_indices[i] < 0) {
+      if (!need_flip) {
+        need_flip = true;
+      }
+      flip_axis.push_back(i);
+      strides_indices[i] = strides_indices[i] * (-1);
+      ends_indices[i] = starts_indices[i] + 1;
+      starts_indices[i] =
+          starts_indices[i] - (slice_dims[i] - 1) * strides_indices[i];
+    }
+  }
+
+  phi::DenseTensor value_temp;
+  if (slice_dims_for_assign == value.dims() ||
+      slice_dims_for_assign.size() == 0) {
+    value_temp = value;
+  } else {
+    value_temp.Resize(slice_dims_for_assign);
+    dev_ctx.template Alloc<T>(&value_temp);
+
+    std::vector<int64_t> slice_dims_int64 =
+        phi::vectorize(slice_dims_for_assign);
+    EXEC_NPU_CMD(aclnnExpand, dev_ctx, value, slice_dims_int64, value_temp);
+  }
+
+  phi::DenseTensor reverse_value;
+  if (need_flip) {
+    reverse_value.Resize(value_temp.dims());
+    dev_ctx.template Alloc<T>(&reverse_value);
+    EXEC_NPU_CMD(aclnnFlip, dev_ctx, value_temp, flip_axis, reverse_value);
+  } else {
+    reverse_value = value_temp;
+  }
+
+  // Add last dim for index
+  starts_indices.push_back(0);
+#if (CANN_VERSION_CODE >= 700000)
+  if (x.dtype() == phi::DataType::FLOAT16) {
+    ends_indices.push_back(16);
+  } else {
+    ends_indices.push_back(8);
+  }
+#else
+  ends_indices.push_back(8);
+#endif
+  strides_indices.push_back(1);
+
+  // Broadcast value;
+  phi::DenseTensor value_brd;
+
+  auto slice_dims_brd = phi::vectorize<int64_t>({});
+  for (int64_t i = 0; i < starts_indices.size(); ++i) {
+    float end_v = static_cast<float>(ends_indices[i]);
+    float starts_v = static_cast<float>(starts_indices[i]);
+    float strides_v = static_cast<float>(strides_indices[i]);
+    int dim_v = std::ceil((end_v - starts_v) / strides_v);
+
+    if (i == 0) {
+      slice_dims_brd[i] = dim_v;
+    } else {
+      slice_dims_brd.push_back(dim_v);
+    }
+  }
+
+  slice_dims_brd[slice_dims_brd.size() - 1] = 1;
+  reverse_value.Resize(phi::make_ddim(slice_dims_brd));
+
+#if (CANN_VERSION_CODE >= 700000)
+  if (x.dtype() == phi::DataType::FLOAT16) {
+    slice_dims_brd[slice_dims_brd.size() - 1] = 16;
+  } else {
+    slice_dims_brd[slice_dims_brd.size() - 1] = 8;
+  }
+#else
+  slice_dims_brd[slice_dims_brd.size() - 1] = 8;
+#endif
+
+  value_brd.Resize(phi::make_ddim(slice_dims_brd));
+  dev_ctx.template Alloc<T>(&value_brd);
+  EXEC_NPU_CMD(aclnnExpand, dev_ctx, reverse_value, slice_dims_brd, value_brd);
+
+  std::vector<int64_t> axes_optional(pad_last_dim_x.dims().size());
+  for (int64_t i = 0; i < pad_last_dim_x.dims().size(); ++i) {
+    axes_optional[i] = i;
+  }
+
+  EXEC_NPU_CMD(aclnnStridedSliceAssignV2,
+               dev_ctx,
+               pad_last_dim_x,
+               value_brd,
+               starts_indices,
+               ends_indices,
+               strides_indices,
+               axes_optional);
+
+  auto out_dims_arr = phi::vectorize(in_dims);
+  out_dims_arr.push_back(1);
+  out->Resize(phi::make_ddim(out_dims_arr));
+  dev_ctx.template Alloc<T>(out);
+
+  phi::DenseTensor zero;
+  phi::DenseTensorMeta meta = {phi::DataType::INT64, {1}};
+  zero.set_meta(meta);
+  dev_ctx.template Alloc<int64_t>(&zero);
+  EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, zero);
+  int64_t dim_last = static_cast<int64_t>(pad_last_dim_x.dims().size() - 1);
+  EXEC_NPU_CMD(aclnnGatherV2, dev_ctx, pad_last_dim_x, dim_last, zero, *out);
   out->Resize(in_dims);
 }
 

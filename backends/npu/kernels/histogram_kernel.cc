@@ -21,8 +21,8 @@ void HistogramKernel(const Context& dev_ctx,
                      const phi::DenseTensor& input,
                      const paddle::optional<phi::DenseTensor>& weight,
                      int64_t bins,
-                     int min,
-                     int max,
+                     float min,
+                     float max,
                      bool density,
                      phi::DenseTensor* output) {
   PADDLE_ENFORCE_EQ(

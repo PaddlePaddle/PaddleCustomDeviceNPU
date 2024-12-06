@@ -24,7 +24,7 @@ limitations under the License. */
 #include "paddle/phi/backends/custom/custom_context.h"
 #include "paddle/phi/core/dense_tensor.h"
 
-using LoDTensor = phi::DenseTensor;
+using DenseTensor = phi::DenseTensor;
 using DDim = phi::DDim;
 using DataType = phi::DataType;
 using DataLayout = phi::DataLayout;
@@ -46,8 +46,8 @@ class SingleOpGcuExecutor {
   SingleOpGcuExecutor& operator=(const SingleOpGcuExecutor& exec) = default;
   void ReleaseResource();
   void RunGcuOp(const phi::CustomContext* device_context,
-                const std::vector<LoDTensor*>& inputs,
-                const std::vector<LoDTensor*>& outputs,
+                const std::vector<DenseTensor*>& inputs,
+                const std::vector<DenseTensor*>& outputs,
                 bool tensor_split);
 
  private:

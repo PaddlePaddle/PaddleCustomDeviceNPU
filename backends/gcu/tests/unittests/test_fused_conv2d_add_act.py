@@ -18,7 +18,6 @@ import unittest
 from ddt import ddt, data, unpack
 from api_base import TestAPIBase
 from paddle import base
-from paddle.base.layer_helper import LayerHelper
 
 # The table retains its original format for better comparison of parameter settings.
 # fmt: off
@@ -56,6 +55,7 @@ class TestConvAddAct(TestAPIBase):
         self.dtype = np.float32
         self.stride = [1, 1]
         self.padding = [0, 0]
+        self.padding_algorithm = "EXPLICIT"
         self.dilation = [1, 1]
         self.groups = 1
         self.activation = "relu"
@@ -63,6 +63,11 @@ class TestConvAddAct(TestAPIBase):
         self.has_residual = False
         self.b_shape = [6]
         self.res_shape = [2, 3, 32, 32]
+
+        self.split_channels = []
+        self.exhaustive_search = False
+        self.workspace_size_MB = 512
+        self.fuse_alpha = 0
 
     def prepare_data(self):
         self.data_x = self.generate_data(self.x_shape, self.dtype)
@@ -73,13 +78,9 @@ class TestConvAddAct(TestAPIBase):
             if self.has_residual
             else None
         )
-        dtype = self.dtype if self.dtype != np.float16 else np.float32
-        self.prog, self.out_names = self.create_program(dtype)
 
     def forward(self):
-        return self.run_program(self.prog, base.CustomPlace("gcu", 0), self.out_names)[
-            0
-        ]
+        return self.run_program(base.CustomPlace("gcu", 0))[0]
 
     def conv2d_add_act_impl(self, dtype):
         paddle.set_device(NATIVE_IMPL_DEV)
@@ -119,69 +120,58 @@ class TestConvAddAct(TestAPIBase):
         paddle.seed(2036)
         np.random.seed(2036)
         paddle.enable_static()
-        with paddle.pir_utils.OldIrGuard():
-            startup_program = paddle.static.Program()
-            main_program = paddle.static.Program()
+        startup_program = paddle.static.Program()
+        main_program = paddle.static.Program()
 
-            with paddle.static.program_guard(main_program, startup_program):
-                attrs = {
-                    "strides": self.stride,
-                    "paddings": self.padding,
-                    "padding_algorithm": "EXPLICIT",
-                    "dilations": self.dilation,
-                    "groups": self.groups,
-                    "data_format": self.data_format,
-                    "activation": self.activation,
-                    "split_channels": [],
-                    "exhaustive_search": False,
-                    "workspace_size_MB": 512,
-                    "fuse_alpha": 0,
-                }
-                helper = LayerHelper("fused_conv2d_add_act")
-                x = helper.create_variable(
-                    name="Input", shape=self.x_shape, dtype=dtype
+        with paddle.static.program_guard(main_program, startup_program):
+            x = paddle.static.data(name="Input", shape=self.x_shape, dtype=dtype)
+            w = paddle.static.data(name="Filter", shape=self.w_shape, dtype=dtype)
+            b = paddle.static.data(name="Bias", shape=self.b_shape, dtype=dtype)
+            res = (
+                paddle.static.data(
+                    name="ResidualData", shape=self.res_shape, dtype=dtype
                 )
-                w = helper.create_variable(
-                    name="Filter", shape=self.w_shape, dtype=dtype
-                )
-                b = helper.create_variable(name="Bias", shape=self.b_shape, dtype=dtype)
-                res = helper.create_variable(
-                    name="ResidualData", shape=self.b_shape, dtype=dtype
-                )
-                out = helper.create_variable_for_type_inference(dtype=dtype)
-
-                inputs = (
-                    {"Input": x, "Filter": w, "Bias": b, "ResidualData": res}
-                    if self.has_residual
-                    else {"Input": x, "Filter": w, "Bias": b}
-                )
-                outputs = {"Output": out}
-                helper.append_op(
-                    type="fused_conv2d_add_act",
-                    inputs=inputs,
-                    outputs=outputs,
-                    attrs=attrs,
-                )
-            # print("DEBUG startup_program:{}".format(startup_program))
-            # print("DEBUG main_program:{}".format(main_program))
-            cpu_exe = base.Executor(place=base.CPUPlace())
-            cpu_exe.run(startup_program)
-        return main_program, out.name
-
-    def run_program(self, main_program, place, out_name):
-        paddle.enable_static()
-        with paddle.pir_utils.OldIrGuard():
-            exe = base.Executor(place=place)
-            x = self.data_x
-            w = self.data_w
-            b = self.data_b
-            res = self.data_res
-            feed = (
-                {"Input": x, "Filter": w, "Bias": b, "ResidualData": res}
                 if self.has_residual
-                else {"Input": x, "Filter": w, "Bias": b}
+                else None
             )
-            out = exe.run(main_program, feed=feed, fetch_list=[out_name])
+            out = paddle._C_ops.fused_conv2d_add_act(
+                x,
+                w,
+                b,
+                res,
+                self.stride,
+                self.padding,
+                self.padding_algorithm,
+                self.dilation,
+                self.groups,
+                self.data_format,
+                self.activation,
+                self.split_channels,
+                self.exhaustive_search,
+                self.workspace_size_MB,
+                self.fuse_alpha,
+            )
+        # print("DEBUG startup_program:{}".format(startup_program))
+        # print("DEBUG main_program:{}".format(main_program))
+        cpu_exe = base.Executor(place=base.CPUPlace())
+        cpu_exe.run(startup_program)
+        return main_program, out[0]
+
+    def run_program(self, place):
+        paddle.enable_static()
+        prog, out = self.create_program(self.dtype)
+        exe = base.Executor(place=place)
+        feed = (
+            {
+                "Input": self.data_x,
+                "Filter": self.data_w,
+                "Bias": self.data_b,
+                "ResidualData": self.data_res,
+            }
+            if self.has_residual
+            else {"Input": self.data_x, "Filter": self.data_w, "Bias": self.data_b}
+        )
+        out = exe.run(prog, feed=feed, fetch_list=[out])
         return out
 
     @data(*CONV_ADD_ACT_CASE)

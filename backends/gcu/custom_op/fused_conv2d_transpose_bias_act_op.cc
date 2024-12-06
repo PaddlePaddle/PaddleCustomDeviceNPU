@@ -36,6 +36,16 @@ void Conv2dTransposeBiasActKernel(const phi::CustomContext& dev_ctx,
   phi::DenseTensor filter_x = MaybeCreateOrTrans64To32bits(dev_ctx, filter);
   phi::DenseTensor output = MaybeCreateOrTrans64To32bits(dev_ctx, *out, false);
 
+  // update paddings and dilations according to padding_algorithm
+  std::vector<int> paddings_vec = paddings;
+  std::vector<int> dilations_vec = dilations;
+  custom_kernel::UpdatePaddingAndDilation(x.dims(),
+                                          filter.dims(),
+                                          padding_algorithm,
+                                          strides,
+                                          paddings_vec,
+                                          dilations_vec);
+
   if (EnableTransposeOptimize()) {
     PADDLE_ENFORCE_EQ(
         data_format,
@@ -70,13 +80,14 @@ void Conv2dTransposeBiasActKernel(const phi::CustomContext& dev_ctx,
   }
 
   std::vector<int64_t> strides_v = {strides.begin(), strides.end()};
-  std::vector<int64_t> paddings_v = {paddings.begin(), paddings.end()};
+  std::vector<int64_t> paddings_v = {paddings_vec.begin(), paddings_vec.end()};
   std::vector<int64_t> output_padding_v = {output_padding.begin(),
                                            output_padding.end()};
   if (output_padding_v.empty()) {
-    output_padding_v = paddings_v;
+    output_padding_v = std::vector<int64_t>({0, 0});
   }
-  std::vector<int64_t> dilations_v = {dilations.begin(), dilations.end()};
+  std::vector<int64_t> dilations_v = {dilations_vec.begin(),
+                                      dilations_vec.end()};
 
   int64_t groups_64 = groups;
   topsatenActivationMode_t act_mode = TOPSATEN_ACTIVATION_RELU;

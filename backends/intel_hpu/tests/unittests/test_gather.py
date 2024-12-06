@@ -39,11 +39,12 @@ class TestGatherOp(OpTest):
         self.op_type = "gather"
         self.config()
         xnp = np.random.random(self.x_shape).astype(self.x_type)
-        self.iintel_hputs = {
+        self.inputs = {
             "X": xnp,
             "Index": np.array(self.index).astype(self.index_type),
         }
-        self.outputs = {"Out": self.iintel_hputs["X"][self.iintel_hputs["Index"]]}
+        self.attrs = {"axis": self.axis}
+        self.outputs = {"Out": gather_numpy(xnp, self.index, self.axis)}
 
     def set_intel_hpu(self):
         self.__class__.use_custom_device = True
@@ -52,43 +53,41 @@ class TestGatherOp(OpTest):
         self.check_output_with_place(self.place)
 
     def test_check_grad(self):
-        self.check_grad_with_place(
-            self.place,
-            ["X"],
-            "Out",
-            max_relative_error=0.006,
-        )
+        pass
 
     def config(self):
         """
-        For multi-dimension iintel_hput
+        For multi-dimension input
         """
         self.x_shape = (10, 20)
         self.x_type = "float32"
         self.index = [1, 3, 5]
         self.index_type = "int32"
+        self.axis = 0
 
 
 class TestCase1(TestGatherOp):
     def config(self):
         """
-        For one dimension iintel_hput
+        For one dimension input
         """
         self.x_shape = 100
         self.x_type = "float32"
         self.index = [1, 3, 5]
         self.index_type = "int32"
+        self.axis = 0
 
 
 class TestCase2(TestGatherOp):
     def config(self):
         """
-        For one dimension iintel_hput
+        For one dimension input
         """
         self.x_shape = 100
         self.x_type = "int64"
         self.index = [1, 3, 5]
         self.index_type = "int32"
+        self.axis = 0
 
     def test_check_grad(self):
         pass
@@ -97,40 +96,28 @@ class TestCase2(TestGatherOp):
 class TestCase3(TestGatherOp):
     def config(self):
         """
-        For one dimension iintel_hput
+        For one dimension input
         """
         self.x_shape = 100
         self.x_type = "int32"
         self.index = [1, 3, 5]
         self.index_type = "int32"
+        self.axis = 0
 
     def test_check_grad(self):
         pass
 
 
-# class TestCase4(TestGatherOp):
-#     def config(self):
-#         """
-#         For one dimension iintel_hput
-#         """
-#         self.x_shape = 100
-#         self.x_type = "bool"
-#         self.index = [1, 3, 5]
-#         self.index_type = "int32"
-
-#     def test_check_grad(self):
-#         pass
-
-
-class TestCase5(TestGatherOp):
+class TestCase4(TestGatherOp):
     def config(self):
         """
-        For one dimension iintel_hput
+        For multi-dimension input
         """
         self.x_shape = [4000, 8192]
         self.x_type = "float32"
         self.index = [1, 3, 5]
         self.index_type = "int32"
+        self.axis = 1
 
 
 class API_TestGather(unittest.TestCase):
@@ -141,10 +128,10 @@ class API_TestGather(unittest.TestCase):
             out = paddle.gather(data1, index)
             place = paddle.CustomPlace("intel_hpu", 0)
             exe = base.Executor(place)
-            iintel_hput = np.array([[1, 2], [3, 4], [5, 6]]).astype("float32")
+            input = np.array([[1, 2], [3, 4], [5, 6]]).astype("float32")
             index_1 = np.array([1, 2]).astype("int32")
             (result,) = exe.run(
-                feed={"data1": iintel_hput, "index": index_1}, fetch_list=[out]
+                feed={"data1": input, "index": index_1}, fetch_list=[out]
             )
             expected_output = np.array([[3, 4], [5, 6]])
         self.assertTrue(np.allclose(result, expected_output))

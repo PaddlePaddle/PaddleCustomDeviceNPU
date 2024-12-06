@@ -268,7 +268,6 @@ function main() {
     pip install -e .
     paddlex --install PaddleClas
     paddlex --install PaddleSeg
-
     wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/cls_flowers_examples.tar -P ./dataset
     tar -xf ./dataset/cls_flowers_examples.tar -C ./dataset/
     wget -q https://paddle-model-ecology.bj.bcebos.com/paddlex/data/seg_optic_examples.tar -P ./dataset
@@ -284,8 +283,8 @@ function main() {
 
     python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
     -o Global.mode=predict \
-    -o Predict.model_dir="./resnet50_output/best_model" \
-    -o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_image_classification_001.jpg" \
+    -o Predict.model_dir="./resnet50_output/best_model/inference" \
+    -o Predict.input="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_image_classification_001.jpg" \
     -o Global.device="mlu:0"
     echo "End PaddleX ResNet50"
 
@@ -298,8 +297,8 @@ function main() {
 
     python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
     -o Global.mode=predict \
-    -o Predict.model_dir="./deeplabv3p_output/best_model/model/" \
-    -o Predict.input_path="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
+    -o Predict.model_dir="./deeplabv3p_output/best_model/inference" \
+    -o Predict.input="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
     -o Global.device="mlu:0"
     echo "End DeepLabv3"
 }

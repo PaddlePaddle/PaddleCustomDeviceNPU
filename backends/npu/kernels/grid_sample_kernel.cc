@@ -350,7 +350,7 @@ void GridSampleGradKernel(const Context& dev_ctx,
       if (find_it != paddlingModeMap.end()) {
         paddle_mode_to_int = find_it->second;
       }
-      EXEC_NPU_CMD(aclnnGridSamplerd3DBackward,
+      EXEC_NPU_CMD(aclnnGridSampler3DBackward,
                    dev_ctx,
                    out_grad,
                    x,
@@ -374,7 +374,7 @@ void GridSampleGradKernel(const Context& dev_ctx,
       if (find_it != paddlingModeMap.end()) {
         paddle_mode_to_int = find_it->second;
       }
-      EXEC_NPU_CMD(aclnnGridSamplerd3DBackward,
+      EXEC_NPU_CMD(aclnnGridSampler3DBackward,
                    dev_ctx,
                    out_grad,
                    x,

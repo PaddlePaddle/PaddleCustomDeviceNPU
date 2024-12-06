@@ -157,13 +157,9 @@ void AdamImplKernel(const Context& dev_ctx,
     phi::DenseTensor param_fp32;
     param_fp32.Resize(calc_param->dims());
     dev_ctx.template Alloc<MPDType>(&param_fp32);
-    const auto& cast_runner = NpuOpRunner(
-        "Cast",
-        {param},
-        {param_fp32},
-        {{"dst_type",
-          static_cast<int>(cpp_type_to_acl_dtype<MPDType>::value())}});
-    cast_runner.Run(stream);
+
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, param, param_fp32.dtype(), &param_fp32);
 
     const auto& runner = NpuOpRunner("ApplyAdamD",
                                      {

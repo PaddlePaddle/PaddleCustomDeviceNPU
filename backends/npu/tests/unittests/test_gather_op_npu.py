@@ -19,8 +19,8 @@ import unittest
 import numpy as np
 import paddle
 import paddle.base as base
-from tests.op_test import OpTest
-from npu_utils import check_run_big_shape_test
+from tests.op_test import OpTest, convert_float_to_uint16
+from npu_utils import check_run_big_shape_test, check_soc_version
 
 paddle.enable_static()
 SEED = 2021
@@ -128,6 +128,45 @@ class TestCase5(TestGatherOp):
         """
         self.x_shape = [4000, 8192]
         self.x_type = "float32"
+        self.index = [1, 3, 5]
+        self.index_type = "int32"
+
+
+class TestCase6(TestGatherOp):
+    def setUp(self):
+        self.set_npu()
+        self.place = paddle.CustomPlace("npu", 0)
+        self.op_type = "gather"
+        self.config()
+        xnp = np.random.random(self.x_shape).astype(np.float32)
+        self.inputs = {
+            "X": convert_float_to_uint16(xnp),
+            "Index": np.array(self.index).astype(self.index_type),
+        }
+        self.outputs = {"Out": convert_float_to_uint16(xnp[self.inputs["Index"]])}
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    @check_soc_version
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+    @check_soc_version
+    def test_check_grad(self):
+        self.check_grad_with_place(
+            self.place,
+            ["X"],
+            "Out",
+            max_relative_error=0.006,
+        )
+
+    def config(self):
+        """
+        For multi-dimension input
+        """
+        self.x_shape = (10, 20)
+        self.x_type = "bfloat16"
         self.index = [1, 3, 5]
         self.index_type = "int32"
 
