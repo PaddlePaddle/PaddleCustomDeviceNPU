@@ -234,12 +234,6 @@ inline void CheckAndUpdateSliceAttrs(const phi::DDim in_dims,
 
     if (dim_value > 0) {
       T step = steps == nullptr ? 1 : (*steps)[i];
-      PADDLE_ENFORCE_NE(
-          step,
-          0,
-          common::errors::InvalidArgument(
-              "Step should not be 0, but received step = %d.", step));
-
       T start, end;
       bool dummy_zero_out_dim = false;
       normalize_interval((*starts)[i],
@@ -261,8 +255,6 @@ inline void CheckAndUpdateSliceAttrs(const phi::DDim in_dims,
     }
   }
 }
-
-}  // namespace custom_kernel
 
 template <typename T = int64_t>
 inline phi::DDim GetSliceDims(const phi::DDim in_dims,
