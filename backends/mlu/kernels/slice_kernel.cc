@@ -230,28 +230,39 @@ inline void CheckAndUpdateSliceAttrs(const phi::DDim in_dims,
       continue;
     }
 
-    T start, end;
-    bool dummy_zero_out_dim = false;
-    normalize_interval((*starts)[i],
-                        (*ends)[i],
-                        step,
-                        dim_value,
-                        &start,
-                        &end,
-                        &dummy_zero_out_dim);
-    if (end == -dim_value - 1) {
-      end = -1;
-    }
+    T dim_value = in_dims[axis];
 
-    (*starts)[i] = start;
-    (*ends)[i] = end;
-  } else if (dim_value == 0) {
-    (*starts)[i] = 0;
-    (*ends)[i] = 0;
+    if (dim_value > 0) {
+      T step = steps == nullptr ? 1 : (*steps)[i];
+      PADDLE_ENFORCE_NE(
+          step,
+          0,
+          common::errors::InvalidArgument(
+              "Step should not be 0, but received step = %d.", step));
+
+      T start, end;
+      bool dummy_zero_out_dim = false;
+      normalize_interval((*starts)[i],
+                         (*ends)[i],
+                         step,
+                         dim_value,
+                         &start,
+                         &end,
+                         &dummy_zero_out_dim);
+      if (end == -dim_value - 1) {
+        end = -1;
+      }
+
+      (*starts)[i] = start;
+      (*ends)[i] = end;
+    } else if (dim_value == 0) {
+      (*starts)[i] = 0;
+      (*ends)[i] = 0;
+    }
   }
 }
 
-} // custom_kernel
+}  // namespace custom_kernel
 
 template <typename T = int64_t>
 inline phi::DDim GetSliceDims(const phi::DDim in_dims,
