@@ -119,9 +119,9 @@ class TestStackOpFP16(TestStackOpBase):
         self.dtype = np.float16
 
 
-class TestStackAPIWithLoDTensorArray(unittest.TestCase):
+class TestStackAPIWithDenseTensorArray(unittest.TestCase):
     """
-    Test stack api when the input(x) is a LoDTensorArray.
+    Test stack api when the input(x) is a DenseTensorArray.
     """
 
     def setUp(self):
@@ -157,9 +157,9 @@ class TestStackAPIWithLoDTensorArray(unittest.TestCase):
         )
 
 
-class TestTensorStackAPIWithLoDTensorArray(unittest.TestCase):
+class TestTensorStackAPIWithDenseTensorArray(unittest.TestCase):
     """
-    Test stack api when the input(x) is a LoDTensorArray.
+    Test stack api when the input(x) is a DenseTensorArray.
     """
 
     def setUp(self):

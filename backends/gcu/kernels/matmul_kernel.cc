@@ -161,13 +161,13 @@ PD_REGISTER_PLUGIN_KERNEL(matmul,
                           float,
                           phi::dtype::float16) {}
 
-PD_REGISTER_PLUGIN_KERNEL(matmul_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::MatmulGradKernel,
-                          float,
-                          phi::dtype::float16,
-                          double) {}
+// PD_REGISTER_PLUGIN_KERNEL(matmul_grad,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::MatmulGradKernel,
+//                           float,
+//                           phi::dtype::float16,
+//                           double) {}
 
 PD_REGISTER_PLUGIN_KERNEL(matmul_with_flatten,
                           gcu,

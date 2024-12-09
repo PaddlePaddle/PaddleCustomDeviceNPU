@@ -119,7 +119,7 @@ def main():
 
     setup(
         name = '@CMAKE_PROJECT_NAME@',
-        version='@OUTPUT_PADDLE_PACKAGE_VERSION@',
+        version='@PADDLE_VERSION@',
         description='PaddlePaddle Custom Device GCU Plugin',
         long_description='',
         long_description_content_type="text/markdown",

@@ -481,14 +481,14 @@ PD_REGISTER_PLUGIN_KERNEL(sum,
   kernel->OutputAt(0).SetDataType(phi::DataType::UNDEFINED);
 }
 
-PD_REGISTER_PLUGIN_KERNEL(sum_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::SumGradKernel,
-                          int32_t,
-                          int64_t,
-                          phi::dtype::float16,
-                          float) {}
+// PD_REGISTER_PLUGIN_KERNEL(sum_grad,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::SumGradKernel,
+//                           int32_t,
+//                           int64_t,
+//                           phi::dtype::float16,
+//                           float) {}
 
 PD_REGISTER_PLUGIN_KERNEL(mean,
                           gcu,

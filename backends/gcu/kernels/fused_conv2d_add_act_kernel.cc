@@ -105,8 +105,8 @@ void FusedConv2dAddActKernel(const Context& dev_ctx,
     auto new_bias = bias;
     auto bias_dims = common::vectorize(bias.dims());
     if (bias_dims.size() != 1) {
-      if (std::count(bias_dims.begin(), bias_dims.end(), 1) !=
-          bias_dims.size() - 1) {
+      auto one_cnt = std::count(bias_dims.begin(), bias_dims.end(), 1);
+      if ((one_cnt != 4) && (one_cnt != bias_dims.size() - 1)) {
         PADDLE_THROW(phi::errors::InvalidArgument(
             "Bias rank should be 1, unsupport bias dims: %s.",
             bias.dims().to_str().c_str()));

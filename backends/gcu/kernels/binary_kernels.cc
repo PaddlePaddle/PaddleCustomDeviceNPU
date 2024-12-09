@@ -593,14 +593,14 @@ PD_REGISTER_PLUGIN_KERNEL(add,
                           double,
                           phi::dtype::float16) {}
 
-PD_REGISTER_PLUGIN_KERNEL(add_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::AddGradKernel,
-                          int,
-                          int64_t,
-                          float,
-                          phi::dtype::float16) {}
+// PD_REGISTER_PLUGIN_KERNEL(add_grad,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::AddGradKernel,
+//                           int,
+//                           int64_t,
+//                           float,
+//                           phi::dtype::float16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(subtract,
                           gcu,
@@ -629,14 +629,14 @@ PD_REGISTER_PLUGIN_KERNEL(multiply,
                           double,
                           phi::dtype::float16) {}
 
-PD_REGISTER_PLUGIN_KERNEL(multiply_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::MultiplyGradKernel,
-                          int,
-                          int64_t,
-                          float,
-                          phi::dtype::float16) {}
+// PD_REGISTER_PLUGIN_KERNEL(multiply_grad,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::MultiplyGradKernel,
+//                           int,
+//                           int64_t,
+//                           float,
+//                           phi::dtype::float16) {}
 
 PD_REGISTER_PLUGIN_KERNEL(divide,
                           gcu,

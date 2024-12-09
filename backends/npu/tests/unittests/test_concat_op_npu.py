@@ -192,9 +192,9 @@ create_test_bool(TestConcatOp4)
 create_test_bool(TestConcatOp5)
 
 
-class TestConcatAPIWithLoDTensorArray(unittest.TestCase):
+class TestConcatAPIWithDenseTensorArray(unittest.TestCase):
     """
-    Test concat api when the input(x) is a LoDTensorArray.
+    Test concat api when the input(x) is a DenseTensorArray.
     """
 
     def setUp(self):

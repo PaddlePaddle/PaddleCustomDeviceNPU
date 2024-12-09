@@ -44,17 +44,18 @@ size_t Alignment(size_t size, const phi::Place& place, int align_size) {
   return remaining == 0 ? size : size + (alignment - remaining);
 }
 
-void GetMemSizeAndDtype(const std::vector<const phi::DenseTensor*>& lod_tensor,
-                        size_t* numel,
-                        const size_t& size_of_dtype,
-                        const phi::Place& place,
-                        const bool use_align = true,
-                        const int align_size = -1) {
+void GetMemSizeAndDtype(
+    const std::vector<const phi::DenseTensor*>& dense_tensor,
+    size_t* numel,
+    const size_t& size_of_dtype,
+    const phi::Place& place,
+    const bool use_align = true,
+    const int align_size = -1) {
   *numel = 0;
   std::stringstream ss;
   ss << "alloc_space_for_vars: ";
-  for (size_t i = 0; i < lod_tensor.size(); i++) {
-    auto size = lod_tensor[i]->numel();
+  for (size_t i = 0; i < dense_tensor.size(); i++) {
+    auto size = dense_tensor[i]->numel();
     PADDLE_ENFORCE_GT(size,
                       0,
                       phi::errors::InvalidArgument(
@@ -66,8 +67,8 @@ void GetMemSizeAndDtype(const std::vector<const phi::DenseTensor*>& lod_tensor,
                                size_of_dtype
                          : static_cast<size_t>(size);
     const void* ptr =
-        lod_tensor[i]->initialized() ? lod_tensor[i]->data() : nullptr;
-    ss << "input(" << i << "-th tensor) dim:(" << lod_tensor[i]->dims() << ")"
+        dense_tensor[i]->initialized() ? dense_tensor[i]->data() : nullptr;
+    ss << "input(" << i << "-th tensor) dim:(" << dense_tensor[i]->dims() << ")"
        << " address: " << ptr << " len: " << len << ", ";
     *numel += len;
   }
@@ -155,7 +156,7 @@ void CoalesceTensorKernel(const Context& dev_ctx,
                         input.size(),
                         output.size()));
 
-  // Input and Output check: only support LoDTensor
+  // Input and Output check: only support DenseTensor
   bool has_not_in_vars = false;
   for (size_t i = 0; i < input.size(); i++) {
     PADDLE_ENFORCE_NOT_NULL(

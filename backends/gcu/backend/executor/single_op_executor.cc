@@ -35,7 +35,7 @@ limitations under the License. */
 namespace backend {
 using TensorPtr = std::shared_ptr<phi::DenseTensor>;
 using phi::DenseTensor;
-using LoDTensor = phi::DenseTensor;
+using DenseTensor = phi::DenseTensor;
 
 SingleOpGcuExecutor::SingleOpGcuExecutor(
     const std::string& op_type,
@@ -67,15 +67,15 @@ void SingleOpGcuExecutor::ReleaseResource() {
 }
 
 void SingleOpGcuExecutor::RunGcuOp(const phi::CustomContext* device_context,
-                                   const std::vector<LoDTensor*>& inputs,
-                                   const std::vector<LoDTensor*>& outputs,
+                                   const std::vector<DenseTensor*>& inputs,
+                                   const std::vector<DenseTensor*>& outputs,
                                    bool tensor_split) {
   std::vector<void*> dev_inputs;
   dev_inputs.reserve(inputs.size());
   std::vector<void*> dev_outputs;
   dev_outputs.resize(outputs.size());
 
-  static LoDTensor tmp_out_tensor;
+  static DenseTensor tmp_out_tensor;
   static std::once_flag alloc_flags;
   std::call_once(alloc_flags, [&]() {
     const phi::DenseTensorMeta meta(phi::DataType::FLOAT32,
@@ -84,8 +84,8 @@ void SingleOpGcuExecutor::RunGcuOp(const phi::CustomContext* device_context,
     device_context->Alloc<float>(&tmp_out_tensor);
   });
 
-  std::vector<LoDTensor*> real_inputs;
-  std::vector<LoDTensor*> real_outputs;
+  std::vector<DenseTensor*> real_inputs;
+  std::vector<DenseTensor*> real_outputs;
   real_inputs.reserve(inputs.size());
   real_outputs.reserve(outputs.size());
 

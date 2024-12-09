@@ -689,7 +689,7 @@ class TestStridedSliceAPI(unittest.TestCase):
 
 #         numeric_output = [self.data, self.data]
 #         self.assertTrue(
-#             self.sliced_arr.type == base.core.VarDesc.VarType.LOD_TENSOR_ARRAY
+#             self.sliced_arr.type == base.core.VarDesc.VarType.DENSE_TENSOR_ARRAY
 #         )
 #         np.testing.assert_array_equal(self.out, numeric_output)
 #         np.testing.assert_array_equal(self.g_x0, np.zeros_like(self.data))

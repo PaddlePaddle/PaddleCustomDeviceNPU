@@ -229,7 +229,7 @@ template <>
 struct aot_op_abstract_info<phi::DenseTensor> {
   explicit aot_op_abstract_info(const phi::DenseTensor &tensor) {
     std::stringstream ss;
-    ss << "LoDTensor<";
+    ss << "DenseTensor<";
     if (tensor.initialized()) {
       ss << "Shape(" << tensor.dims() << ")";
     } else {

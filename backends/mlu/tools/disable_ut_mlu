@@ -9,3 +9,7 @@ test_dygraph_sharding_stage_3
 test_compare_op_mlu
 test_kldiv_loss_op_mlu
 test_flash_attention_op_mlu
+test_adamw_op_mlu
+test_rms_norm_op_mlu
+test_sync_batch_norm_op_mlu
+test_unsqueeze_op_mlu

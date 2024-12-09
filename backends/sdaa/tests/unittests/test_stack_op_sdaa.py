@@ -196,9 +196,9 @@ create_test_fp16(TestStackOp5)
 create_test_fp16(TestStackOp6)
 
 
-class TestStackAPIWithLoDTensorArray(unittest.TestCase):
+class TestStackAPIWithDenseTensorArray(unittest.TestCase):
     """
-    Test stack api when the input(x) is a LoDTensorArray.
+    Test stack api when the input(x) is a DenseTensorArray.
     """
 
     def setUp(self):
@@ -230,9 +230,9 @@ class TestStackAPIWithLoDTensorArray(unittest.TestCase):
         )
 
 
-class TestTensorStackAPIWithLoDTensorArray(unittest.TestCase):
+class TestTensorStackAPIWithDenseTensorArray(unittest.TestCase):
     """
-    Test stack api when the input(x) is a LoDTensorArray.
+    Test stack api when the input(x) is a DenseTensorArray.
     """
 
     def setUp(self):

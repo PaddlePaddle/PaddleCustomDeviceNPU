@@ -10,13 +10,12 @@ Please refer to the following steps to compile, install and verify the hardware 
 # 1) Pull the image. Note that this image is only for development environment
 #    and does not contain precompiled PaddlePaddle installation package.
 #    The build script and dockerfile of this image are located in the tools/dockerfile directory.
-#    Note: This docker is in the release process now. (20241113)
-registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84
+ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
 
 # 2) Refer to the following command to start the container.
 docker run --name paddle-gcu-dev -v /home:/home \
     --network=host --ipc=host -it --privileged \
-    registry.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
+    ccr-2vdh3abv-pub.cnc.bj.baidubce.com/device/paddle-gcu:topsrider3.2.109-ubuntu20-x86_64-gcc84 /bin/bash
 
 # 3) Clone the source code.
 git clone https://github.com/PaddlePaddle/PaddleCustomDevice
