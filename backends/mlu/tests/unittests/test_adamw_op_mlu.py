@@ -81,7 +81,7 @@ def adamw_wrapper(
     with_decay=True,
     lazy_mode=False,
 ):
-    _, _, _, _, _, _ = paddle._C_ops.adamw_(
+    _, _, _, _, _, *_ = paddle._C_ops.adamw_(
         param,
         grad,
         lr,
@@ -375,7 +375,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         ref_moment_2 = moment2.astype(paddle.float32)
 
         # reference code
-        _, _, _, _, _, _ = paddle._C_ops.adamw_(
+        _, _, _, _, _, *_ = paddle._C_ops.adamw_(
             ref_param,
             main_grad,
             lr,
@@ -398,7 +398,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         )
 
         if use_main_grad:
-            _, _, _, _, _, _ = paddle._C_ops.adamw_(
+            _, _, _, _, _, *_ = paddle._C_ops.adamw_(
                 param,
                 main_grad,
                 lr,
@@ -426,7 +426,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 master_weight.numpy(), ref_param.numpy(), atol=1e-5
             )
         else:
-            _, _, _, _, _, _ = paddle._C_ops.adamw_(
+            _, _, _, _, _, *_ = paddle._C_ops.adamw_(
                 param,
                 grad,
                 lr,
@@ -973,7 +973,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         ref_moment_2 = moment2.astype(paddle.float32)
 
         # reference code
-        _, _, _, _, _, _ = paddle._C_ops.adamw_(
+        _, _, _, _, _, *_ = paddle._C_ops.adamw_(
             ref_param,
             main_grad,
             lr,
@@ -996,7 +996,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         )
 
         if use_main_grad:
-            _, _, _, _, _, _ = paddle._C_ops.adamw_(
+            _, _, _, _, _, *_ = paddle._C_ops.adamw_(
                 param,
                 main_grad,
                 lr,
@@ -1024,7 +1024,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 master_weight.numpy(), ref_param.numpy(), atol=1e-4
             )
         else:
-            _, _, _, _, _, _ = paddle._C_ops.adamw_(
+            _, _, _, _, _, *_ = paddle._C_ops.adamw_(
                 param,
                 grad,
                 lr,

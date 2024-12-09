@@ -54,7 +54,9 @@ def adam_step(inputs, attributes):
     moment2_out = beta2 * moment2 + (1 - beta2) * np.square(grad)
     lr_t = lr * np.sqrt(1 - beta2_pow) / (1 - beta1_pow)
     param_out = param - lr_t * (moment1_out / (np.sqrt(moment2_out) + epsilon))
-    return param_out, moment1_out, moment2_out
+
+    moment2_max_out = np.empty_like(moment2_out)
+    return param_out, moment1_out, moment2_out, moment2_max_out
 
 
 class TestAdam(OpTest):
@@ -67,6 +69,8 @@ class TestAdam(OpTest):
         moment1 = np.random.uniform(-1, 1, (102, 105)).astype(self.dtype)
         # The second moment is positive
         moment2 = np.random.random((102, 105)).astype(self.dtype)
+        # npu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros((102, 105)).astype(self.dtype)
 
         learning_rate = 0.004
         beta1 = 0.78
@@ -80,18 +84,27 @@ class TestAdam(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype(self.dtype),
             "Beta1Pow": np.array([beta1_pow]).astype(self.dtype),
             "Beta2Pow": np.array([beta2_pow]).astype(self.dtype),
         }
 
-        self.attrs = {"epsilon": epsilon, "beta1": beta1, "beta2": beta2}
+        self.attrs = {
+            "epsilon": epsilon,
+            "beta1": beta1,
+            "beta2": beta2,
+            "amsgrad": False,
+        }
 
-        param_out, moment1_out, moment2_out = adam_step(self.inputs, self.attrs)
+        param_out, moment1_out, moment2_out, moment2_max_out = adam_step(
+            self.inputs, self.attrs
+        )
 
         self.outputs = {
             "Moment1Out": moment1_out,
             "Moment2Out": moment2_out,
+            "Moment2MaxOut": moment2_max_out,
             "ParamOut": param_out,
             "Beta1PowOut": np.array([beta1_pow]).astype("float32") * beta1,
             "Beta2PowOut": np.array([beta2_pow]).astype("float32") * beta2,
@@ -104,7 +117,9 @@ class TestAdam(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 @check_run_big_shape_test()
@@ -119,6 +134,8 @@ class TestAdamRank1(OpTest):
         moment1 = np.random.uniform(-1, 1, self.shape).astype(self.dtype)
         # The second moment is positive
         moment2 = np.random.random(self.shape).astype(self.dtype)
+        # npu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros(self.shape).astype(self.dtype)
 
         learning_rate = 0.004
         beta1 = 0.78
@@ -132,18 +149,27 @@ class TestAdamRank1(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype(self.dtype),
             "Beta1Pow": np.array([beta1_pow]).astype(self.dtype),
             "Beta2Pow": np.array([beta2_pow]).astype(self.dtype),
         }
 
-        self.attrs = {"epsilon": epsilon, "beta1": beta1, "beta2": beta2}
+        self.attrs = {
+            "epsilon": epsilon,
+            "beta1": beta1,
+            "beta2": beta2,
+            "amsgrad": False,
+        }
 
-        param_out, moment1_out, moment2_out = adam_step(self.inputs, self.attrs)
+        param_out, moment1_out, moment2_out, moment2_max_out = adam_step(
+            self.inputs, self.attrs
+        )
 
         self.outputs = {
             "Moment1Out": moment1_out,
             "Moment2Out": moment2_out,
+            "Moment2MaxOut": moment2_max_out,
             "ParamOut": param_out,
             "Beta1PowOut": np.array([beta1_pow]).astype("float32") * beta1,
             "Beta2PowOut": np.array([beta2_pow]).astype("float32") * beta2,
@@ -159,7 +185,9 @@ class TestAdamRank1(OpTest):
         self.shape = (4000, 8192)
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 @check_run_big_shape_test()
@@ -202,6 +230,9 @@ class TestAdamWithEpsilonTensor(OpTest):
         moment1 = np.random.uniform(-1, 1, (102, 105)).astype(self.dtype)
         # The second moment is positive
         moment2 = np.random.random((102, 105)).astype(self.dtype)
+        # npu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros((102, 105)).astype(self.dtype)
+
         learning_rate = 0.004
         beta1 = 0.78
         beta2 = 0.836
@@ -214,6 +245,7 @@ class TestAdamWithEpsilonTensor(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype(self.dtype),
             "Beta1Pow": np.array([beta1_pow]).astype(self.dtype),
             "Beta2Pow": np.array([beta2_pow]).astype(self.dtype),
@@ -224,11 +256,14 @@ class TestAdamWithEpsilonTensor(OpTest):
 
         self.attrs = {"epsilon": epsilon}
 
-        param_out, moment1_out, moment2_out = adam_step(self.inputs, self.attrs)
+        param_out, moment1_out, moment2_out, moment2_max_out = adam_step(
+            self.inputs, self.attrs
+        )
 
         self.outputs = {
             "Moment1Out": moment1_out,
             "Moment2Out": moment2_out,
+            "Moment2MaxOut": moment2_max_out,
             "ParamOut": param_out,
             "Beta1PowOut": np.array([beta1_pow]).astype("float32") * beta1,
             "Beta2PowOut": np.array([beta2_pow]).astype("float32") * beta2,
@@ -241,7 +276,9 @@ class TestAdamWithEpsilonTensor(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 @unittest.skip(reason="disable_ut in Paddle CI")
@@ -255,6 +292,8 @@ class TestAdamOpWithSkipUpdate(OpTest):
         moment1 = np.random.uniform(-1, 1, (102, 105)).astype(self.dtype)
         # The second moment is positive
         moment2 = np.random.random((102, 105)).astype(self.dtype)
+        # npu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros((102, 105)).astype(self.dtype)
 
         learning_rate = 0.004
         beta1 = 0.78
@@ -268,6 +307,7 @@ class TestAdamOpWithSkipUpdate(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype(self.dtype),
             "Beta1Pow": np.array([beta1_pow]).astype(self.dtype),
             "Beta2Pow": np.array([beta2_pow]).astype(self.dtype),
@@ -277,11 +317,12 @@ class TestAdamOpWithSkipUpdate(OpTest):
             "SkipUpdate": np.array([True]).astype("bool"),
         }
 
-        self.attrs = {"epsilon": epsilon}
+        self.attrs = {"epsilon": epsilon, "amsgrad": False}
 
         self.outputs = {
             "Moment1Out": moment1,
             "Moment2Out": moment2,
+            "Moment2MaxOut": moment2_max,
             "ParamOut": param,
             "Beta1PowOut": self.inputs["Beta1Pow"],
             "Beta2PowOut": self.inputs["Beta2Pow"],
@@ -294,7 +335,9 @@ class TestAdamOpWithSkipUpdate(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestAdamOpWithGlobalBetaPow(OpTest):
@@ -307,6 +350,8 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
         moment1 = np.random.uniform(-1, 1, (102, 105)).astype(self.dtype)
         # The second moment is positive
         moment2 = np.random.random((102, 105)).astype(self.dtype)
+        # npu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros((102, 105)).astype(self.dtype)
 
         learning_rate = 0.004
         beta1 = 0.78
@@ -320,6 +365,7 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype(self.dtype),
             "Beta1Pow": np.array([beta1_pow]).astype(self.dtype),
             "Beta2Pow": np.array([beta2_pow]).astype(self.dtype),
@@ -328,16 +374,19 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
             "EpsilonTensor": np.array([epsilon]).astype(self.dtype),
         }
 
-        attributes = {"epsilon": epsilon}
+        attributes = {"epsilon": epsilon, "amsgrad": False}
 
-        param_out, moment1_out, moment2_out = adam_step(self.inputs, attributes)
+        param_out, moment1_out, moment2_out, moment2_max_out = adam_step(
+            self.inputs, attributes
+        )
 
-        self.attrs = {"use_global_beta_pow": True}
+        self.attrs = {"use_global_beta_pow": True, "amsgrad": False}
 
         # use_global_beta_pow=True, Beta1PowOut and Beta2PowOut are empty.
         self.outputs = {
             "Moment1Out": moment1_out,
             "Moment2Out": moment2_out,
+            "Moment2MaxOut": moment2_max_out,
             "ParamOut": param_out,
             "Beta1PowOut": np.array([]),
             "Beta2PowOut": np.array([]),
@@ -350,7 +399,9 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 def create_test_fp64_class(parent):
@@ -359,7 +410,9 @@ def create_test_fp64_class(parent):
             self.dtype = np.float64
 
         def test_check_output(self):
-            self.check_output_with_place(self.place, atol=1e-5, rtol=1e-4)
+            self.check_output_with_place(
+                no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5, rtol=1e-4
+            )
 
     cls_name = "{0}_{1}".format(parent.__name__, "Fp64")
     TestAdamOpFp64Case.__name__ = cls_name
@@ -378,7 +431,9 @@ def create_test_fp16_class(parent):
             self.dtype = np.float16
 
         def test_check_output(self):
-            self.check_output_with_place(self.place, atol=1e-5, rtol=1e-4)
+            self.check_output_with_place(
+                no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5, rtol=1e-4
+            )
 
     cls_name = "{0}_{1}".format(parent.__name__, "Fp16")
     TestAdamOpFp16Case.__name__ = cls_name

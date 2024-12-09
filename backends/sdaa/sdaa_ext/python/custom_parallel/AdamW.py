@@ -294,7 +294,7 @@ class DistributeAdamW(AdamW, DistributeOptimizer):
             moment1_ = moment1
             moment2_ = moment2
 
-        _, _, _, _, _, _ = paddle._C_ops.adamw_(
+        _, _, _, _, _, *_ = paddle._C_ops.adamw_(
             param_,
             grad_,
             lr,
