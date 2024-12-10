@@ -60,7 +60,8 @@ def adamw_step(inputs, attributes):
     lr_t = lr * np.sqrt(1 - beta2_pow) / (1 - beta1_pow)
     param_out = param - lr_t * (moment1_out / (np.sqrt(moment2_out) + epsilon))
 
-    return param_out, moment1_out, moment2_out
+    moment2_max_out = np.empty_like(moment2_out)
+    return param_out, moment1_out, moment2_out, moment2_max_out
 
 
 def adamw_wrapper(
@@ -69,6 +70,7 @@ def adamw_wrapper(
     lr,
     moment1,
     moment2,
+    moment2_max,
     beta1_pow,
     beta2_pow,
     master_weight=None,
@@ -87,6 +89,7 @@ def adamw_wrapper(
         lr,
         moment1,
         moment2,
+        moment2_max,
         beta1_pow,
         beta2_pow,
         master_weight,
@@ -99,6 +102,7 @@ def adamw_wrapper(
         with_decay,
         lazy_mode,
         1000,
+        False,
         False,
         False,
     )
@@ -115,6 +119,8 @@ class TestAdamW(OpTest):
         moment1 = np.random.uniform(-1, 1, (105, 102)).astype("float32")
         # The second moment is positive
         moment2 = np.random.random((105, 102)).astype("float32")
+        # mlu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros((105, 102)).astype("float32")
 
         learning_rate = 0.5
         beta1 = 0.78
@@ -128,6 +134,7 @@ class TestAdamW(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype("float32"),
             "Beta1Pow": np.array([beta1_pow]).astype("float32"),
             "Beta2Pow": np.array([beta2_pow]).astype("float32"),
@@ -139,13 +146,17 @@ class TestAdamW(OpTest):
             "beta2": beta2,
             "coeff": 0.9,
             "with_decay": True,
+            "amsgrad": False,
         }
 
-        param_out, moment1_out, moment2_out = adamw_step(self.inputs, self.attrs)
+        param_out, moment1_out, moment2_out, moment2_max_out = adamw_step(
+            self.inputs, self.attrs
+        )
 
         self.outputs = {
             "Moment1Out": moment1_out,
             "Moment2Out": moment2_out,
+            "Moment2MaxOut": moment2_max_out,
             "ParamOut": param_out,
             "Beta1PowOut": np.array([beta1_pow]).astype("float32") * beta1,
             "Beta2PowOut": np.array([beta2_pow]).astype("float32") * beta2,
@@ -171,6 +182,8 @@ class TestAdamOpWithSkipUpdate(OpTest):
         moment1 = np.random.uniform(-1, 1, (102, 105)).astype("float32")
         # The second moment is positive
         moment2 = np.random.random((102, 105)).astype("float32")
+        # mlu not support amsgrad, `moment2_max` is useless
+        moment2_max = np.zeros((102, 105)).astype("float32")
 
         learning_rate = 0.004
         beta1 = 0.78
@@ -184,6 +197,7 @@ class TestAdamOpWithSkipUpdate(OpTest):
             "Grad": grad,
             "Moment1": moment1,
             "Moment2": moment2,
+            "Moment2Max": moment2_max,
             "LearningRate": np.array([learning_rate]).astype("float32"),
             "Beta1Pow": np.array([beta1_pow]).astype("float32"),
             "Beta2Pow": np.array([beta2_pow]).astype("float32"),
@@ -193,11 +207,17 @@ class TestAdamOpWithSkipUpdate(OpTest):
             "SkipUpdate": np.array([True]).astype("bool"),
         }
 
-        self.attrs = {"epsilon": epsilon, "coeff": 0.02, "with_decay": True}
+        self.attrs = {
+            "epsilon": epsilon,
+            "coeff": 0.02,
+            "with_decay": True,
+            "amsgrad": False,
+        }
 
         self.outputs = {
             "Moment1Out": moment1,
             "Moment2Out": moment2,
+            "Moment2MaxOut": moment2_max,
             "ParamOut": param,
             "Beta1PowOut": self.inputs["Beta1Pow"],
             "Beta2PowOut": self.inputs["Beta2Pow"],
@@ -211,7 +231,9 @@ class TestAdamOpWithSkipUpdate(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestAdamWOp(unittest.TestCase):
@@ -361,6 +383,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         main_grad = grad.astype(paddle.float32)
         moment1 = paddle.randn(shape).astype(paddle.float32)
         moment2 = paddle.randn(shape).astype(paddle.float32).abs()
+        moment2_max = paddle.randn(shape).astype(paddle.float32).abs()
         lr = paddle.zeros([1]).astype(paddle.float32)
         lr[0] = lr_rate
         beta1_pow_acc = paddle.ones([1]).astype(paddle.float32)
@@ -368,11 +391,12 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         beta2_pow_acc = paddle.ones([1]).astype(paddle.float32)
         beta2_pow_acc[0] = _beta2**10
 
-        ref_param = param.astype(paddle.float32)
-        ref_beta1_pow_acc = beta1_pow_acc.astype(paddle.float32)
-        ref_beta2_pow_acc = beta2_pow_acc.astype(paddle.float32)
-        ref_moment_1 = moment1.astype(paddle.float32)
-        ref_moment_2 = moment2.astype(paddle.float32)
+        ref_param = param.astype(paddle.float32).clone().detach()
+        ref_beta1_pow_acc = beta1_pow_acc.astype(paddle.float32).clone().detach()
+        ref_beta2_pow_acc = beta2_pow_acc.astype(paddle.float32).clone().detach()
+        ref_moment_1 = moment1.astype(paddle.float32).clone().detach()
+        ref_moment_2 = moment2.astype(paddle.float32).clone().detach()
+        ref_moment_2_max = moment2_max.astype(paddle.float32).clone().detach()
 
         # reference code
         _, _, _, _, _, *_ = paddle._C_ops.adamw_(
@@ -381,6 +405,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
             lr,
             ref_moment_1,
             ref_moment_2,
+            ref_moment_2_max,
             ref_beta1_pow_acc,
             ref_beta2_pow_acc,
             master_weight,
@@ -395,6 +420,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
             1000,
             False,
             False,
+            False,
         )
 
         if use_main_grad:
@@ -404,6 +430,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 lr,
                 moment1,
                 moment2,
+                moment2_max,
                 beta1_pow_acc,
                 beta2_pow_acc,
                 master_weight,
@@ -417,6 +444,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 _lazy_mode,
                 1000,
                 find_master,
+                False,
                 False,
             )
             np.testing.assert_allclose(
@@ -432,6 +460,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 lr,
                 moment1,
                 moment2,
+                moment2_max,
                 beta1_pow_acc,
                 beta2_pow_acc,
                 master_weight,
@@ -445,6 +474,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 _lazy_mode,
                 1000,
                 find_master,
+                False,
                 False,
             )
             np.testing.assert_allclose(
@@ -712,8 +742,10 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 "coeff": weight_decay,
                 "with_decay": True,
             }
-            param_out, moment1_out, moment2_out = adamw_step(np_inputs, np_attrs)
-            return param_out, moment1_out, moment2_out
+            param_out, moment1_out, moment2_out, moment2_out_max = adamw_step(
+                np_inputs, np_attrs
+            )
+            return param_out, moment1_out, moment2_out, moment2_out_max
 
         for i in range(5):
             a = paddle.to_tensor(np.random.uniform(-1, 1, (2, 13)).astype("float32"))
@@ -722,7 +754,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
             out = paddle.mean(out)
             out.backward()
 
-            fc1_w, fc1_w_mon1, fc1_w_mon2 = get_numpy_output(
+            fc1_w, fc1_w_mon1, fc1_w_mon2, _ = get_numpy_output(
                 fc1_w,
                 np.array(linear1.weight.grad),
                 fc1_w_mon1,
@@ -730,7 +762,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 simple_lr_fun(linear1.weight),
                 i + 1,
             )
-            fc1_b, fc1_b_mon1, fc1_b_mon2 = get_numpy_output(
+            fc1_b, fc1_b_mon1, fc1_b_mon2, _ = get_numpy_output(
                 fc1_b,
                 np.array(linear1.bias.grad),
                 fc1_b_mon1,
@@ -738,7 +770,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 simple_lr_fun(linear1.bias),
                 i + 1,
             )
-            fc2_w, fc2_w_mon1, fc2_w_mon2 = get_numpy_output(
+            fc2_w, fc2_w_mon1, fc2_w_mon2, _ = get_numpy_output(
                 fc2_w,
                 np.array(linear2.weight.grad),
                 fc2_w_mon1,
@@ -746,7 +778,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 simple_lr_fun(linear2.weight),
                 i + 1,
             )
-            fc2_b, fc2_b_mon1, fc2_b_mon2 = get_numpy_output(
+            fc2_b, fc2_b_mon1, fc2_b_mon2, _ = get_numpy_output(
                 fc2_b,
                 np.array(linear2.bias.grad),
                 fc2_b_mon1,
@@ -822,12 +854,13 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 )
                 opt.minimize(avg_cost)
 
-        def get_numpy_output(param, grad, moment1, moment2, lr_ratio, t):
+        def get_numpy_output(param, grad, moment1, moment2, moment2_max, lr_ratio, t):
             np_inputs = {
                 "Param": param,
                 "Grad": grad,
                 "Moment1": moment1,
                 "Moment2": moment2,
+                "Moment2Max": moment2_max,
                 "LearningRate": np.array([learning_rate]).astype("float32"),
                 "Beta1Pow": np.array([beta1**t]).astype("float32"),
                 "Beta2Pow": np.array([beta2**t]).astype("float32"),
@@ -840,9 +873,10 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 "lr_ratio": lr_ratio,
                 "coeff": weight_decay,
                 "with_decay": True,
+                "amsgrad": False,
             }
-            param_out, moment1_out, moment2_out = adamw_step(np_inputs, np_attrs)
-            return param_out, moment1_out, moment2_out
+            param_out, moment1_out, moment2_out, _ = adamw_step(np_inputs, np_attrs)
+            return param_out, moment1_out, moment2_out, _
 
         fetch_list1 = [
             "linear_0.w_0",
@@ -889,7 +923,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
             fc2_b = param[3]
             fc2_b_grad = params_and_gras[7]
 
-            fc1_w, fc1_w_mon1, fc1_w_mon2 = get_numpy_output(
+            fc1_w, fc1_w_mon1, fc1_w_mon2, _ = get_numpy_output(
                 fc1_w,
                 fc1_w_grad,
                 fc1_w_mon1,
@@ -897,7 +931,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 simple_lr_fun(linear1.weight),
                 i + 1,
             )
-            fc1_b, fc1_b_mon1, fc1_b_mon2 = get_numpy_output(
+            fc1_b, fc1_b_mon1, fc1_b_mon2, _ = get_numpy_output(
                 fc1_b,
                 fc1_b_grad,
                 fc1_b_mon1,
@@ -905,7 +939,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 simple_lr_fun(linear1.bias),
                 i + 1,
             )
-            fc2_w, fc2_w_mon1, fc2_w_mon2 = get_numpy_output(
+            fc2_w, fc2_w_mon1, fc2_w_mon2, _ = get_numpy_output(
                 fc2_w,
                 fc2_w_grad,
                 fc2_w_mon1,
@@ -913,7 +947,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 simple_lr_fun(linear2.weight),
                 i + 1,
             )
-            fc2_b, fc2_b_mon1, fc2_b_mon2 = get_numpy_output(
+            fc2_b, fc2_b_mon1, fc2_b_mon2, _ = get_numpy_output(
                 fc2_b,
                 fc2_b_grad,
                 fc2_b_mon1,
@@ -959,6 +993,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         main_grad = grad.astype(paddle.float32)
         moment1 = paddle.randn(shape).astype(paddle.float32)
         moment2 = paddle.randn(shape).astype(paddle.float32).abs()
+        moment2_max = paddle.randn(shape).astype(paddle.float32).abs()
         lr = paddle.zeros([1]).astype(paddle.float32)
         lr[0] = lr_rate
         beta1_pow_acc = paddle.ones([1]).astype(paddle.float32)
@@ -966,11 +1001,12 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
         beta2_pow_acc = paddle.ones([1]).astype(paddle.float32)
         beta2_pow_acc[0] = _beta2**10
 
-        ref_param = param.astype(paddle.float32)
-        ref_beta1_pow_acc = beta1_pow_acc.astype(paddle.float32)
-        ref_beta2_pow_acc = beta2_pow_acc.astype(paddle.float32)
-        ref_moment_1 = moment1.astype(paddle.float32)
-        ref_moment_2 = moment2.astype(paddle.float32)
+        ref_param = param.astype(paddle.float32).clone().detach()
+        ref_beta1_pow_acc = beta1_pow_acc.astype(paddle.float32).clone().detach()
+        ref_beta2_pow_acc = beta2_pow_acc.astype(paddle.float32).clone().detach()
+        ref_moment_1 = moment1.astype(paddle.float32).clone().detach()
+        ref_moment_2 = moment2.astype(paddle.float32).clone().detach()
+        ref_moment_2_max = moment2_max.astype(paddle.float32).clone().detach()
 
         # reference code
         _, _, _, _, _, *_ = paddle._C_ops.adamw_(
@@ -979,6 +1015,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
             lr,
             ref_moment_1,
             ref_moment_2,
+            ref_moment_2_max,
             ref_beta1_pow_acc,
             ref_beta2_pow_acc,
             master_weight,
@@ -993,6 +1030,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
             1000,
             False,
             False,
+            False,
         )
 
         if use_main_grad:
@@ -1002,6 +1040,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 lr,
                 moment1,
                 moment2,
+                moment2_max,
                 beta1_pow_acc,
                 beta2_pow_acc,
                 master_weight,
@@ -1015,6 +1054,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 _lazy_mode,
                 1000,
                 find_master,
+                False,
                 False,
             )
             np.testing.assert_allclose(
@@ -1030,6 +1070,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 lr,
                 moment1,
                 moment2,
+                moment2_max,
                 beta1_pow_acc,
                 beta2_pow_acc,
                 master_weight,
@@ -1043,6 +1084,7 @@ class TestAdamWOpMultiPrecisonWithMainGrad(unittest.TestCase):
                 _lazy_mode,
                 1000,
                 find_master,
+                False,
                 False,
             )
             np.testing.assert_allclose(
