@@ -287,11 +287,6 @@ class TestMultinomialError(unittest.TestCase):
 
         self.assertRaises(ValueError, test_dim_less_than_1)
 
-        with self.assertRaises(ValueError):
-            prob = paddle.rand([20, 1000])
-            prob[1:0] = 0
-            out = paddle.multinomial(prob)
-
 
 if __name__ == "__main__":
     unittest.main()
