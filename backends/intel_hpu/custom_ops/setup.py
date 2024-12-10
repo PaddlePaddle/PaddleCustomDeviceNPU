@@ -31,6 +31,7 @@ setup(
                 "./src/fake_gpu_kernels.cc",
                 "./llama_infer/fused_rms_qkv_rope.cc",
                 "./llama_infer/fused_sdpa_proj.cc",
+                "./llama_infer/fused_mlp.cc",
             ],
             include_dirs=[
                 "../",
