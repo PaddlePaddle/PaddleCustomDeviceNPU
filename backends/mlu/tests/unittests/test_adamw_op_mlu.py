@@ -20,6 +20,7 @@ import random
 from functools import partial
 from paddle import base
 
+
 paddle.enable_static()
 SEED = 2022
 
