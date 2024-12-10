@@ -49,6 +49,7 @@ def run_adam_op(
     lr_vars = [paddle.to_tensor(l) for l in lrs]
     moment1_vars = [paddle.to_tensor(m) for m in moment1s]
     moment2_vars = [paddle.to_tensor(m) for m in moment2s]
+    moment2_max_vars = [paddle.to_tensor(m) for m in moment2s]
     beta1_pow_vars = [paddle.to_tensor(b) for b in beta1_pows]
     beta2_pow_vars = [paddle.to_tensor(b) for b in beta2_pows]
     master_param_vars = [paddle.to_tensor(m_p) for m_p in master_params]
@@ -61,6 +62,7 @@ def run_adam_op(
                 lr_vars[i],
                 moment1_vars[i],
                 moment2_vars[i],
+                moment2_max_vars[i],
                 beta1_pow_vars[i],
                 beta2_pow_vars[i],
                 master_param_vars[i],
@@ -75,10 +77,11 @@ def run_adam_op(
                 1000,
                 False,
                 False,
+                False,
             )
     else:
         if in_dygraph_mode():
-            _, _, _, _, _, _ = _C_ops.merged_adam_(
+            _, _, _, _, _, *_ = _C_ops.merged_adam_(
                 param_vars,
                 grad_vars,
                 lr_vars,

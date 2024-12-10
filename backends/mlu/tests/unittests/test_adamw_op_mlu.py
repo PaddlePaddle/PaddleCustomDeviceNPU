@@ -170,7 +170,9 @@ class TestAdamW(OpTest):
         self.dtype = np.float32
 
     def test_check_output(self):
-        self.check_output_with_place(self.place, atol=1e-5)
+        self.check_output_with_place(
+            no_check_set=["Moment2MaxOut"], place=self.place, atol=1e-5
+        )
 
 
 class TestAdamOpWithSkipUpdate(OpTest):
@@ -567,7 +569,7 @@ class TestAdamWOpError(unittest.TestCase):
             adam = paddle.optimizer.AdamW(
                 learning_rate=0.01,
                 parameters=linear.parameters(),
-                weight_decay=1,
+                weight_decay="1",
             )
 
         def test_parameters_dtype1():
@@ -928,6 +930,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 fc1_w_grad,
                 fc1_w_mon1,
                 fc1_w_mon2,
+                np.zeros_like(fc1_w_mon2),
                 simple_lr_fun(linear1.weight),
                 i + 1,
             )
@@ -936,6 +939,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 fc1_b_grad,
                 fc1_b_mon1,
                 fc1_b_mon2,
+                np.zeros_like(fc1_w_mon2),
                 simple_lr_fun(linear1.bias),
                 i + 1,
             )
@@ -944,6 +948,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 fc2_w_grad,
                 fc2_w_mon1,
                 fc2_w_mon2,
+                np.zeros_like(fc1_w_mon2),
                 simple_lr_fun(linear2.weight),
                 i + 1,
             )
@@ -952,6 +957,7 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 fc2_b_grad,
                 fc2_b_mon1,
                 fc2_b_mon2,
+                np.zeros_like(fc1_w_mon2),
                 simple_lr_fun(linear2.bias),
                 i + 1,
             )
