@@ -341,18 +341,17 @@ class TestNPUFAFP16_Varlen(TestNPUFAFP16):
         self.trans_shape = (15, 64, 128)
         self.actual_seq_q_len = self.actual_seq_kv_len = [3, 6, 9, 12, 15]
         self.is_varlen = True
+        self.pass_line = 0.999
 
     def fused_fa(self, query_, key_, value_, mask=None):
         query = query_.transpose((0, 2, 1, 3))
         key = key_.transpose((0, 2, 1, 3))
         value = value_.transpose((0, 2, 1, 3))
         new_shape = query.shape
-        print(new_shape)
 
         query = paddle.reshape(query, self.trans_shape)
         key = paddle.reshape(key, self.trans_shape)
         value = paddle.reshape(value, self.trans_shape)
-        print(query.shape)
 
         y = core.eager._run_custom_op(
             "flash_attention_npu",
@@ -443,12 +442,10 @@ class TestNPUFAFP16_Varlen_GQA(TestNPUFAFP16_Varlen):
         key = key_.transpose((0, 2, 1, 3))
         value = value_.transpose((0, 2, 1, 3))
         new_shape = query.shape
-        print(new_shape)
 
         query = paddle.reshape(query, self.trans_shape)
         key = paddle.reshape(key, self.kv_trans_shape)
         value = paddle.reshape(value, self.kv_trans_shape)
-        print(query.shape)
 
         y = core.eager._run_custom_op(
             "flash_attention_npu",
