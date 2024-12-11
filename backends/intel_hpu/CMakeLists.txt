@@ -57,6 +57,7 @@ endif()
 
 include(third_party)
 add_dependencies(${PLUGIN_NAME} third_party)
+target_link_libraries(${PLUGIN_NAME} PRIVATE gflags glog)
 
 # packing wheel package
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/setup.py.in
