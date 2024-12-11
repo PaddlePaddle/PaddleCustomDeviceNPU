@@ -182,13 +182,13 @@ function run_paddlex() {
     echo "End Download"
 
     echo "Start PaddleX ResNet50"
-    python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
+    python main.py -c paddlex/configs/modules/image_classification/ResNet50.yaml \
     -o Global.mode=train \
     -o Global.dataset_dir=./dataset/cls_flowers_examples \
     -o Global.output=resnet50_output \
     -o Global.device="npu:${DEVICE_LIST}"
 
-    python main.py -c paddlex/configs/image_classification/ResNet50.yaml \
+    python main.py -c paddlex/configs/modules/image_classification/ResNet50.yaml \
     -o Global.mode=predict \
     -o Predict.model_dir="./resnet50_output/best_model/inference" \
     -o Predict.input="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_image_classification_001.jpg" \
@@ -196,13 +196,13 @@ function run_paddlex() {
     echo "End PaddleX ResNet50"
 
     echo "Start PP-YOLOE+"
-    python main.py -c paddlex/configs/object_detection/PP-YOLOE_plus-S.yaml \
+    python main.py -c paddlex/configs/modules/object_detection/PP-YOLOE_plus-S.yaml \
     -o Global.mode=train \
     -o Global.dataset_dir=./dataset/det_coco_examples \
     -o Global.output=ppyolo_plus_s_output \
     -o Global.device="npu:${DEVICE_LIST}"
 
-    python main.py -c paddlex/configs/object_detection/PP-YOLOE_plus-S.yaml \
+    python main.py -c paddlex/configs/modules/object_detection/PP-YOLOE_plus-S.yaml \
     -o Global.mode=predict \
     -o Predict.model_dir="./ppyolo_plus_s_output/best_model/inference" \
     -o Predict.input="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_object_detection_002.png" \
@@ -210,13 +210,13 @@ function run_paddlex() {
     echo "End PP-YOLOE+"
 
     echo "Start DeepLabv3+"
-    python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
+    python main.py -c paddlex/configs/modules/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
     -o Global.mode=train \
     -o Global.dataset_dir=./dataset/seg_optic_examples \
     -o Global.output=deeplabv3p_output \
     -o Global.device="npu:${DEVICE_LIST}"
 
-    python main.py -c paddlex/configs/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
+    python main.py -c paddlex/configs/modules/semantic_segmentation/Deeplabv3_Plus-R50.yaml \
     -o Global.mode=predict \
     -o Predict.model_dir="./deeplabv3p_output/best_model/inference" \
     -o Predict.input="https://paddle-model-ecology.bj.bcebos.com/paddlex/imgs/demo_image/general_semantic_segmentation_001.jpg" \
