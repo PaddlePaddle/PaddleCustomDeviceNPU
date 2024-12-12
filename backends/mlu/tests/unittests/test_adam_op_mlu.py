@@ -153,7 +153,10 @@ class TestAdamWithEpsilonTensor(OpTest):
             "EpsilonTensor": np.array([epsilon]).astype("float32"),
         }
 
-        self.attrs = {"epsilon": epsilon}
+        self.attrs = {
+            "epsilon": epsilon,
+            "amsgrad": False,
+        }
 
         param_out, moment1_out, moment2_out, moment2_max_out = adam_step(
             self.inputs, self.attrs
@@ -215,7 +218,7 @@ class TestAdamOpWithSkipUpdate(OpTest):
             "SkipUpdate": np.array([True]).astype("bool"),
         }
 
-        self.attrs = {"epsilon": epsilon}
+        self.attrs = {"epsilon": epsilon, "amsgrad": False}
 
         self.outputs = {
             "Moment1Out": moment1,
@@ -272,13 +275,13 @@ class TestAdamOpWithGlobalBetaPow(OpTest):
             "EpsilonTensor": np.array([epsilon]).astype("float32"),
         }
 
-        attributes = {"epsilon": epsilon}
+        attributes = {"epsilon": epsilon, "amsgrad": False}
 
         param_out, moment1_out, moment2_out, moment2_max_out = adam_step(
             self.inputs, attributes
         )
 
-        self.attrs = {"use_global_beta_pow": True}
+        self.attrs = {"use_global_beta_pow": True, "amsgrad": False}
 
         # use_global_beta_pow=True, Beta1PowOut and Beta2PowOut are empty.
         self.outputs = {
