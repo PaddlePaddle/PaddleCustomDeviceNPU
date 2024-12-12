@@ -731,14 +731,16 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
     tmp_onehot.set_meta(tmp_onehot_meta);
     dev_ctx.template Alloc<int32_t>(&tmp_onehot);
 
-    EXEC_NPU_CMD(aclnnOneHot,
-                 dev_ctx,
-                 casted_labels,
-                 cls_num,
-                 on_tensor,
-                 off_tensor,
-                 axis_one,
-                 tmp_onehot);
+    NpuOpRunner runner_onehot;
+    runner_onehot.SetType("OneHot")
+        .AddInput(casted_labels)
+        .AddInput(dev_ctx,
+                  std::vector<int32_t>(1, static_cast<int32_t>(cls_num)))
+        .AddInput(on_tensor)
+        .AddInput(off_tensor)
+        .AddOutput(tmp_onehot)
+        .AddAttr("axis", -1);
+    runner_onehot.Run(stream);
 
     // cast one_hot from int32 to T
     phi::DenseTensor casted_onehot;
