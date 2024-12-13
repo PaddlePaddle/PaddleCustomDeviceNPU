@@ -421,7 +421,8 @@ void MergedAdamKernel(
     const std::vector<const phi::DenseTensor*>& learning_rate,
     const std::vector<const phi::DenseTensor*>& moment1,
     const std::vector<const phi::DenseTensor*>& moment2,
-    const std::vector<const phi::DenseTensor*>& beta1_pow,
+    const paddle::optional<std::vector<const phi::DenseTensor*>>&
+        moment2_max const std::vector<const phi::DenseTensor*>& beta1_pow,
     const std::vector<const phi::DenseTensor*>& beta2_pow,
     const paddle::optional<std::vector<const phi::DenseTensor*>>& master_param,
     const phi::Scalar& beta1,
@@ -429,9 +430,11 @@ void MergedAdamKernel(
     const phi::Scalar& epsilon,
     bool multi_precision,
     bool use_global_beta_pow,
+    bool amsgrad,
     std::vector<phi::DenseTensor*> param_out,
     std::vector<phi::DenseTensor*> moment1_out,
     std::vector<phi::DenseTensor*> moment2_out,
+    std::vector<phi::DenseTensor*> moment2_max_out,
     std::vector<phi::DenseTensor*> beta1_pow_out,
     std::vector<phi::DenseTensor*> beta2_pow_out,
     std::vector<phi::DenseTensor*> master_param_out) {
@@ -487,6 +490,10 @@ void MergedAdamKernel(
                         param_num));
 
   VLOG(4) << "use_global_beta_pow:" << use_global_beta_pow;
+  PADDLE_ENFORCE_NE(
+      amsgrad,
+      true,
+      phi::errors::Unimplemented("Operation amsgrad is not supported yet."));
 
   const phi::DenseTensor* beta1_tensor = nullptr;
   const phi::DenseTensor* beta2_tensor = nullptr;
