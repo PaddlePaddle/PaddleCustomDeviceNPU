@@ -20,14 +20,14 @@ import paddle.profiler as profiler
 
 paddle.device.set_device("intel_hpu")
 
-paddle.seed(20241214)
+paddle.seed(20241213)
 
 
 def init_data(
-    batch_size=8,
-    seqence_len=128,
+    batch_size=2,
+    seqence_len=16,
     hidden_size=256,
-    intermediate_size=512,
+    intermediate_size=1024,
     dtype="bfloat16",
 ):
     with paddle.no_grad():
@@ -35,6 +35,7 @@ def init_data(
             [batch_size, seqence_len, hidden_size], dtype=paddle.float32
         ).to(paddle.bfloat16)
 
+        ln_scales = paddle.rand([hidden_size], dtype=paddle.bfloat16)
         gate_weight = paddle.normal(
             mean=0.0, std=0.02, shape=[hidden_size, intermediate_size]
         ).astype(dtype)
@@ -46,14 +47,18 @@ def init_data(
         ).astype(dtype)
         proj_weight = paddle.concat([gate_weight, up_weight], axis=1)
 
-    return x, gate_weight, up_weight, down_weight, proj_weight
+        epsilon = 1e-06
+
+    return x, ln_scales, proj_weight, gate_weight, up_weight, down_weight, epsilon
 
 
-def ref_mlp(
+def ref_rms_mlp(
     x,
+    ln_scales,
     gate_weight,
     up_weight,
     down_weight,
+    epsilon,
 ):
     def swiglu_naive(x, up=None):
         if up is not None:
@@ -63,57 +68,65 @@ def ref_mlp(
         silu = gate / (paddle.exp(-gate) + 1)
         return silu * up
 
-    gate = paddle.matmul(x, gate_weight)
-    up = paddle.matmul(x, up_weight)
+    hidden_states = paddle.incubate.nn.functional.fused_rms_norm(
+        x, ln_scales, None, epsilon, 2
+    )[0]
+
+    gate = paddle.matmul(hidden_states, gate_weight)
+    up = paddle.matmul(hidden_states, up_weight)
     swiglu = swiglu_naive(x=gate, up=up)
     res = paddle.matmul(swiglu, down_weight)
 
     return res.numpy()
 
 
-class refMlpOP(paddle.nn.Layer):
+class refRmsMlpOP(paddle.nn.Layer):
     def __init__(self):
         super().__init__()
-        self.x, self.gate_weight, self.up_weight, self.down_weight, _ = init_data()
-
-    def forward(self):
-        mlp_out_ref = ref_mlp(
+        (
             self.x,
+            self.ln_scales,
+            _,
             self.gate_weight,
             self.up_weight,
             self.down_weight,
+            self.epsilon,
+        ) = init_data()
+
+    def forward(self):
+        mlp_out_ref = ref_rms_mlp(
+            self.x,
+            self.ln_scales,
+            self.gate_weight,
+            self.up_weight,
+            self.down_weight,
+            self.epsilon,
         )
         return mlp_out_ref
 
 
-class fusedMlpOP(paddle.nn.Layer):
+class fusedRmsMlpOP(paddle.nn.Layer):
     def __init__(self):
         super().__init__()
-        self.x, self.gate_weight, self.up_weight, self.down_weight, _ = init_data()
-
-    def forward(self):
-        fused_mlp_out = paddlenlp_ops.fused_mlp(
+        (
             self.x,
-            self.gate_weight,
-            self.up_weight,
-            self.down_weight,
-        )
-        return fused_mlp_out
-
-
-class fusedGateUpMlpOP(paddle.nn.Layer):
-    def __init__(self):
-        super().__init__()
-        self.x, _, _, self.down_weight, self.proj_weight = init_data()
-
-    def forward(self):
-        fused_gateup_mlp_out = paddlenlp_ops.fused_mlp(
-            self.x,
+            self.ln_scales,
             self.proj_weight,
-            None,
+            _,
+            _,
             self.down_weight,
+            self.epsilon,
+        ) = init_data()
+
+    def forward(self):
+        fused_rms_mlp_out = paddlenlp_ops.fused_rms_mlp(
+            self.x,
+            self.ln_scales,
+            self.proj_weight,
+            self.down_weight,
+            self.epsilon,
         )
-        return fused_gateup_mlp_out
+        return fused_rms_mlp_out
 
 
 def run_profile(my_profile_func):
@@ -124,32 +137,28 @@ def run_profile(my_profile_func):
     prof.start()
     for iter in range(20):
         with paddle.no_grad():
-            mlp_out = my_profile_func()
+            rms_mlp_out = my_profile_func()
     prof.stop()
 
 
 def run_accuracy_check():
-    ref_mlp = refMlpOP()
-    fused_mlp = fusedMlpOP()
-    fused_gate_up_mlp = fusedGateUpMlpOP()
+    ref_rms_mlp = refRmsMlpOP()
+    fused_rms_mlp = fusedRmsMlpOP()
 
-    golden_res = ref_mlp()
-    fused_res = fused_mlp()
-    fused_gate_up_res = fused_gate_up_mlp()
+    golden_res = ref_rms_mlp()
+    fused_rms_res = fused_rms_mlp()
 
-    print((fused_res == golden_res).all())
-    print((fused_gate_up_res == golden_res).all())
+    print((fused_rms_res == golden_res).all())
 
 
 def main():
     parser = argparse.ArgumentParser(description="Run profile or accuracy check")
     parser.add_argument("--profile", action="store_true", help="Run profile")
-    parser.add_argument("--accuracy", action="store_true", help="Run accuracy check")
+    parser.add_argument("--accuracy", action="store_false", help="Run accuracy check")
     args = parser.parse_args()
     if args.profile:
-        run_profile(fusedGateUpMlpOP())
-        run_profile(fusedMlpOP())
-        run_profile(refMlpOP())
+        run_profile(fusedRmsMlpOP())
+        run_profile(refRmsMlpOP())
     else:
         run_accuracy_check()
 

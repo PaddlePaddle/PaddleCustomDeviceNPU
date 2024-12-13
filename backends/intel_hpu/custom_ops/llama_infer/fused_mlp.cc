@@ -283,8 +283,8 @@ class FusedGateUpMlp : public HpuOperator {
                            split_outputs.data(),
                            split_inputs.size(),
                            split_outputs.size(),
-                           nullptr,
-                           0,
+                           &params,
+                           sizeof(params),
                            split.c_str(),
                            split_name.c_str(),
                            nullptr,
@@ -297,8 +297,8 @@ class FusedGateUpMlp : public HpuOperator {
                            silu_outputs.data(),
                            silu_inputs.size(),
                            silu_outputs.size(),
-                           &params,
-                           sizeof(params),
+                           nullptr,
+                           0,
                            silu.c_str(),
                            silu_name.c_str(),
                            nullptr,
@@ -433,13 +433,7 @@ void CallFusedMlpKernel(const Context& dev_ctx,
                         const phi::DenseTensor& up_weight,
                         const phi::DenseTensor& down_weight,
                         phi::DenseTensor* out) {
-  if (x.dtype() == phi::DataType::FLOAT32) {
-    custom_kernel::FusedMlpKernel<float>(
-        dev_ctx, x, gate_weight, up_weight, down_weight, out);
-  } else if (x.dtype() == phi::DataType::FLOAT16) {
-    custom_kernel::FusedMlpKernel<phi::dtype::float16>(
-        dev_ctx, x, gate_weight, up_weight, down_weight, out);
-  } else if (x.dtype() == phi::DataType::BFLOAT16) {
+  if (x.dtype() == phi::DataType::BFLOAT16) {
     custom_kernel::FusedMlpKernel<phi::dtype::bfloat16>(
         dev_ctx, x, gate_weight, up_weight, down_weight, out);
   } else {
@@ -453,13 +447,7 @@ void CallFusedGateUpMlpKernel(const Context& dev_ctx,
                               const phi::DenseTensor& proj_weight,
                               const phi::DenseTensor& down_weight,
                               phi::DenseTensor* out) {
-  if (x.dtype() == phi::DataType::FLOAT32) {
-    custom_kernel::FusedGateUpMlpKernel<float>(
-        dev_ctx, x, proj_weight, down_weight, out);
-  } else if (x.dtype() == phi::DataType::FLOAT16) {
-    custom_kernel::FusedGateUpMlpKernel<phi::dtype::float16>(
-        dev_ctx, x, proj_weight, down_weight, out);
-  } else if (x.dtype() == phi::DataType::BFLOAT16) {
+  if (x.dtype() == phi::DataType::BFLOAT16) {
     custom_kernel::FusedGateUpMlpKernel<phi::dtype::bfloat16>(
         dev_ctx, x, proj_weight, down_weight, out);
   } else {
