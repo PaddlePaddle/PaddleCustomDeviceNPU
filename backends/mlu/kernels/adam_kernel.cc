@@ -421,8 +421,8 @@ void MergedAdamKernel(
     const std::vector<const phi::DenseTensor*>& learning_rate,
     const std::vector<const phi::DenseTensor*>& moment1,
     const std::vector<const phi::DenseTensor*>& moment2,
-    const paddle::optional<std::vector<const phi::DenseTensor*>>&
-        moment2_max const std::vector<const phi::DenseTensor*>& beta1_pow,
+    const paddle::optional<std::vector<const phi::DenseTensor*>>& moment2_max,
+    const std::vector<const phi::DenseTensor*>& beta1_pow,
     const std::vector<const phi::DenseTensor*>& beta2_pow,
     const paddle::optional<std::vector<const phi::DenseTensor*>>& master_param,
     const phi::Scalar& beta1,
