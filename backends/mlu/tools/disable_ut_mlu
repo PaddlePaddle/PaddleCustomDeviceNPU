@@ -14,3 +14,4 @@ test_rms_norm_op_mlu
 test_sync_batch_norm_op_mlu
 test_unsqueeze_op_mlu
 test_LeNet_MNIST
+test_strided_slice_op_mlu
