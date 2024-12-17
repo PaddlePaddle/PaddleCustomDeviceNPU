@@ -37,7 +37,7 @@ def adam_wrapper(
     epsilon=1e-4,
     lazy_mode=False,
 ):
-    _, _, _, _, _, _ = paddle._C_ops.adam_(
+    _, _, _, _, _, *_ = paddle._C_ops.adam_(
         param,
         grad,
         LearningRate,
