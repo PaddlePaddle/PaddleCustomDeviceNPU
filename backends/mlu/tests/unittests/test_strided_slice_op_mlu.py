@@ -608,13 +608,13 @@ class TestStridedSliceAPI(unittest.TestCase):
             },
             fetch_list=[out_1, out_2, out_3, out_4, out_5, out_6, out_7],
         )
-        assert np.array_equal(res_1, input[-3:3, 0:100, 2:-1, :])
-        assert np.array_equal(res_2, input[-3:3, 0:100, :, 2:-1])
-        assert np.array_equal(res_3, input[-3:3, 0:100, :, 2:-1])
-        assert np.array_equal(res_4, input[-3:3, 0:100, 2:-1, :])
-        assert np.array_equal(res_5, input[-3:3, 0:100:2, -1:2:-1, :])
-        assert np.array_equal(res_6, input[-3:3, 0:100:2, :, -1:2:-1])
-        assert np.array_equal(res_7, input[-1, 0:100:2, :, -1:2:-1])
+        np.testing.assert_array_equal(res_1, input[-3:3, 0:100, 2:-1, :])
+        np.testing.assert_array_equal(res_2, input[-3:3, 0:100, :, 2:-1])
+        np.testing.assert_array_equal(res_3, input[-3:3, 0:100, :, 2:-1])
+        np.testing.assert_array_equal(res_4, input[-3:3, 0:100, 2:-1, :])
+        np.testing.assert_array_equal(res_5, input[-3:3, 0:100:2, -1:2:-1, :])
+        np.testing.assert_array_equal(res_6, input[-3:3, 0:100:2, :, -1:2:-1])
+        np.testing.assert_array_equal(res_7, input[-1, 0:100:2, :, -1:2:-1])
 
     def test_dygraph_op(self):
         x = paddle.zeros(shape=[3, 4, 5, 6], dtype="float32")
@@ -634,7 +634,7 @@ class TestStridedSliceTensorArray(unittest.TestCase):
             data = np.random.rand(2, 10).astype("float32")
             var = paddle.to_tensor(data)
             out = var[:, ::-1]
-            assert np.array_equal(out, data[:, ::-1])
+            np.testing.assert_array_equal(out, data[:, ::-1])
 
 
 if __name__ == "__main__":

@@ -57,7 +57,7 @@ inline hcclDataType_t PDDataTypeToHcclDataType(C_DataType type) {
   } else if (type == C_DataType::INT64) {
     return hcclInt64;
   } else {
-    PD_CHECK(false, "[RUNTIME] Datatype %d in hccl is not supported.", type);
+    PD_CHECK(false, "[RUNTIME] Datatype ", type, " in hccl is not supported.");
   }
 }
 
@@ -71,7 +71,7 @@ hcclRedOp_t PDReduceOpToHcclReduceOp(C_CCLReduceOp op) {
   } else if (op == C_CCLReduceOp::PRODUCT) {
     return hcclProd;
   } else {
-    PD_CHECK(false, "[RUNTIME] Reduceop %d n hccl is not supported.", op);
+    PD_CHECK(false, "[RUNTIME] Reduceop ", op, " n hccl is not supported.");
   }
 }
 
@@ -91,7 +91,7 @@ class RuntimeManager {
             << "1st ================================= " << require_id;
         status = synDeviceAcquireByModuleId(&deviceId, require_id);
         PD_CHECK(status == synSuccess,
-                 "[RUNTIME] synDeviceAcquireByModuleId() failed = %d",
+                 "[RUNTIME] synDeviceAcquireByModuleId() failed = ",
                  status);
       }
     } else {
@@ -99,12 +99,12 @@ class RuntimeManager {
       if (Status == 1) {
         status = synDeviceRelease(deviceId);
         PD_CHECK(status == synSuccess,
-                 "[RUNTIME] synDeviceRelease() failed = %d",
+                 "[RUNTIME] synDeviceRelease() failed = ",
                  status);
       }
       status = synDeviceAcquireByModuleId(&deviceId, require_id);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synDeviceAcquireByModuleId() failed = %d",
+               "[RUNTIME] synDeviceAcquireByModuleId() failed = ",
                status);
     }
     Status = 1;
@@ -119,7 +119,7 @@ class RuntimeManager {
     if (Status == 1) {
       synStatus status = synDeviceRelease(deviceId);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synDeviceRelease() failed = %d",
+               "[RUNTIME] synDeviceRelease() failed = ",
                status);
     }
 
@@ -139,7 +139,7 @@ class RuntimeManager {
 
     synStatus status = synDeviceGetMemoryInfo(deviceId, &free, &total);
     PD_CHECK(status == synSuccess,
-             "[RUNTIME] synDeviceGetMemoryInfo() failed = %d",
+             "[RUNTIME] synDeviceGetMemoryInfo() failed = ",
              status);
 
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "free = " << free;
@@ -153,7 +153,7 @@ class RuntimeManager {
     uint32_t num_devices = 0;
     synStatus status = synDeviceGetCount(&num_devices);
     PD_CHECK(status == synSuccess,
-             "[RUNTIME] synDeviceGetCount() failed = %d",
+             "[RUNTIME] synDeviceGetCount() failed = ",
              status);
     // if (num_devices >= 1) {
     //   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
@@ -178,7 +178,7 @@ class RuntimeManager {
       synStatus status = synStreamCreateGeneric(&h, device->id, 0);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synStreamCreateGeneric() failed = %d",
+               "[RUNTIME] synStreamCreateGeneric() failed = ",
                status);
 
       streams.insert(h);
@@ -198,7 +198,7 @@ class RuntimeManager {
     if (it != streams.end()) {
       synStatus status = synStreamDestroy(*it);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synStreamDestroy() failed = %d",
+               "[RUNTIME] synStreamDestroy() failed = ",
                status);
 
       streams.erase(*it);
@@ -220,7 +220,7 @@ class RuntimeManager {
         status = synStreamCreateGeneric(
             reinterpret_cast<synStreamHandle *>(&stream_h2d), device->id, 0);
         PD_CHECK(status == synSuccess,
-                 "[RUNTIME] synStreamCreateGeneric() failed = %d",
+                 "[RUNTIME] synStreamCreateGeneric() failed = ",
                  status);
 
         LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
@@ -234,22 +234,19 @@ class RuntimeManager {
                                reinterpret_cast<uint64_t>(dst),
                                HOST_TO_DRAM);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synMemCopyAsync(HOST_TO_DRAM) failed = %d",
+               "[RUNTIME] synMemCopyAsync(HOST_TO_DRAM) failed = ",
                status);
       status = synStreamSynchronize(stream_h2d);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synStreamSynchronize(stream_h2d) failed = %d",
+               "[RUNTIME] synStreamSynchronize(stream_h2d) failed = ",
                status);
-      status = synHostUnmap(device->id, src);
-      LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synHostUnmap() failed = " << status;
 
     } else if (flag == 1) {
       if (stream_d2h == nullptr) {
         status = synStreamCreateGeneric(
             reinterpret_cast<synStreamHandle *>(&stream_d2h), device->id, 0);
         PD_CHECK(status == synSuccess,
-                 "[RUNTIME] synStreamCreateGeneric() failed = %d",
+                 "[RUNTIME] synStreamCreateGeneric() failed = ",
                  status);
       }
 
@@ -261,22 +258,19 @@ class RuntimeManager {
                                reinterpret_cast<uint64_t>(dst),
                                DRAM_TO_HOST);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synMemCopyAsync() failed = %d",
+               "[RUNTIME] synMemCopyAsync() failed = ",
                status);
       status = synStreamSynchronize(stream_d2h);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synStreamSynchronize() failed = %d",
+               "[RUNTIME] synStreamSynchronize() failed = ",
                status);
-      status = synHostUnmap(device->id, dst);
-      LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synHostUnmap() failed = " << status;
 
     } else if (flag == 2) {
       if (stream_d2d == nullptr) {
         status = synStreamCreateGeneric(
             reinterpret_cast<synStreamHandle *>(&stream_d2d), device->id, 0);
         PD_CHECK(status == synSuccess,
-                 "[RUNTIME] synStreamCreateGeneric() failed = %d",
+                 "[RUNTIME] synStreamCreateGeneric() failed = ",
                  status);
       }
       status = synMemCopyAsync(stream_d2d,
@@ -286,13 +280,13 @@ class RuntimeManager {
                                DRAM_TO_DRAM);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synMemCopyAsync() failed = %d",
+               "[RUNTIME] synMemCopyAsync() failed = ",
                status);
 
       status = synStreamSynchronize(stream_d2d);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synStreamSynchronize() failed = %d",
+               "[RUNTIME] synStreamSynchronize() failed = ",
                status);
     }
     return C_SUCCESS;
@@ -317,7 +311,7 @@ class RuntimeManager {
                                HOST_TO_DRAM);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synMemCopyAsync() failed = %d",
+               "[RUNTIME] synMemCopyAsync() failed = ",
                status);
 
     } else if (flag == 1) {
@@ -329,7 +323,7 @@ class RuntimeManager {
                                DRAM_TO_HOST);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synMemCopyAsync() failed = %d",
+               "[RUNTIME] synMemCopyAsync() failed = ",
                status);
 
     } else if (flag == 2) {
@@ -340,7 +334,7 @@ class RuntimeManager {
                                DRAM_TO_DRAM);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synMemCopyAsync() failed = %d",
+               "[RUNTIME] synMemCopyAsync() failed = ",
                status);
     }
     return C_SUCCESS;
@@ -355,9 +349,8 @@ class RuntimeManager {
     if (it == events.end()) {
       synEventHandle e = nullptr;
       synStatus status = synEventCreate(&e, deviceId, 0);
-      PD_CHECK(status == synSuccess,
-               "[RUNTIME] synEventCreate() failed = %d",
-               status);
+      PD_CHECK(
+          status == synSuccess, "[RUNTIME] synEventCreate() failed = ", status);
       events.insert(e);
       *event = reinterpret_cast<C_Event>(e);
     }
@@ -377,7 +370,7 @@ class RuntimeManager {
       synStatus status = synEventDestroy(*it);
 
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] synEventDestroy() failed = %d",
+               "[RUNTIME] synEventDestroy() failed = ",
                status);
 
       events.erase(*it);
@@ -392,29 +385,47 @@ class RuntimeManager {
   inline synDeviceId GetDeviceID() { return deviceId; }
 
   inline void addCache(const C_Device device, const void *ptr, size_t size) {
-    auto it = hostMappedAddress.find(ptr);
     synStatus status = synFail;
-    if (it == hostMappedAddress.end()) {
-      // not found, map and cache
-      status = synHostMap(device->id, size, ptr);
-      LOG_IF(ERROR, status != synSuccess)
-          << "[RUNTIME] synHostMap() failed = " << status << " ptr=" << ptr
-          << " size=" << size;
-      // hostMappedAddress[ptr] = size;
-    } else {
-      if (it->second != size) {
-        // found but size not equal
-        // unmap the old one and map a new one
-        status = synHostUnmap(device->id, ptr);
+
+    for (const auto &pair : hostMappedAddress) {
+      if (pair.first == ptr && pair.second == size) {
+        // found mapped, do nothing and return
+        LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+            << "[RUNTIME] synHostMap() already mapped ptr=" << ptr
+            << " size=" << size;
+        return;
+      } else if ((pair.first == ptr && pair.second != size) ||
+                 (ptr > pair.first && ptr < (pair.first + pair.second))) {
+        // found but size not equal or ptr is in the range of previous mapping.
+        // unmap the old one and remap new one.
+        status = synHostUnmap(device->id, pair.first);
         LOG_IF(ERROR, status != synSuccess)
             << "[RUNTIME] synHostUnmap() failed = " << status;
+        hostMappedAddress.erase(pair.first);
+        LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+            << "[RUNTIME] synHostUnMap() success ptr=" << pair.first
+            << " size=" << pair.second;
 
         status = synHostMap(device->id, size, ptr);
         LOG_IF(ERROR, status != synSuccess)
             << "[RUNTIME] synHostMap() failed = " << status;
-        // hostMappedAddress[ptr] = size;
+        hostMappedAddress[ptr] = size;
+        LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+            << "[RUNTIME] synHostMap() remap success ptr=" << ptr
+            << " size=" << size;
+        return;
       }
     }
+
+    // not found, new map and cache
+    status = synHostMap(device->id, size, ptr);
+    LOG_IF(ERROR, status != synSuccess)
+        << "[RUNTIME] synHostMap() failed = " << status << " ptr=" << ptr
+        << " size=" << size;
+    hostMappedAddress[ptr] = size;
+    LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
+        << "[RUNTIME] synHostMap() new map success ptr=" << ptr
+        << " size=" << size;
   }
 
   void GetUniqueIdSize(size_t *sz) {
@@ -514,8 +525,7 @@ static RuntimeManager runtimeManager;
 
 C_Status Init() {
   synStatus status = synInitialize();
-  PD_CHECK(
-      status == synSuccess, "[RUNTIME] synInitialize() failed = %d", status);
+  PD_CHECK(status == synSuccess, "[RUNTIME] synInitialize() failed = ", status);
 
   return C_SUCCESS;
 }
@@ -547,7 +557,7 @@ C_Status DestroyDevice(const C_Device device) {
 
 C_Status Finalize() {
   synStatus status = synDestroy();
-  PD_CHECK(status == synSuccess, "[RUNTIME] synDestroy() failed = %d", status);
+  PD_CHECK(status == synSuccess, "[RUNTIME] synDestroy() failed = ", status);
 
   return C_SUCCESS;
 }
@@ -561,9 +571,8 @@ C_Status GetDevicesCount(size_t *count) {
 C_Status GetDevicesList(size_t *devices) {
   uint32_t count = 0;
   synStatus status = synDeviceGetCount(&count);
-  PD_CHECK(status == synSuccess,
-           "[RUNTIME] synDeviceGetCount() failed = %d",
-           status);
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synDeviceGetCount() failed = ", status);
   for (size_t dev_id = 0; dev_id < count; dev_id++) {
     devices[dev_id] = dev_id;
   }
@@ -632,7 +641,7 @@ C_Status Allocate_device(const C_Device device, void **ptr, size_t size) {
   synStatus status =
       synDeviceMalloc(runtimeManager.GetDeviceID(), size, 0, 0, &p);
   PD_CHECK(
-      status == synSuccess, "[RUNTIME] synDeviceMalloc() failed = %d", status);
+      status == synSuccess, "[RUNTIME] synDeviceMalloc() failed = ", status);
   *ptr = reinterpret_cast<void *>(p);
   LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug)
       << "allocate device mem device id = " << runtimeManager.GetDeviceID()
@@ -649,8 +658,7 @@ C_Status Deallocate_device(const C_Device device, void *ptr, size_t size) {
   synStatus status = synDeviceFree(
       runtimeManager.GetDeviceID(), reinterpret_cast<uint64_t>(ptr), 0);
 
-  PD_CHECK(
-      status == synSuccess, "[RUNTIME] synDeviceFree() failed = %d", status);
+  PD_CHECK(status == synSuccess, "[RUNTIME] synDeviceFree() failed = ", status);
 
   return C_SUCCESS;
 }
@@ -662,8 +670,7 @@ C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
       << "allocate host mem device id=" << runtimeManager.GetDeviceID()
       << " ptr = " << ptr << " size=" << size;
 
-  PD_CHECK(
-      status == synSuccess, "[RUNTIME] synHostMalloc() failed = %d", status);
+  PD_CHECK(status == synSuccess, "[RUNTIME] synHostMalloc() failed = ", status);
 
   return C_FAILED;
 }
@@ -675,7 +682,7 @@ C_Status Deallocate_host(const C_Device device, void *ptr, size_t size) {
       << "device id=" << runtimeManager.GetDeviceID() << " ptr = " << ptr
       << " size=" << size;
 
-  PD_CHECK(status == synSuccess, "[RUNTIME] synHostFree() failed = %d", status);
+  PD_CHECK(status == synSuccess, "[RUNTIME] synHostFree() failed = ", status);
 
   return C_SUCCESS;
 }
@@ -710,7 +717,7 @@ C_Status RecordEvent(const C_Device device, C_Stream stream, C_Event event) {
                      reinterpret_cast<const synStreamHandle>(stream));
 
   PD_CHECK(
-      status == synSuccess, "[RUNTIME] synEventRecord() failed = %d", status);
+      status == synSuccess, "[RUNTIME] synEventRecord() failed = ", status);
 
   return C_SUCCESS;
 }
@@ -729,7 +736,7 @@ C_Status SyncDevice(const C_Device device) {
 
   synStatus status = synDeviceSynchronize(runtimeManager.GetDeviceID());
   PD_CHECK(status == synSuccess,
-           "[RUNTIME] synDeviceSynchronize() failed = %d",
+           "[RUNTIME] synDeviceSynchronize() failed = ",
            status);
 
   return C_SUCCESS;
@@ -748,7 +755,7 @@ C_Status SyncStream(const C_Device device, C_Stream stream) {
       synStreamSynchronize(reinterpret_cast<const synStreamHandle>(stream));
 
   PD_CHECK(status == synSuccess,
-           "[RUNTIME] synStreamSynchronize() failed = %d",
+           "[RUNTIME] synStreamSynchronize() failed = ",
            status);
 
   return C_SUCCESS;
@@ -764,7 +771,7 @@ C_Status SyncEvent(const C_Device device, C_Event event) {
       synEventSynchronize(reinterpret_cast<const synEventHandle>(event));
 
   PD_CHECK(status == synSuccess,
-           "[RUNTIME] synEventSynchronize() failed = %d",
+           "[RUNTIME] synEventSynchronize() failed = ",
            status);
 
   return C_SUCCESS;
@@ -783,9 +790,8 @@ C_Status StreamWaitEvent(const C_Device device,
                          reinterpret_cast<synEventHandle>(event),
                          0);
 
-  PD_CHECK(status == synSuccess,
-           "[RUNTIME] synStreamWaitEvent() failed = %d",
-           status);
+  PD_CHECK(
+      status == synSuccess, "[RUNTIME] synStreamWaitEvent() failed = ", status);
 
   return C_SUCCESS;
 }
@@ -978,24 +984,24 @@ C_Status ProfilerStart(C_Profiler prof, void *user_data) {
     uint32_t bytes_req = 0;
     synStatus status = synProfilerQueryRequiredMemory(0, &bytes_req);
     PD_CHECK(status == synSuccess,
-             "[RUNTIME] query required memory of intel hpu profiler failed  = ",
+             "[RUNTIME] query required memory of intel hpu profiler failed = ",
              status);
     if (bytes_req > 0) {
       uint64_t data_ptr{0};
       synStatus status = synDeviceMalloc(0, bytes_req, 0, 0, &data_ptr);
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] allocate intel hpu profiler user buffer failed  = %d",
+               "[RUNTIME] allocate intel hpu profiler user buffer failed = ",
                status);
       status = synProfilerSetUserBuffer(0, reinterpret_cast<void *>(data_ptr));
       PD_CHECK(status == synSuccess,
-               "[RUNTIME] set intel hpu profiler user buffer failed  = %d",
+               "[RUNTIME] set intel hpu profiler user buffer failed = ",
                status);
     }
 
     auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
     status = synProfilerStart(type, 0);
     PD_CHECK(status == synSuccess,
-             "[RUNTIME] start intel hpu profiling failed  = %d",
+             "[RUNTIME] start intel hpu profiling failed = ",
              status);
 
     runtimeManager.initParser();
@@ -1009,7 +1015,7 @@ C_Status ProfilerStop(C_Profiler prof, void *user_data) {
     auto type = static_cast<synTraceType>(FLAGS_intel_hpu_profiling_type);
     synStatus status = synProfilerStop(type, 0);
     PD_CHECK(status == synSuccess,
-             "[RUNTIME] stop intel hpu profiling failed  = %d",
+             "[RUNTIME] stop intel hpu profiling failed = ",
              status);
   }
 
@@ -1023,16 +1029,15 @@ C_Status ProfilerCollectData(C_Profiler prof,
     size_t size, count;
     auto status = synProfilerGetTrace(
         synTraceAll, 0, synTraceFormatTEF, nullptr, &size, &count);
-    PD_CHECK(
-        status == synSuccess,
-        "[RUNTIME] get intel hpu profiler trace size and count failed  = %d",
-        status);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] get intel hpu profiler trace size and count failed = ",
+             status);
 
     auto events = std::make_unique<unsigned char[]>(size);
     status = synProfilerGetTrace(
         synTraceAll, 0, synTraceFormatTEF, events.get(), &size, &count);
     PD_CHECK(status == synSuccess,
-             "[RUNTIME] get intel hpu profiler trace content  = %d",
+             "[RUNTIME] get intel hpu profiler trace content = ",
              status);
 
     runtimeManager.exportTrace(
