@@ -14,6 +14,7 @@
 
 #include "kernels/funcs/mlu_baseop.h"
 #include "kernels/funcs/mlu_funcs.h"
+#include "paddle/phi/kernels/funcs/slice_utils.h"
 
 namespace custom_kernel {
 static void StridedSliceOutDims(const std::vector<int64_t>& starts,
@@ -62,13 +63,13 @@ static void StridedSliceOutDims(const std::vector<int64_t>& starts,
     }
 
     bool neg_dim_condition = false;
-    normalize_interval(start_index,
-                       end_index,
-                       stride_index,
-                       axis_size,
-                       &start_index,
-                       &end_index,
-                       &neg_dim_condition);
+    phi::funcs::normalize_interval(start_index,
+                                   end_index,
+                                   stride_index,
+                                   axis_size,
+                                   &start_index,
+                                   &end_index,
+                                   &neg_dim_condition);
     if (stride_index < 0 && end_index == -axis_size - 1) {
       end_index = -1;
     }
@@ -114,13 +115,13 @@ static void StridedSliceFunctor(int64_t* starts,
     }
     // stride must not be zero
     bool dummy_zero_dim_out = false;
-    normalize_interval(starts[axis_index],
-                       ends[axis_index],
-                       strides[axis_index],
-                       axis_size,
-                       &starts[axis_index],
-                       &ends[axis_index],
-                       &dummy_zero_dim_out);
+    phi::funcs::normalize_interval(starts[axis_index],
+                                   ends[axis_index],
+                                   strides[axis_index],
+                                   axis_size,
+                                   &starts[axis_index],
+                                   &ends[axis_index],
+                                   &dummy_zero_dim_out);
     if (strides[axis_index] < 0 && ends[axis_index] == -axis_size - 1) {
       // manually set the end to -1 when step < 0,
       // which indicates that it can extend to the left endpoint.
