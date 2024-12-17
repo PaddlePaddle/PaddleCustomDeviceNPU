@@ -243,7 +243,7 @@ inline void CheckAndUpdateSliceAttrs(const phi::DDim in_dims,
                          &start,
                          &end,
                          &dummy_zero_out_dim);
-      if (end == -dim_value - 1) {
+      if (step < 0 && end == -dim_value - 1) {
         end = -1;
       }
 
