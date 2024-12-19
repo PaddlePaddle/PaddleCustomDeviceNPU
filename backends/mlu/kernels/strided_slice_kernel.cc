@@ -41,6 +41,8 @@ static void StridedSliceOutDims(const std::vector<int64_t>& starts,
       auto ret = std::find(decrease_axis.begin(), decrease_axis.end(), axes[i]);
       if (ret != decrease_axis.end()) {
         decrease_axis_affect = true;
+        start_index = in_dims[axes_index] - 1;
+        end_index = in_dims[axes_index];
       }
     }
     if (decrease_axis_affect) {
@@ -111,6 +113,8 @@ static void StridedSliceFunctor(int64_t* starts,
           decrease_axis.begin(), decrease_axis.end(), axes[axis_index]);
       if (ret != decrease_axis.end()) {
         decrease_axis_affect = true;
+        starts[axis_index] = axis_size - 1;
+        ends[axis_index] = axis_size;
       }
     }
     // stride must not be zero
