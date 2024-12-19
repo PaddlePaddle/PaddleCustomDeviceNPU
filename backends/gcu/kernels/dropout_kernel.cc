@@ -18,19 +18,55 @@
 
 namespace custom_kernel {
 template <typename Context>
-void GetSeed(const Context& dev_ctx,
-             const paddle::optional<phi::DenseTensor>& seed_tensor,
-             int seed,
-             bool fix_seed,
-             int* seed_out) {
+inline void GetSeedDataAndIncrement(
+    const Context& dev_ctx,
+    const paddle::optional<phi::DenseTensor>& seed_tensor,
+    const bool is_fix_seed,
+    const int seed_val,
+    const int offset,
+    uint64_t* seed_data,
+    uint64_t* increment) {
+  auto gen_custom = dev_ctx.GetGenerator();
   if (seed_tensor) {
-    phi::DenseTensor cpu_tensor;
+    phi::DenseTensor seed_cpu_tensor;
     TensorCopy(
-        dev_ctx, seed_tensor.get(), true, &cpu_tensor, phi::CustomPlace());
-    std::memcpy(seed_out, cpu_tensor.data(), sizeof(int));
-    return;
+        dev_ctx, seed_tensor.get(), true, &seed_cpu_tensor, phi::CustomPlace());
+    *seed_data = static_cast<uint64_t>(seed_cpu_tensor.data<int>()[0]);
+    *increment = offset;
+  } else if (!is_fix_seed) {
+    auto seed_offset = gen_custom->IncrementOffset(offset);
+    *seed_data = seed_offset.first;
+    *increment = seed_offset.second;
+    VLOG(6) << "DefaultCustomDeviceGenerator status, seed:" << seed_offset.first
+            << ", offset:" << seed_offset.second;
+  } else {
+    *seed_data = seed_val;
+    *increment = offset;
   }
-  *seed_out = fix_seed ? seed : 0;
+}
+
+template <typename Context>
+inline std::pair<uint64_t, uint64_t> GetSeedOffset(
+    const Context& dev_ctx,
+    const phi::DenseTensor& x,
+    const paddle::optional<phi::DenseTensor>& seed_tensor,
+    int seed,
+    bool fix_seed) {
+  // Refer to the implementation of GPU dropout at:
+  // paddle/phi/kernels/funcs/dropout_impl.cu.h
+  int64_t x_numel = x.numel();
+  int64_t device_id = dev_ctx.GetPlace().GetDeviceId();
+  topsDeviceProp_t prop = GetDeviceProp(device_id);
+  size_t grid_size = prop.multiProcessorCount;
+  size_t block_size = prop.maxThreadsPerBlock;
+  size_t kVecSize = 4;
+  int offset =
+      ((x_numel - 1) / (grid_size * block_size * kVecSize) + 1) * kVecSize;
+  uint64_t seed_data = 0;
+  uint64_t increment = 0;
+  GetSeedDataAndIncrement<Context>(
+      dev_ctx, seed_tensor, fix_seed, seed, offset, &seed_data, &increment);
+  return std::pair<uint64_t, uint64_t>(seed_data, increment);
 }
 
 template <typename T, typename Context>
@@ -46,33 +82,43 @@ void DropoutKernel(const Context& dev_ctx,
                    phi::DenseTensor* mask) {
   PADDLE_GCU_KERNEL_TRACE("dropout");
   dev_ctx.template Alloc<T>(out);
-  dev_ctx.template Alloc<uint8_t>(mask);
+  if (mask) {
+    dev_ctx.template Alloc<uint8_t>(mask);
+  }
 
   if (LaunchAOTKernel()) {
-    // TODO(xuelei.wan): Implement mode mode='downscale_in_infer'
-    if (mode != "upscale_in_train") {
-      PADDLE_THROW(phi::errors::Unimplemented(
-          "Only support mode='upscale_in_train' in dropout so far as now."));
-    }
     auto dropout_prob = p.to<double>();
-    int seed_data = 0;
-    GetSeed<Context>(dev_ctx, seed_tensor, seed, fix_seed, &seed_data);
-    auto generator =
-        std::pair<uint64_t, uint64_t>(static_cast<uint64_t>(seed_data), 0);
-    auto tmp_out = std::make_shared<phi::DenseTensor>();
-    tmp_out->set_meta(out->meta());
-    dev_ctx.template Alloc<T>(tmp_out.get());
+    auto keep_scale = phi::Scalar(static_cast<float>(1.0 - dropout_prob));
+    if (is_test) {
+      if (mode == "upscale_in_train") {
+        TensorCopy(dev_ctx, x, false, out);
+      } else {
+        LAUNCH_TOPSATENOP(topsatenMul, dev_ctx, *out, x, keep_scale);
+      }
+      return;
+    }
+
+    auto seed_offset =
+        GetSeedOffset<Context>(dev_ctx, x, seed_tensor, seed, fix_seed);
+    VLOG(6) << "DropoutKernel status, seed:" << seed_offset.first
+            << ", offset:" << seed_offset.second;
+    auto tmp_out = custom_kernel::TensorEmpty(dev_ctx, out->meta());
     LAUNCH_TOPSATENOP(topsatenNativeDropout,
                       dev_ctx,
                       *out,
-                      *tmp_out,
+                      tmp_out,
                       x,
                       dropout_prob,
                       !is_test,
-                      generator);
-    if (!is_test) {
-      custom_kernel::Cast(dev_ctx, *tmp_out, mask->dtype(), mask);
+                      seed_offset);
+    if (mode != "upscale_in_train") {
+      LAUNCH_TOPSATENOP(topsatenMul, dev_ctx, *out, *out, keep_scale);
     }
+
+    if (!is_test && (mask != nullptr)) {
+      custom_kernel::Cast(dev_ctx, tmp_out, mask->dtype(), mask);
+    }
+
   } else {  // kernel impl base on JIT
     TensorNameMap input_names;
     input_names["X"] = {"x"};
@@ -89,8 +135,9 @@ void DropoutKernel(const Context& dev_ctx,
     outputs["Mask"] = {mask};
 
     auto dropout_prob = p.to<float>();
-    int seed_data = 0;
-    GetSeed<Context>(dev_ctx, seed_tensor, seed, fix_seed, &seed_data);
+    auto seed_offset =
+        GetSeedOffset<Context>(dev_ctx, x, seed_tensor, seed, fix_seed);
+    int seed_data = seed_offset.first;
 
     GcuAttributeMap attrs;
     attrs["dropout_prob"] = dropout_prob;

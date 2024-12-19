@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 # Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,41 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Copyright (c) 2024 Baidu.com, Inc. All Rights Reserved.
 
-Build and setup Intele_HPU custom ops.
-"""
+from setuptools import Distribution, setup
 
-from paddle.utils.cpp_extension import CppExtension, setup
+packages = []
+package_data = {}
 
-setup(
-    name="paddlenlp_ops",
-    ext_modules=[
-        CppExtension(
-            sources=[
-                "./src/index_copy.cc",
-                "./src/fake_gpu_kernels.cc",
-                "./llama_infer/fused_rms_qkv_rope.cc",
-                "./llama_infer/fused_sdpa_proj.cc",
-                "./llama_infer/fused_mlp.cc",
-                "./llama_infer/fused_rms_mlp.cc",
-                "./llama_infer/ref_pp_kernels.cc",
-            ],
-            include_dirs=[
-                "../",
-                "../build/third_party/install/onednn/include/",
-                "../build/third_party/install/glog/include/",
-                "../build/third_party/install/gflags/include/",
-            ],
-            library_dirs=[
-                "../build/python/paddle_custom_device/",
-                "/usr/lib/habanalabs/",
-            ],
-            libraries=[
-                "paddle-intel-hpu",
-                "Synapse",
-            ],
-        )
-    ],
-)
+
+class BinaryDistribution(Distribution):
+    def has_ext_modules(self):
+        return True
+
+
+def main():
+    setup(
+        name="paddlenlp_ops",
+        version="0.0.0",
+        description="PaddleNLP NPU CustomOps",
+        long_description="",
+        long_description_content_type="text/markdown",
+        author_email="Paddle-better@baidu.com",
+        maintainer="PaddlePaddle",
+        maintainer_email="Paddle-better@baidu.com",
+        project_urls={},
+        license="Apache Software License",
+        packages=[
+            "paddlenlp_ops",
+        ],
+        include_package_data=True,
+        package_data={
+            "": ["*.py"],
+        },
+        package_dir={
+            "": "python",
+        },
+        zip_safe=False,
+        distclass=BinaryDistribution,
+        entry_points={"console_scripts": []},
+        classifiers=[],
+        keywords="PaddleNLP NPU CustomOps",
+    )
+
+
+if __name__ == "__main__":
+    main()

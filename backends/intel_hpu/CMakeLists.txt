@@ -33,6 +33,7 @@ set(PLUGIN_VERSION "0.0.1")
 include(paddle)
 include(generic)
 include(version)
+include(external/synapse)
 
 include_directories(${PADDLE_INC_DIR} ${CMAKE_SOURCE_DIR}
                     ${CMAKE_SOURCE_DIR}/kernels /usr/include/habanalabs)
@@ -45,6 +46,13 @@ file(
   RELATIVE ${CMAKE_SOURCE_DIR}
   kernels/*.cc utils/*.cc)
 list(APPEND PLUGIN_SRCS runtime/runtime.cc)
+
+# custom op with kernel
+file(
+  GLOB_RECURSE CUSTOM_OPERATOR_SRCS FOLLOW_SYMLINKS
+  RELATIVE ${CMAKE_SOURCE_DIR}
+  custom_ops/*.cc)
+list(APPEND PLUGIN_SRCS ${CUSTOM_OPERATOR_SRCS})
 
 # build shared library
 add_library(${PLUGIN_NAME} SHARED ${PLUGIN_SRCS})
