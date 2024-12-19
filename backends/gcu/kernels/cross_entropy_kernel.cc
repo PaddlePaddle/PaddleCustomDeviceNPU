@@ -119,16 +119,16 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
 }
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(cross_entropy_with_softmax,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::CrossEntropyWithSoftmaxKernel,
-                          phi::dtype::float16,
-                          float) {}
+// PD_REGISTER_PLUGIN_KERNEL(cross_entropy_with_softmax,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::CrossEntropyWithSoftmaxKernel,
+//                           phi::dtype::float16,
+//                           float) {}
 
-PD_REGISTER_PLUGIN_KERNEL(cross_entropy_with_softmax_grad,
-                          gcu,
-                          ALL_LAYOUT,
-                          custom_kernel::CrossEntropyWithSoftmaxGradKernel,
-                          phi::dtype::float16,
-                          float) {}
+// PD_REGISTER_PLUGIN_KERNEL(cross_entropy_with_softmax_grad,
+//                           gcu,
+//                           ALL_LAYOUT,
+//                           custom_kernel::CrossEntropyWithSoftmaxGradKernel,
+//                           phi::dtype::float16,
+//                           float) {}

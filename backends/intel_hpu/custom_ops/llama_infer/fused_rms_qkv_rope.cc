@@ -31,7 +31,7 @@ struct FusedRmsQkvRopeParams {
 class FusedRmsQkvRope : public HpuOperator {
  public:
   explicit FusedRmsQkvRope(synDataType dtype)
-      : HpuOperator("fused_rms_qkv_rope_fwd_"), dtype_(dtype) {}
+      : HpuOperator("fused_rms_qkv_rope_fwd_", false), dtype_(dtype) {}
 
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
