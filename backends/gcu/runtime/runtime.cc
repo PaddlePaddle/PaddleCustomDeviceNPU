@@ -81,6 +81,8 @@ static size_t total_pinned_alloc = 0;
 static size_t total_pinned_using = 0;
 static size_t total_pinned_free = 0;
 
+static std::vector<topsDeviceProp_t> properties_cache;
+
 // Device
 C_Status Init() {
   size_t dev_cnt = get_devices_count();
@@ -102,9 +104,31 @@ C_Status Finalize() {
 void OpsInitialize() { TOPSATEN_CHECK(topsatenInit()); }
 void OpsFinalize() { TOPSATEN_CHECK(topsatenFinalize()); }
 
+void InitDeviceProperties(void) {
+  topsDeviceProp_t prop;
+  properties_cache.clear();
+
+  size_t dev_cnt = get_devices_count();
+  for (int i = 0; i < dev_cnt; ++i) {
+    RT_CHECK(topsGetDeviceProperties(&prop, i));
+    properties_cache.emplace_back(prop);
+  }
+}
+
+topsDeviceProp_t GetDeviceProp(int device_id) {
+  int cur_dev;
+  RT_CHECK(topsGetDevice(&cur_dev));
+
+  if (properties_cache.empty()) {
+    InitDeviceProperties();
+  }
+  return properties_cache[cur_dev];
+}
+
 C_Status InitDevice(const C_Device device) {
   RT_CHECK(topsSetDevice(device->id));
   OpsInitialize();
+  InitDeviceProperties();
   VLOG(0) << "Backend GCU init device:" << device->id;
   return C_SUCCESS;
 }

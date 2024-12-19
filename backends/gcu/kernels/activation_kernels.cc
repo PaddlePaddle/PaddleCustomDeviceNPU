@@ -17,6 +17,20 @@
 #include "paddle/phi/common/type_traits.h"
 
 namespace custom_kernel {
+template <typename T, typename Context>
+extern void ScaleKernel(const Context& dev_ctx,
+                        const phi::DenseTensor& x,
+                        const phi::Scalar& in_scale,
+                        const phi::Scalar& in_bias,
+                        bool bias_after_scale,
+                        phi::DenseTensor* out);
+
+template <typename T, typename Context>
+extern void ClipKernel(const Context& dev_ctx,
+                       const phi::DenseTensor& x,
+                       const phi::Scalar& min,
+                       const phi::Scalar& max,
+                       phi::DenseTensor* out);
 
 #define DEFINE_UNARY_AOT_ACTIVATION_KERNEL(name, functor_prefix)     \
   template <typename T, typename Context>                            \
@@ -598,7 +612,12 @@ void Hard_SigmoidKernel(const Context& dev_ctx,
   PADDLE_GCU_KERNEL_TRACE("hard_sigmoid");
   if (LaunchAOTKernel()) {
     dev_ctx.template Alloc<T>(out);
-    LAUNCH_TOPSATENOP(topsatenHardsigmoid, dev_ctx, *out, x);
+    // clip((x * slope + offset), min=0, max=1)
+    custom_kernel::ScaleKernel<T, Context>(
+        dev_ctx, x, phi::Scalar(slope), phi::Scalar(offset), true, out);
+    custom_kernel::ClipKernel<T, Context>(
+        dev_ctx, *out, phi::Scalar(0.0f), phi::Scalar(1.0f), out);
+
   } else {  // kernel impl base on JIT
     GcuAttributeMap attrs;
     attrs["slope"] = slope;

@@ -172,6 +172,8 @@ void OpsInitialize();
 
 void OpsFinalize();
 
+topsDeviceProp_t GetDeviceProp(int device_id = 0);
+
 #ifdef __cplusplus
 } /* extern "c" */
 #endif

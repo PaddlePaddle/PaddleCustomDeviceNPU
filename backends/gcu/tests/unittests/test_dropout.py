@@ -22,15 +22,23 @@ from api_base import TestAPIBase
 # The table retains its original format for better comparison of parameter settings.
 # fmt: off
 DROPOUT_CASE = [
-    {"x_shape": [6], "p": 0.5, "axis": None, "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [6], "p": 0.5, "axis": None, "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [2, 3], "p": 0.5, "axis": [0, 1], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [2, 3], "p": 0.5, "axis": [0, 1], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [2, 3], "p": 0.5, "axis": [1], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [2, 3], "p": 0.5, "axis": [1], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [2, 3], "p": 0.5, "axis": [0], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
-    {"x_shape": [2, 3], "p": 0.5, "axis": [0], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
-    # TODO(xuelei.wan): Add test cases about mode='downscale_in_infer'
+    {"x_shape": [600000], "p": 0.5, "axis": None, "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [600000], "p": 0.5, "axis": None, "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0, 1], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0, 1], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [1], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [1], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0], "training": True, "mode": "upscale_in_train", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0], "training": False, "mode": "upscale_in_train", "x_dtype": np.float32},
+
+    {"x_shape": [200, 3000], "p": 0.5, "axis": None, "training": True, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": None, "training": False, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0, 1], "training": True, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0, 1], "training": False, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [1], "training": True, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [1], "training": False, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0], "training": True, "mode": "downscale_in_infer", "x_dtype": np.float32},
+    {"x_shape": [200, 3000], "p": 0.5, "axis": [0], "training": False, "mode": "downscale_in_infer", "x_dtype": np.float32},
 ]
 # fmt: on
 
@@ -51,7 +59,7 @@ class TestDropout(TestAPIBase):
         self.mask = None
 
     def prepare_data(self):
-        self.data_x = self.generate_data(self.x_shape, self.x_dtype) * 0 + 2
+        self.data_x = self.generate_data(self.x_shape, self.x_dtype) * 0 + 1
 
     def forward(self):
         x = paddle.to_tensor(self.data_x, dtype=self.x_dtype)
@@ -84,15 +92,15 @@ class TestDropout(TestAPIBase):
     @unpack
     def test_check_output(self, x_shape, p, axis, training, mode, x_dtype):
         self.x_shape = x_shape
-        self.p = 1.0
+        self.p = p
         self.axis = axis
         self.training = training
         self.mode = mode
         self.x_dtype = x_dtype
 
         self.prepare_data()
-        t0 = self.forward().numpy()
-        t1 = self.expect_output()
+        t0 = self.calc_result(self.forward, "gcu").numpy()
+        t1 = self.expect_output().numpy()
 
         self.assertEqual(t0.max(), t1.max())
 
