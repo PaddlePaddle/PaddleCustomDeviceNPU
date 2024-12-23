@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -486,7 +487,13 @@ class RuntimeManager {
   void initParser() {
     uint64_t hpu_start_time_ns;
     synProfilerGetCurrentTimeNS(&hpu_start_time_ns);
-    parser = std::make_unique<HpuTraceParser>(hpu_start_time_ns);
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    uint64_t wall_start_time_ns = ts.tv_sec * 1000000000 + ts.tv_nsec;
+
+    parser =
+        std::make_unique<HpuTraceParser>(hpu_start_time_ns, wall_start_time_ns);
   }
 
   void exportTrace(C_Profiler prof,
