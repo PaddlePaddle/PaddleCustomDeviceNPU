@@ -24,14 +24,36 @@ class Fused_Rms_Qkv_Rope(paddle.nn.Layer):
         self.head_dim = head_dim
         self.num_head = num_head
 
-    def forward(self, hidden, cos, sin, position_ids):
+    def forward(self, i, src, cos, sin, position_ids):
         query_states, key_states, value_states = fused_rms_qkv_rope(
-            hidden,
-            self.ln_scales,
-            self.qkv_weights,
+            src,
+            self.ln_scales[i],
+            self.qkv_weights[i],
             cos,
             sin,
             position_ids,
+            self.epsilon,
+            self.head_dim,
+            self.num_head,
+        )
+        return query_states, key_states, value_states
+
+
+class Fused_Rms_Qkv_Rope_v2(paddle.nn.Layer):
+    def __init__(self, ln_scales, qkv_weights, epsilon, head_dim, num_head):
+        super().__init__()
+        self.ln_scales = ln_scales
+        self.qkv_weights = qkv_weights
+        self.epsilon = epsilon
+        self.head_dim = head_dim
+        self.num_head = num_head
+
+    def forward(self, i, src, rotary_embs):
+        query_states, key_states, value_states = fused_rms_qkv_rope_v2(
+            src,
+            self.ln_scales[i],
+            self.qkv_weights[i],
+            rotary_embs,
             self.epsilon,
             self.head_dim,
             self.num_head,
@@ -45,13 +67,13 @@ class Fused_Sdpa_Proj(paddle.nn.Layer):
         self.scaling_factor = scaling_factor
         self.linear_weights = linear_weights
 
-    def forward(self, query_states, key_states, value_states, attention_mask):
+    def forward(self, i, query_states, key_states, value_states, attention_mask):
         out_linear_out = fused_sdpa_proj(
             query_states,
             key_states,
             value_states,
             attention_mask,
-            self.linear_weights,
+            self.linear_weights[i],
             self.scaling_factor,
         )
         return out_linear_out
@@ -64,12 +86,12 @@ class Fused_Mlp(paddle.nn.Layer):
         self.down_weight = down_weight
         self.up_weight = up_weight
 
-    def forward(self, x):
+    def forward(self, i, x):
         fused_mlp_out = fused_mlp(
             x,
-            self.proj_weight,
-            self.up_weight,
-            self.down_weight,
+            self.proj_weight[i],
+            self.up_weight[i],
+            self.down_weight[i],
         )
         return fused_mlp_out
 
@@ -82,12 +104,12 @@ class Fused_Rms_Mlp(paddle.nn.Layer):
         self.proj_weight = proj_weight
         self.down_weight = down_weight
 
-    def forward(self, x):
+    def forward(self, i, x):
         fused_rms_mlp_out = fused_rms_mlp(
             x,
-            self.ln_scales,
-            self.proj_weight,
-            self.down_weight,
+            self.ln_scales[i],
+            self.proj_weight[i],
+            self.down_weight[i],
             self.epsilon,
         )
         return fused_rms_mlp_out
