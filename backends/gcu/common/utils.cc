@@ -20,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "passes/gcu_custom_passes.h"
+
 namespace custom_kernel {
 namespace {
 const int64_t kMicrosToMillis = 1000;

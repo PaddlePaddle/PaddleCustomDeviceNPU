@@ -14,6 +14,9 @@
 
 cmake_minimum_required(VERSION 3.10)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
 project(paddle-custom-gcu CXX C)
 set(CUSTOM_GCU_NAME "paddle-custom-gcu")
 
@@ -85,6 +88,12 @@ if(WITH_KERNELS)
     custom_op/*.cc)
   list(APPEND CUSTOM_GCU_SRCS ${CUSTOM_CUSTOM_OP_SRCS})
 endif()
+
+file(
+  GLOB_RECURSE CUSTOM_PASSES_SRCS
+  RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
+  passes/*.cc)
+list(APPEND CUSTOM_GCU_SRCS ${CUSTOM_PASSES_SRCS})
 
 file(
   GLOB_RECURSE CUSTOM_ENGINE_SRCS
@@ -227,8 +236,15 @@ add_custom_command(
           ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes
   COMMAND ${CMAKE_COMMAND} -E make_directory
           ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes
-  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/passes/*
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/passes/*.py
           ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes
+  COMMAND
+    ${CMAKE_COMMAND} -E make_directory
+    ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes/legacy_ir_passes
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/passes/legacy_ir_passes/*.py
+    ${CMAKE_CURRENT_BINARY_DIR}/python/paddle_custom_device/gcu/passes/legacy_ir_passes
   COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/setup.py bdist_wheel
   DEPENDS ${CUSTOM_GCU_NAME}
   COMMENT "Packing whl packages------>>>")

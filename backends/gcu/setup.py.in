@@ -132,7 +132,8 @@ def main():
             'paddle_custom_device',
             'paddle_custom_device.gcu',
             'paddle_custom_device.gcu.ops',
-            'paddle_custom_device.gcu.passes'
+            'paddle_custom_device.gcu.passes',
+            'paddle_custom_device.gcu.passes.legacy_ir_passes'
         ],
         include_package_data=True,
         package_data = {
