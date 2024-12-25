@@ -98,6 +98,17 @@ class TestElementwiseMinOp(OpTest):
             )
 
 
+class TestElementwiseMinOp1(TestElementwiseMinOp):
+    def init_input_output(self):
+        self.x = np.random.uniform(0.1, 1, [100]).astype(self.dtype)
+        self.sgn = np.random.choice([-1, 1], [2, 100]).astype(self.dtype)
+        self.y = self.x + self.sgn * np.random.uniform(0.1, 1, [2, 100]).astype(
+            self.dtype
+        )
+        self.out = np.minimum(self.x, self.y)
+        self.axis = -1
+
+
 class TestElementwiseMinOpFp16(TestElementwiseMinOp):
     def init_dtype(self):
         self.dtype = np.float16

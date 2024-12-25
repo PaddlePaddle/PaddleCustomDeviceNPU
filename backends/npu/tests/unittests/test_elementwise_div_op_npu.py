@@ -74,6 +74,66 @@ class TestElementwiseDiv(OpTest):
         self.check_grad_with_place(self.place, ["X"], "Out", no_grad_set=set("Y"))
 
 
+class TestElementwiseDiv1(OpTest):
+    def setUp(self):
+        self.set_npu()
+        self.op_type = "elementwise_div"
+        self.place = paddle.CustomPlace("npu", 0)
+
+        self.init_dtype()
+        np.random.seed(SEED)
+        x = np.random.uniform(1, 2, [2, 100]).astype(self.dtype)
+        y = np.random.uniform(1, 2, [100]).astype(self.dtype)
+        out = np.divide(x, y)
+
+        self.inputs = {
+            "X": OpTest.np_dtype_to_base_dtype(x),
+            "Y": OpTest.np_dtype_to_base_dtype(y),
+        }
+        self.attrs = {}
+        self.outputs = {"Out": out}
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    def init_dtype(self):
+        self.dtype = np.float32
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+    def test_check_grad_normal(self):
+        self.check_grad_with_place(
+            self.place,
+            ["X", "Y"],
+            "Out",
+            max_relative_error=0.007,
+        )
+
+
+class TestElementwiseDiv2(TestElementwiseDiv1):
+    def setUp(self):
+        self.set_npu()
+        self.op_type = "elementwise_div"
+        self.place = paddle.CustomPlace("npu", 0)
+
+        self.init_dtype()
+        np.random.seed(SEED)
+        x = np.random.uniform(1, 2, [100]).astype(self.dtype)
+        y = np.random.uniform(1, 2, [2, 100]).astype(self.dtype)
+        out = np.divide(x, y)
+
+        self.inputs = {
+            "X": OpTest.np_dtype_to_base_dtype(x),
+            "Y": OpTest.np_dtype_to_base_dtype(y),
+        }
+        self.attrs = {}
+        self.outputs = {"Out": out}
+
+    def init_dtype(self):
+        self.dtype = np.float16
+
+
 class TestElementwiseDivFp16(OpTest):
     def setUp(self):
         self.set_npu()

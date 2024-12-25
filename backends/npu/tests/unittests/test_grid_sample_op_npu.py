@@ -543,5 +543,32 @@ class TestGridSamperAPI(unittest.TestCase):
         paddle.enable_static()
 
 
+class TestGridSampleAPI1(TestGridSamperAPI):
+    def setUp(self):
+        self.x_shape = (2, 3, 5, 6, 7)
+        self.grid_shape = (2, 8, 9, 10, 3)
+        self.theta_shape = (2, 3, 4)
+        self.align_corners = False
+        self.padding_mode = "zeros"
+        self.mode = "bilinear"
+
+        self.x = np.random.randint(0, 255, self.x_shape).astype("float32")
+        self.theta = np.zeros(self.theta_shape).astype("float32")
+
+        if len(self.grid_shape) == 4:
+            for i in range(self.theta_shape[0]):
+                for j in range(2):
+                    for k in range(3):
+                        self.theta[i, j, k] = np.random.rand(1)[0]
+            self.grid = AffineGrid(self.theta, self.grid_shape)
+        else:
+            for i in range(self.theta_shape[0]):
+                for j in range(3):
+                    for k in range(4):
+                        self.theta[i, j, k] = np.random.rand(1)[0]
+            self.grid = AffineGrid3D(self.theta, self.grid_shape)
+        self.place = paddle.CustomPlace("npu", 0)
+
+
 if __name__ == "__main__":
     unittest.main()

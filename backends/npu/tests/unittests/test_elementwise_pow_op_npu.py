@@ -132,6 +132,17 @@ class TestElementwisePow(OpTest):
         )
 
 
+class TestElementwisePow1(TestElementwisePow):
+    def init_axis(self):
+        self.axis = 1
+
+    def init_input_output(self):
+        np.random.seed(SEED)
+        self.x = np.random.uniform(1, 2, [2, 100]).astype(self.dtype)
+        self.y = np.random.uniform(1, 2, [100]).astype(self.dtype)
+        self.out = np.power(self.x, self.y)
+
+
 class TestElementwisePowFp16(TestElementwisePow):
     def init_input_output(self):
         np.random.seed(SEED)

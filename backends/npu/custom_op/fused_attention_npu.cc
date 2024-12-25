@@ -594,7 +594,7 @@ PD_BUILD_OP(flash_attention_npu)
               "offset",
               "numel"})
     .Attrs({"dropout: float",
-            "causal:bool",
+            "casual:bool",
             "return_softmax:bool",
             "is_test:bool",
             "is_triangle_upper_mask:bool"})
@@ -618,7 +618,7 @@ PD_BUILD_GRAD_OP(flash_attention_npu)
     .Outputs({paddle::Grad("query"),
               paddle::Grad("key"),
               paddle::Grad("value")})
-    .Attrs({"dropout: float", "causal:bool", "is_triangle_upper_mask:bool"})
+    .Attrs({"dropout: float", "casual:bool", "is_triangle_upper_mask:bool"})
     .SetKernelFn(PD_KERNEL(npu_flash_attention_grad))
     .SetInferShapeFn(PD_INFER_SHAPE(
         fusedattentionInferShape));  // neccessary if the op has muti_inputs

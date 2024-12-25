@@ -129,6 +129,105 @@ class TestDropoutOpInput1d_1(TestDropoutOp):
         }
 
 
+class TestDropoutOpInput1d_2(TestDropoutOp):
+    def setUp(self):
+        self.op_type = "dropout"
+        self.set_npu()
+        self.init_dtype()
+        self.inputs = {"X": np.random.random((2000)).astype(self.dtype)}
+        self.attrs = {
+            "dropout_prob": 0.0,
+            "fix_seed": True,
+            "is_test": False,
+            "dropout_implementation": "upscale_in_train",
+        }
+        self.outputs = {
+            "Out": self.inputs["X"],
+            "Mask": convert_to_npu_mask(np.ones((2000)).astype("uint8")),
+        }
+
+    def init_dtype(self):
+        self.dtype = "float64"
+
+
+class TestDropoutOpInput1d_3(TestDropoutOpInput1d_2):
+    def setUp(self):
+        self.op_type = "dropout"
+        self.set_npu()
+        self.init_dtype()
+        self.inputs = {"X": np.random.random((2000)).astype(self.dtype)}
+        self.attrs = {
+            "dropout_prob": 0.1,
+            "fix_seed": True,
+            "is_test": False,
+            "dropout_implementation": "upscale_in_train",
+        }
+        self.outputs = {
+            "Out": self.inputs["X"],
+            "Mask": convert_to_npu_mask(np.ones((2000)).astype("uint8")),
+        }
+
+
+class TestDropoutOpInput2d(TestDropoutOp):
+    def init_dtype(self):
+        self.dtype = "float64"
+
+    def setUp(self):
+        self.op_type = "dropout"
+        self.set_npu()
+        self.init_dtype()
+        self.inputs = {"X": np.random.random((2000, 2)).astype(self.dtype)}
+        self.attrs = {
+            "dropout_prob": 0.1,
+            "fix_seed": True,
+            "is_test": False,
+            "dropout_implementation": "upscale_in_train",
+        }
+        self.outputs = {
+            "Out": self.inputs["X"],
+            "Mask": convert_to_npu_mask(np.ones((2000, 2)).astype("uint8")),
+        }
+
+
+class TestDropoutOpInput0d(TestDropoutOp):
+    def setUp(self):
+        self.op_type = "dropout"
+        self.set_npu()
+        self.init_dtype()
+        self.inputs = {"X": np.random.random([]).astype(self.dtype)}
+        self.attrs = {
+            "dropout_prob": 0.0,
+            "fix_seed": True,
+            "is_test": False,
+            "dropout_implementation": "upscale_in_train",
+        }
+        self.outputs = {
+            "Out": self.inputs["X"],
+            "Mask": convert_to_npu_mask(np.ones([]).astype("uint8")),
+        }
+
+
+@skip_check_grad_ci(reason="For inference, check_grad is not required.")
+class TestDropoutOpInput2d_1(TestDropoutOp):
+    def setUp(self):
+        self.op_type = "dropout"
+        self.set_npu()
+        self.init_dtype()
+        self.inputs = {
+            "X": np.random.random([128]).astype(self.dtype),
+            "Seed": np.asarray([125], dtype="int32"),
+        }
+        self.attrs = {
+            "dropout_prob": 0.0,
+            "is_test": True,
+            "dropout_implementation": "downgrade_in_infer",
+        }
+        self.outputs = {
+            "Out": self.inputs["X"],
+            "Mask": convert_to_npu_mask(np.ones([128 * 8]).astype("uint8")),
+        }
+
+
 class TestDropoutModeDownOp1(TestDropoutOp):
     # the dropout_prob is 1.0
     def setUp(self):

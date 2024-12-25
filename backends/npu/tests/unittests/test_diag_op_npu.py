@@ -129,5 +129,12 @@ class TestDiagOp3(TestDiagOp):
         self.check_output_with_place(self.place, atol=1e-3)
 
 
+class TestDiagOp4(TestDiagOp3):
+    def config(self):
+        self.x_shape = (100, 2)
+        self.offset = 0
+        self.padding_value = 0.0
+
+
 if __name__ == "__main__":
     unittest.main()

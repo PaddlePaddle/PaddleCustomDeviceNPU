@@ -198,5 +198,60 @@ class TestCast16(TestCast1):
         self.shape = [8192, 4000]
 
 
+class TestCast17(TestCast1):
+    def init_dtype(self):
+        self.input_dtype = "float16"
+        self.output_dtype = "int16"
+        self.in_dtype = int(core.VarDesc.VarType.FP16)
+        self.out_dtype = int(core.VarDesc.VarType.INT32)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
+class TestCast18(TestCast1):
+    def init_dtype(self):
+        self.input_dtype = "float16"
+        self.output_dtype = "uint8"
+        self.in_dtype = int(core.VarDesc.VarType.FP16)
+        self.out_dtype = int(core.VarDesc.VarType.UINT8)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
+class TestCast19(TestCast1):
+    def init_dtype(self):
+        self.input_dtype = "float16"
+        self.output_dtype = "int8"
+        self.in_dtype = int(core.VarDesc.VarType.FP16)
+        self.out_dtype = int(core.VarDesc.VarType.INT8)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
+class TestCast20(TestCast1):
+    def init_dtype(self):
+        self.input_dtype = "float16"
+        self.output_dtype = "complex64"
+        self.in_dtype = int(core.VarDesc.VarType.FP16)
+        self.out_dtype = int(core.VarDesc.VarType.COMPLEX64)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
+class TestCast21(TestCast1):
+    def init_dtype(self):
+        self.input_dtype = "float16"
+        self.output_dtype = "complex128"
+        self.in_dtype = int(core.VarDesc.VarType.FP16)
+        self.out_dtype = int(core.VarDesc.VarType.COMPLEX128)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
 if __name__ == "__main__":
     unittest.main()

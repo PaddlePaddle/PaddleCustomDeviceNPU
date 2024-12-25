@@ -70,7 +70,7 @@ class TestNPUFAFP16(unittest.TestCase):
         self.shape = (1, 5, 2048, 128)
         self.dropout = 0.0
         self.fixed_seed_offset = None
-        self.causal = False
+        self.casual = False
         self.return_softmax = False
         self.is_test = False
         self.is_triangle_upper_mask = True
@@ -128,7 +128,7 @@ class TestNPUFAFP16(unittest.TestCase):
             self.fixed_seed_offset,
             mask,
             self.dropout,
-            self.causal,
+            self.casual,
             self.return_softmax,
             self.is_test,
             self.is_triangle_upper_mask,
@@ -187,6 +187,76 @@ class TestNPUFAFP16(unittest.TestCase):
         )
 
         golden_res = self.golden_fa(golden_query, golden_key, golden_value, mask)
+        fused_res = self.fused_fa(fused_query, fused_key, fused_value, mask)
+        self.check_result(golden_res, fused_res)
+
+
+class TestNpuFAFP16WithCasual(TestNPUFAFP16):
+    def setUp(self):
+        self.npu_place = paddle.CustomPlace("npu", 0)
+        self.cpu_place = paddle.CPUPlace()
+        # (B,S,N,D)
+        self.shape = (1, 5, 2048, 128)
+        self.dropout = 0.0
+        self.fixed_seed_offset = None
+        self.casual = True
+        self.return_softmax = False
+        self.is_test = False
+        self.is_triangle_upper_mask = True
+        self.pass_line = 0.9999
+        self.init_dtype()
+
+    def golden_fa(self, query_, key_, value_, mask=None, casual=False):
+        query = query_.cast("float32")
+        key = key_.cast("float32")
+        value = value_.cast("float32")
+        if casual:
+            mask = paddle.full(
+                (self.shape[2], self.shape[2]), paddle.finfo(paddle.float16).min
+            )
+            mask = paddle.triu(mask, diagonal=1)
+            mask = mask.astype(paddle.bool)
+        y = attention_naive(query, key, value, mask)
+        y.backward()
+        dx = query_.grad.cast("float32")
+        return y.numpy(), dx.numpy()
+
+    @check_soc_version
+    def test_fa(self):
+        np_query, np_key, np_value, mask = self.gen_input()
+        if self.dtype == "float16":
+            golden_query = paddle.to_tensor(
+                np_query, place=self.cpu_place, dtype=self.dtype, stop_gradient=False
+            )
+            golden_key = paddle.to_tensor(
+                np_key, place=self.cpu_place, dtype=self.dtype, stop_gradient=True
+            )
+            golden_value = paddle.to_tensor(
+                np_value, place=self.cpu_place, dtype=self.dtype, stop_gradient=True
+            )
+        elif self.dtype == "bfloat16":
+            golden_query = paddle.to_tensor(
+                np_query, place=self.npu_place, dtype=self.dtype, stop_gradient=False
+            )
+            golden_key = paddle.to_tensor(
+                np_key, place=self.npu_place, dtype=self.dtype, stop_gradient=True
+            )
+            golden_value = paddle.to_tensor(
+                np_value, place=self.npu_place, dtype=self.dtype, stop_gradient=True
+            )
+        fused_query = paddle.to_tensor(
+            np_query, place=self.npu_place, dtype=self.dtype, stop_gradient=False
+        )
+        fused_key = paddle.to_tensor(
+            np_key, place=self.npu_place, dtype=self.dtype, stop_gradient=True
+        )
+        fused_value = paddle.to_tensor(
+            np_value, place=self.npu_place, dtype=self.dtype, stop_gradient=True
+        )
+
+        golden_res = self.golden_fa(
+            golden_query, golden_key, golden_value, mask, self.casual
+        )
         fused_res = self.fused_fa(fused_query, fused_key, fused_value, mask)
         self.check_result(golden_res, fused_res)
 

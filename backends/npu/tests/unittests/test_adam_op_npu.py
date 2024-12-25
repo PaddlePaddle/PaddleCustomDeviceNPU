@@ -62,6 +62,7 @@ def adam_step(inputs, attributes):
 class TestAdam(OpTest):
     def setUp(self):
         self.set_npu()
+        self.init_dtype()
         self.place = paddle.CustomPlace("npu", 0)
         self.op_type = "adam"
         param = np.random.uniform(-1, 1, (102, 105)).astype(self.dtype)

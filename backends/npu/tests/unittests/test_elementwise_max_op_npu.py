@@ -131,6 +131,14 @@ class TestElementwiseMaxOp(OpTest):
         self.check_grad_with_place(self.place, ["X"], "Out", no_grad_set=set("Y"))
 
 
+class TestElementwiseMaxOp1(TestElementwiseMaxOp):
+    def init_input_output(self):
+        self.x = np.random.uniform(0.1, 1, [100]).astype(self.dtype)
+        sgn = np.random.choice([-1, 1], [2, 100]).astype(self.dtype)
+        self.y = self.x + sgn * np.random.uniform(0.1, 1, [2, 100]).astype(self.dtype)
+        self.out = np.maximum(self.x, self.y)
+
+
 class TestElementwiseMaxOp_int32(TestElementwiseMaxOp):
     def init_dtype(self):
         self.dtype = np.int32

@@ -117,6 +117,29 @@ class TestExpandAsOpRank4(OpTest):
         pass
 
 
+class TestExpandAsOpRank5(OpTest):
+    def setUp(self):
+        self.set_npu()
+        self.place = paddle.CustomPlace("npu", 0)
+        self.op_type = "expand_as_v2"
+        x = np.random.rand(1, 1, 7, 16).astype("float64")
+        target_tensor = np.random.rand(4, 6, 7, 16).astype("float64")
+        self.inputs = {"X": x}
+        self.attrs = {"target_shape": target_tensor.shape}
+        bcast_dims = [4, 6, 1, 1]
+        output = np.tile(self.inputs["X"], bcast_dims)
+        self.outputs = {"Out": output}
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+    def test_check_grad(self):
+        pass
+
+
 # Test python API
 class TestExpandAsV2API(unittest.TestCase):
     def test_api(self):
