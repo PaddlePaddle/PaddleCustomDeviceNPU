@@ -496,7 +496,6 @@ void Pool2dGradKernel(const Context& dev_ctx,
                                                         adaptive,
                                                         padding_algorithm,
                                                         in_x_grad)));
-
   // aclnnAvgPool2dBackward do not support padding_algorithm = "SAME"
   if (pooling_type == "max" || padding_algorithm == "SAME" ||
       adaptive == false) {
