@@ -37,7 +37,7 @@ int64_t getMaxDifference(const std::vector<int64_t>& actual_seq_len) {
     return actual_seq_len[0];
   }
 
-  int64_t max_diff = 0;
+  int64_t max_diff = actual_seq_len[0];
   for (size_t i = 1; i < actual_seq_len.size(); ++i) {
     int64_t diff = actual_seq_len[i] - actual_seq_len[i - 1];
     if (diff > max_diff) {
