@@ -32,6 +32,21 @@ DropOutStatus get_dropout_status(double keep_prob) {
   return DropOutStatus::DROPOUT_NORMAL;
 }
 
+int64_t getMaxDifference(const std::vector<int64_t>& actual_seq_len) {
+    if (actual_seq_len.size() == 1) {
+        return actual_seq_len[0];
+    }
+ 
+    int64_t max_diff = 0;
+    for (size_t i = 1; i < actual_seq_len.size(); ++i) {
+        int64_t diff = actual_seq_len[i] - actual_seq_len[i - 1];
+        if (diff > max_diff) {
+            max_diff = diff;
+        }
+    }
+    return max_diff;
+}
+
 std::vector<std::vector<int64_t>> fusedattentionInferShape(
     std::vector<int64_t> q_shape,
     std::vector<int64_t> k_shape,
@@ -197,12 +212,8 @@ std::vector<paddle::Tensor> npu_flash_attention(
 
     if (is_varlen == true &&
         actual_seq_q_len.size() == actual_seq_kv_len.size()) {
-      auto max_q =
-          std::max_element(actual_seq_q_len.begin(), actual_seq_q_len.end());
-      auto max_kv =
-          std::max_element(actual_seq_kv_len.begin(), actual_seq_kv_len.end());
-      int64_t max_q_value = *max_q;
-      int64_t max_kv_value = *max_kv;
+      int64_t max_q_value = getMaxDifference(actual_seq_q_len);
+      int64_t max_kv_value = getMaxDifference(actual_seq_kv_len);
       attn_mask_tensor_null->Resize({max_q_value, max_kv_value});
     } else {
       attn_mask_tensor_null->Resize(
@@ -504,12 +515,8 @@ std::vector<paddle::Tensor> npu_flash_attention_grad(
 
     if (is_varlen == true &&
         actual_seq_q_len.size() == actual_seq_kv_len.size()) {
-      auto max_q =
-          std::max_element(actual_seq_q_len.begin(), actual_seq_q_len.end());
-      auto max_kv =
-          std::max_element(actual_seq_kv_len.begin(), actual_seq_kv_len.end());
-      int64_t max_q_value = *max_q;
-      int64_t max_kv_value = *max_kv;
+      int64_t max_q_value = getMaxDifference(actual_seq_q_len);
+      int64_t max_kv_value = getMaxDifference(actual_seq_kv_len);
       attn_mask_tensor_null->Resize({max_q_value, max_kv_value});
     } else {
       attn_mask_tensor_null->Resize(
