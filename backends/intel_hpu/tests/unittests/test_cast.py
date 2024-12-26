@@ -84,5 +84,211 @@ class TestCastBF16_2(TestCastBF16_1):
         self.out_dtype = int(core.VarDesc.VarType.FP32)
 
 
+class TestCastBF16_3(TestCastBF16):
+    def init_shape(self):
+        self.shape = [2, 1, 1, 4096]
+
+    def init_dtype(self):
+        self.input_dtype = "bool"
+        self.output_dtype = "uint16"
+        self.in_dtype = int(core.VarDesc.VarType.BOOL)
+        self.out_dtype = int(core.VarDesc.VarType.BF16)
+
+
+class TestCastBF16_4(TestCastBF16):
+    def init_shape(self):
+        self.shape = [1]
+
+
+class TestCastBF16_5(TestCastBF16):
+    def init_shape(self):
+        self.shape = [1024, 8192]
+
+
+@skip_check_grad_ci(reason="[skip NPU cast grad check] not implemented yet.")
+class TestCastBF16_5(TestCastBF16):
+    def init_dtype(self):
+        self.input_dtype = "float16"
+        self.output_dtype = "float32"
+        self.in_dtype = int(core.VarDesc.VarType.FP16)
+        self.out_dtype = int(core.VarDesc.VarType.FP32)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
+@skip_check_grad_ci(reason="[skip NPU cast grad check] not implemented yet.")
+class TestCastBF16_6(TestCastBF16):
+    def init_dtype(self):
+        self.input_dtype = "int32"
+        self.output_dtype = "int32"
+        self.in_dtype = int(core.VarDesc.VarType.INT32)
+        self.out_dtype = int(core.VarDesc.VarType.INT32)
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place, atol=1e-3)
+
+
+class TestCastBF16_7(TestCastBF16):
+    def init_shape(self):
+        self.shape = [2, 4096, 1]
+
+    def init_dtype(self):
+        self.input_dtype = "float"
+        self.output_dtype = "bool"
+        self.in_dtype = int(core.VarDesc.VarType.FP32)
+        self.out_dtype = int(core.VarDesc.VarType.BOOL)
+
+
+class TestCastBF16_8(TestCastBF16):
+    def init_shape(self):
+        self.shape = [4096, 4096]
+
+    def init_dtype(self):
+        self.input_dtype = "float"
+        self.output_dtype = "int32"
+        self.in_dtype = int(core.VarDesc.VarType.FP32)
+        self.out_dtype = int(core.VarDesc.VarType.INT32)
+
+
+class TestCastBF16_9(TestCastBF16):
+    def init_shape(self):
+        self.shape = [8192]
+
+    def init_dtype(self):
+        self.input_dtype = "int64"
+        self.output_dtype = "bool"
+        self.in_dtype = int(core.VarDesc.VarType.INT64)
+        self.out_dtype = int(core.VarDesc.VarType.BOOL)
+
+
+class TestCastBF16_10(TestCastBF16):
+    def init_shape(self):
+        self.shape = [2, 1, 1, 4096]
+
+    def init_dtype(self):
+        self.input_dtype = "bool"
+        self.output_dtype = "uint16"
+        self.in_dtype = int(core.VarDesc.VarType.BOOL)
+        self.out_dtype = int(core.VarDesc.VarType.BF16)
+
+
+class TestCast10(TestCastBF16):
+    def init_shape(self):
+        self.shape = [2, 4096, 4000]
+
+    def init_dtype(self):
+        self.input_dtype = "float"
+        self.output_dtype = "uint16"
+        self.in_dtype = int(core.VarDesc.VarType.FP32)
+        self.out_dtype = int(core.VarDesc.VarType.BF16)
+
+
+class TestCast11(TestCast10):
+    def init_shape(self):
+        self.shape = [3584, 8192]
+
+
+class TestCast12(TestCast10):
+    def init_shape(self):
+        self.shape = [4000, 8192]
+
+
+class TestCast13(TestCast10):
+    def init_shape(self):
+        self.shape = [8192, 1280]
+
+
+class TestCast14(TestCast10):
+    def init_shape(self):
+        self.shape = [8192, 7168]
+
+
+class TestCast15(TestCastBF16):
+    def init_dtype(self):
+        self.input_dtype = "int64"
+        self.output_dtype = "float32"
+        self.in_dtype = int(core.VarDesc.VarType.INT64)
+        self.out_dtype = int(core.VarDesc.VarType.FP32)
+
+    def init_shape(self):
+        self.shape = [8192, 1]
+
+
+class TestCast16(TestCastBF16):
+    def init_dtype(self):
+        self.input_dtype = "bool"
+        self.output_dtype = "float32"
+        self.in_dtype = int(core.VarDesc.VarType.BOOL)
+        self.out_dtype = int(core.VarDesc.VarType.FP32)
+
+    def init_shape(self):
+        self.shape = [8192, 4000]
+
+
+class TestCastOpFp32ToFp64(OpTest):
+    def setUp(self):
+        self.set_npu()
+        self.op_type = "cast"
+        self.place = paddle.CustomPlace("intel_hpu", 0)
+
+        ipt = np.random.random(size=[10, 10])
+        self.inputs = {"X": ipt.astype("float32")}
+        self.outputs = {"Out": ipt.astype("float64")}
+        self.attrs = {
+            "in_dtype": int(core.VarDesc.VarType.FP32),
+            "out_dtype": int(core.VarDesc.VarType.FP64),
+        }
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output()
+
+    def test_grad(self):
+        self.check_grad(["X"], ["Out"])
+
+
+class TestCastOpFp16ToFp32(OpTest):
+    def setUp(self):
+        self.set_npu()
+        ipt = np.random.random(size=[10, 10])
+        self.inputs = {"X": ipt.astype("float16")}
+        self.outputs = {"Out": ipt.astype("float32")}
+        self.attrs = {
+            "in_dtype": int(core.VarDesc.VarType.FP16),
+            "out_dtype": int(core.VarDesc.VarType.FP32),
+        }
+        self.op_type = "cast"
+        self.__class__.no_need_check_grad = True
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output(atol=1e-3)
+
+
+class TestCastOpBf16ToFp32(OpTest):
+    def setUp(self):
+        self.set_npu()
+        ipt = np.array(np.random.randint(10, size=[10, 10])).astype("uint16")
+        self.inputs = {"X": ipt}
+        self.outputs = {"Out": convert_uint16_to_float(ipt)}
+        self.attrs = {
+            "in_dtype": int(core.VarDesc.VarType.BF16),
+            "out_dtype": int(core.VarDesc.VarType.FP32),
+        }
+        self.op_type = "cast"
+        self.__class__.no_need_check_grad = True
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output()
+
+
 if __name__ == "__main__":
     unittest.main()
