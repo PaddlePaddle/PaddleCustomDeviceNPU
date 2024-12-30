@@ -57,7 +57,7 @@ load_lib()
 def write_version_py(filename='python/paddle_custom_device/gcu/__init__.py'):
     cnt = '''# THIS FILE IS GENERATED FROM PADDLEPADDLE SETUP.PY
 #
-full_version  = '@OUTPUT_PADDLE_PACKAGE_VERSION@'
+full_version  = '@PADDLE_VERSION@'
 tops_version  = '@TOPS_VERSION@'
 git_commit_id = '@GIT_HASH@'
 
@@ -132,7 +132,8 @@ def main():
             'paddle_custom_device',
             'paddle_custom_device.gcu',
             'paddle_custom_device.gcu.ops',
-            'paddle_custom_device.gcu.passes'
+            'paddle_custom_device.gcu.passes',
+            'paddle_custom_device.gcu.passes.legacy_ir_passes'
         ],
         include_package_data=True,
         package_data = {

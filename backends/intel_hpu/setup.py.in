@@ -1,3 +1,4 @@
+import os
 from setuptools import setup, Distribution
 
 packages = []
@@ -7,10 +8,96 @@ class BinaryDistribution(Distribution):
     def has_ext_modules(self):
         return True
 
+def write_custom_op_api_py(filename='python/paddle_custom_device/intel_hpu/ops.py', libname='python/paddle_custom_device/libpaddle-intel-hpu.so'):
+    import os
+    os.environ['CUSTOM_DEVICE_ROOT']=''
+    import sys
+    import paddle
+    op_names = paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(libname)
+    api_content = [paddle.utils.cpp_extension.extension_utils._custom_api_content(op_name) for op_name in op_names]
+    dirname = os.path.dirname(filename)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    with open(filename, 'w') as f:
+        f.write('''# THIS FILE IS GENERATED FROM PADDLEPADDLE SETUP.PY
+#
+import paddle
+import os
+for lib in os.listdir(os.getenv("CUSTOM_DEVICE_ROOT")):
+    if lib.endswith(".so"):
+        paddle.utils.cpp_extension.extension_utils.load_op_meta_info_and_register_op(
+            lib
+        )
+''')
+        f.write('\n\n'.join(api_content))
+
+def write_version_py(filename='python/paddle_custom_device/intel_hpu/__init__.py'):
+    dirname = os.path.dirname(filename)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    cnt = '''# THIS FILE IS GENERATED FROM PADDLEPADDLE SETUP.PY
+#
+from .ops import *
+
+full_version  = '@PADDLE_VERSION@'
+synapse_version  = @SYNAPSE_VERSION@
+git_commit_id = '@GIT_HASH@'
+custom_op_git_commit_id = '@CUSTOM_OP_GIT_HASH@'
+
+__all__ = ['version']
+
+def version():
+    """Get the version info of paddle custom npu
+
+    Returns:
+        version: version of paddle custom npu
+        commit: the commit id of paddle custom npu
+        cann: the cann version of paddle custom npu
+
+    Examples:
+        .. code-block:: python
+
+            import paddle_custom_device
+
+            paddle_custom_device.intel_hpu.version()
+            # version: 2.5.0
+            # commit: b1539a921dbabf708807ebedb2671fa7bd3fd2f9
+            # synapse: 1.17.0
+    """
+    print('version:', full_version)
+    print('commit:', git_commit_id)
+    print('custom_op commit:', custom_op_git_commit_id)
+    print('synapse:', synapse_version)
+    return {'version': full_version, 'commit': git_commit_id, 'custom_op commit': custom_op_git_commit_id, 'synapse': synapse_version}
+'''
+
+    with open(filename, 'w') as f:
+        f.write(cnt)
+
+def write_init_py(filename='python/paddle_custom_device/__init__.py'):
+    dirname = os.path.dirname(filename)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
+    cnt = '''# THIS FILE IS GENERATED FROM PADDLEPADDLE SETUP.PY
+#
+from . import intel_hpu # noqa: F401
+
+__all__ = [  # noqa
+    'intel_hpu',
+]
+
+'''
+    with open(filename, 'w') as f:
+        f.write(cnt)
+
+write_custom_op_api_py()
+write_version_py()
+write_init_py()
+
 setup(
     name = '@CMAKE_PROJECT_NAME@',
     version='@PLUGIN_VERSION@',
-    description='Paddle HabanaHPU plugin',
+    description='PaddlePaddle INTEL HPU plugin',
     long_description='',
     long_description_content_type="text/markdown",
     author_email="Paddle-better@baidu.com",
@@ -20,6 +107,7 @@ setup(
     license='Apache Software License',
     packages= [
         'paddle_custom_device',
+        'paddle_custom_device.intel_hpu',
     ],
     include_package_data=True,
     package_data = {
@@ -36,5 +124,5 @@ setup(
     },
     classifiers=[
     ],
-    keywords='Paddle HabanaHPU plugin',
+    keywords='PaddlePaddle INTEL HPU plugin',
 )

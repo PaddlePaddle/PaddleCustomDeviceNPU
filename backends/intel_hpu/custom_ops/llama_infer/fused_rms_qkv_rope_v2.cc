@@ -28,10 +28,10 @@ struct FusedRmsQkvRopeParams {
   int kv_num_head;
 };
 
-class FusedRmsQkvRope : public HpuOperator {
+class FusedRmsQkvRopeV2 : public HpuOperator {
  public:
-  explicit FusedRmsQkvRope(synDataType dtype)
-      : HpuOperator("fused_rms_qkv_rope_fwd_", false), dtype_(dtype) {}
+  explicit FusedRmsQkvRopeV2(synDataType dtype)
+      : HpuOperator("fused_rms_qkv_rope_v2_fwd_"), dtype_(dtype) {}
 
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
@@ -45,6 +45,7 @@ class FusedRmsQkvRope : public HpuOperator {
     std::string guid_reshape = "reshape";
     std::string guid_rmsnorm = "rms_norm_ex_fwd_";
     std::string guid_rope = "rotary_pos_embedding_fwd_";
+    // std::string guid_rope = "rope_st2_fwd_";
 
     if (dtype_ == syn_type_fp16) {
       guid_rmsnorm = guid_rmsnorm + "f16";
@@ -214,48 +215,123 @@ class FusedRmsQkvRope : public HpuOperator {
              "[RUNTIME] FusedRmsQkvRopeKernel synNodeCreate () failed = ",
              status);
 
-    std::vector<synTensor> sin_inputs;
+    std::vector<synTensor> rotary_embs_c_inputs;
+    auto rotary_embs_c =
+        createTensor(ins[3].size(), dtype_, ins[3], true, "rotary_embs");
+    rotary_embs_c_inputs.push_back(rotary_embs_c);
+
+    auto rotary_embs_dims = ins[3];
+    rotary_embs_dims[0] = 1;
+
     std::vector<synTensor> cos_inputs;
-    auto sin = createTensor(ins[3].size(), dtype_, ins[3], true, "sin");
-    auto cos = createTensor(ins[4].size(), dtype_, ins[4], true, "cos");
-    sin_inputs.push_back(sin);
-    cos_inputs.push_back(cos);
+    auto cos_in = createTensor(
+        rotary_embs_dims.size(), dtype_, rotary_embs_dims, false, "cos_in");
+    cos_inputs.push_back(cos_in);
 
-    auto sin_cos_dims = ins[3];
-    sin_cos_dims[2] = sin_cos_dims[1];
-    sin_cos_dims[1] = 1;
+    synSliceParamsV2 sliceParams;
+    for (int i = 0; i < rotary_embs_dims.size(); i++) {
+      sliceParams.axes[i] = i;
+      sliceParams.steps[i] = 1;
+      sliceParams.starts[i] = 0;
+      sliceParams.ends[i] = rotary_embs_dims[rotary_embs_dims.size() - 1 - i];
+    }
 
-    std::vector<synTensor> sin_squeezed;
-    std::vector<synTensor> cos_squeezed;
-    auto sin_sq = createTensor(
-        sin_cos_dims.size(), dtype_, sin_cos_dims, false, "sin_squeezed");
-    auto cos_sq = createTensor(
-        sin_cos_dims.size(), dtype_, sin_cos_dims, false, "cos_squeezed");
-    sin_squeezed.push_back(sin_sq);
-    cos_squeezed.push_back(cos_sq);
+    std::string slice_guid = "slice";
+    std::string slice_name = guid_ + "slice";
+    std::string slice_name_cos = slice_name + "_cos";
     status = synNodeCreate(graphHandle_,
-                           sin_inputs.data(),
-                           sin_squeezed.data(),
-                           1,
-                           1,
-                           nullptr,
-                           0,
-                           guid_reshape.c_str(),
-                           name_reshape.c_str(),
+                           rotary_embs_c_inputs.data(),
+                           cos_inputs.data(),
+                           rotary_embs_c_inputs.size(),
+                           cos_inputs.size(),
+                           &sliceParams,
+                           sizeof(sliceParams),
+                           slice_guid.c_str(),
+                           slice_name_cos.c_str(),
                            nullptr,
                            nullptr);
     PD_CHECK(status == synSuccess,
              "[RUNTIME] FusedRmsQkvRopeKernel synNodeCreate () failed = ",
              status);
+
+    std::vector<synTensor> rotary_embs_s_inputs;
+    auto rotary_embs_s =
+        createTensor(ins[3].size(), dtype_, ins[3], true, "rotary_embs");
+    rotary_embs_s_inputs.push_back(rotary_embs_s);
+
+    std::vector<synTensor> sin_inputs;
+    auto sin_in = createTensor(
+        rotary_embs_dims.size(), dtype_, rotary_embs_dims, false, "sin_in");
+    sin_inputs.push_back(sin_in);
+    sliceParams.starts[rotary_embs_dims.size() - 1] = 1;
+    sliceParams.ends[rotary_embs_dims.size() - 1] = 2;
+    std::string slice_name_sin = slice_name + "_sin";
+    status = synNodeCreate(graphHandle_,
+                           rotary_embs_s_inputs.data(),
+                           sin_inputs.data(),
+                           rotary_embs_s_inputs.size(),
+                           sin_inputs.size(),
+                           &sliceParams,
+                           sizeof(sliceParams),
+                           slice_guid.c_str(),
+                           slice_name_sin.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FusedRmsQkvRopeKernel synNodeCreate () failed = ",
+             status);
+
+    synSqueezeParams squeezeParams;
+    squeezeParams.axis = 4;
+    std::string squeeze_guid = "squeeze";
+    std::string squeeze_name = guid_ + "squeeze";
+
+    rotary_embs_dims.erase(rotary_embs_dims.begin());
+
+    std::vector<synTensor> sin_squeezed;
+    auto sin_sq = createTensor(rotary_embs_dims.size(),
+                               dtype_,
+                               rotary_embs_dims,
+                               false,
+                               "sin_squeezed");
+    // auto sin_sq = createTensor(
+    //     rotary_embs_dims.size(), dtype_, rotary_embs_dims, true, "debugs");
+    sin_squeezed.push_back(sin_sq);
+    std::string squeeze_name_sin = squeeze_name + "_sin";
+    status = synNodeCreate(graphHandle_,
+                           sin_inputs.data(),
+                           sin_squeezed.data(),
+                           1,
+                           1,
+                           &squeezeParams,
+                           sizeof(squeezeParams),
+                           squeeze_guid.c_str(),
+                           squeeze_name_sin.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] FusedRmsQkvRopeKernel synNodeCreate () failed = ",
+             status);
+
+    std::vector<synTensor> cos_squeezed;
+    auto cos_sq = createTensor(rotary_embs_dims.size(),
+                               dtype_,
+                               rotary_embs_dims,
+                               false,
+                               "cos_squeezed");
+    // auto cos_sq = createTensor(
+    //     rotary_embs_dims.size(), dtype_, rotary_embs_dims, true, "debugc");
+    cos_squeezed.push_back(cos_sq);
+    std::string squeeze_name_cos = squeeze_name + "_cos";
     status = synNodeCreate(graphHandle_,
                            cos_inputs.data(),
                            cos_squeezed.data(),
                            1,
                            1,
-                           nullptr,
-                           0,
-                           guid_reshape.c_str(),
-                           name_reshape.c_str(),
+                           &squeezeParams,
+                           sizeof(squeezeParams),
+                           squeeze_guid.c_str(),
+                           squeeze_name_cos.c_str(),
                            nullptr,
                            nullptr);
     PD_CHECK(status == synSuccess,
@@ -267,9 +343,6 @@ class FusedRmsQkvRope : public HpuOperator {
     inputs_q.push_back(q);
     inputs_q.push_back(sin_sq);
     inputs_q.push_back(cos_sq);
-    auto position_ids = createTensor(
-        ins[5].size(), syn_type_int32, ins[5], true, "position_ids");
-    inputs_q.push_back(position_ids);
 
     auto q_states =
         createTensor(outs[0].size(), dtype_, outs[0], true, "query_states");
@@ -299,7 +372,6 @@ class FusedRmsQkvRope : public HpuOperator {
     inputs_k.push_back(k);
     inputs_k.push_back(sin_sq);
     inputs_k.push_back(cos_sq);
-    inputs_k.push_back(position_ids);
 
     auto k_states =
         createTensor(outs[1].size(), dtype_, outs[1], true, "key_states");
@@ -326,28 +398,24 @@ class FusedRmsQkvRope : public HpuOperator {
 };
 
 template <typename T, typename Context>
-void FusedRmsQkvRopeKernel(const Context& dev_ctx,
-                           const phi::DenseTensor& src,
-                           const phi::DenseTensor& ln_scales,
-                           const phi::DenseTensor& qkv_weights,
-                           const phi::DenseTensor& cos,
-                           const phi::DenseTensor& sin,
-                           const phi::DenseTensor& position_ids,
-                           phi::DenseTensor* query_states,
-                           phi::DenseTensor* key_states,
-                           phi::DenseTensor* value_states,
-                           const phi::Scalar& epsilon,
-                           const phi::Scalar& head_dim,
-                           const phi::Scalar& num_head) {
+void FusedRmsQkvRopeKernelV2(const Context& dev_ctx,
+                             const phi::DenseTensor& src,
+                             const phi::DenseTensor& ln_scales,
+                             const phi::DenseTensor& qkv_weights,
+                             const phi::DenseTensor& rotary_embs,
+                             phi::DenseTensor* query_states,
+                             phi::DenseTensor* key_states,
+                             phi::DenseTensor* value_states,
+                             const phi::Scalar& epsilon,
+                             const phi::Scalar& head_dim,
+                             const phi::Scalar& num_head) {
   std::vector<int64_t> src_dims = phi::vectorize<int64_t>(src.dims());
   std::vector<int64_t> ln_scales_dims =
       phi::vectorize<int64_t>(ln_scales.dims());
   std::vector<int64_t> qkv_weights_dims =
       phi::vectorize<int64_t>(qkv_weights.dims());
-  std::vector<int64_t> cos_dims = phi::vectorize<int64_t>(cos.dims());
-  std::vector<int64_t> sin_dims = phi::vectorize<int64_t>(sin.dims());
-  std::vector<int64_t> position_ids_dims =
-      phi::vectorize<int64_t>(position_ids.dims());
+  std::vector<int64_t> rotary_embs_dims =
+      phi::vectorize<int64_t>(rotary_embs.dims());
 
   std::vector<int64_t> out_q_dim =
       phi::vectorize<int64_t>(query_states->dims());
@@ -355,12 +423,8 @@ void FusedRmsQkvRopeKernel(const Context& dev_ctx,
   std::vector<int64_t> out_v_dim =
       phi::vectorize<int64_t>(value_states->dims());
 
-  std::vector<DIMS> inputs = {src_dims,
-                              ln_scales_dims,
-                              qkv_weights_dims,
-                              sin_dims,
-                              cos_dims,
-                              position_ids_dims};
+  std::vector<DIMS> inputs = {
+      src_dims, ln_scales_dims, qkv_weights_dims, rotary_embs_dims};
   std::vector<DIMS> outputs = {out_q_dim, out_k_dim, out_v_dim};
 
   int head_dim_ = head_dim.to<int>();
@@ -388,7 +452,7 @@ void FusedRmsQkvRopeKernel(const Context& dev_ctx,
     params.num_head = num_head_;
     params.kv_num_head = kv_num_head;
 
-    FusedRmsQkvRope op(op_info.datatype_);
+    FusedRmsQkvRopeV2 op(op_info.datatype_);
     op.AddNode(inputs, outputs, params);
     op.Compile();
     op_info.setOp(op);
@@ -400,10 +464,7 @@ void FusedRmsQkvRopeKernel(const Context& dev_ctx,
   tensors["src"] = reinterpret_cast<uint64_t>(src.data<T>());
   tensors["ln_scales"] = reinterpret_cast<uint64_t>(ln_scales.data<T>());
   tensors["qkv_weights"] = reinterpret_cast<uint64_t>(qkv_weights.data<T>());
-  tensors["sin"] = reinterpret_cast<uint64_t>(sin.data<T>());
-  tensors["cos"] = reinterpret_cast<uint64_t>(cos.data<T>());
-  tensors["position_ids"] =
-      reinterpret_cast<uint64_t>(position_ids.data<int64_t>());
+  tensors["rotary_embs"] = reinterpret_cast<uint64_t>(rotary_embs.data<T>());
 
   tensors["query_states"] = reinterpret_cast<uint64_t>(query_states->data<T>());
   tensors["key_states"] = reinterpret_cast<uint64_t>(key_states->data<T>());
@@ -415,61 +476,53 @@ void FusedRmsQkvRopeKernel(const Context& dev_ctx,
 }  // namespace custom_kernel
 
 template <typename Context>
-void CallFusedRmsQkvRopeKernel(const Context& dev_ctx,
-                               const phi::DenseTensor& src,
-                               const phi::DenseTensor& ln_scales,
-                               const phi::DenseTensor& qkv_weights,
-                               const phi::DenseTensor& cos,
-                               const phi::DenseTensor& sin,
-                               const phi::DenseTensor& position_ids,
-                               phi::DenseTensor* query_states,
-                               phi::DenseTensor* key_states,
-                               phi::DenseTensor* value_states,
-                               const phi::Scalar& epsilon,
-                               const phi::Scalar& head_dim,
-                               const phi::Scalar& num_head) {
+void CallFusedRmsQkvRopeKernelV2(const Context& dev_ctx,
+                                 const phi::DenseTensor& src,
+                                 const phi::DenseTensor& ln_scales,
+                                 const phi::DenseTensor& qkv_weights,
+                                 const phi::DenseTensor& rotary_embs,
+                                 phi::DenseTensor* query_states,
+                                 phi::DenseTensor* key_states,
+                                 phi::DenseTensor* value_states,
+                                 const phi::Scalar& epsilon,
+                                 const phi::Scalar& head_dim,
+                                 const phi::Scalar& num_head) {
   if (src.dtype() == phi::DataType::FLOAT16) {
-    custom_kernel::FusedRmsQkvRopeKernel<phi::dtype::float16>(dev_ctx,
-                                                              src,
-                                                              ln_scales,
-                                                              qkv_weights,
-                                                              cos,
-                                                              sin,
-                                                              position_ids,
-                                                              query_states,
-                                                              key_states,
-                                                              value_states,
-                                                              epsilon,
-                                                              head_dim,
-                                                              num_head);
+    custom_kernel::FusedRmsQkvRopeKernelV2<phi::dtype::float16>(dev_ctx,
+                                                                src,
+                                                                ln_scales,
+                                                                qkv_weights,
+                                                                rotary_embs,
+                                                                query_states,
+                                                                key_states,
+                                                                value_states,
+                                                                epsilon,
+                                                                head_dim,
+                                                                num_head);
   } else if (src.dtype() == phi::DataType::BFLOAT16) {
-    custom_kernel::FusedRmsQkvRopeKernel<phi::dtype::bfloat16>(dev_ctx,
-                                                               src,
-                                                               ln_scales,
-                                                               qkv_weights,
-                                                               cos,
-                                                               sin,
-                                                               position_ids,
-                                                               query_states,
-                                                               key_states,
-                                                               value_states,
-                                                               epsilon,
-                                                               head_dim,
-                                                               num_head);
+    custom_kernel::FusedRmsQkvRopeKernelV2<phi::dtype::bfloat16>(dev_ctx,
+                                                                 src,
+                                                                 ln_scales,
+                                                                 qkv_weights,
+                                                                 rotary_embs,
+                                                                 query_states,
+                                                                 key_states,
+                                                                 value_states,
+                                                                 epsilon,
+                                                                 head_dim,
+                                                                 num_head);
   } else {
     throw std::runtime_error("Unsupported data type for FusedRmsQkvRopeKernel");
   }
 }
 
-std::vector<paddle::Tensor> FusedRmsQkvRope(const paddle::Tensor& src,
-                                            const paddle::Tensor& ln_scales,
-                                            const paddle::Tensor& qkv_weights,
-                                            const paddle::Tensor& cos,
-                                            const paddle::Tensor& sin,
-                                            const paddle::Tensor& position_ids,
-                                            float epsilon,
-                                            int head_dim,
-                                            int num_head) {
+std::vector<paddle::Tensor> FusedRmsQkvRopeV2(const paddle::Tensor& src,
+                                              const paddle::Tensor& ln_scales,
+                                              const paddle::Tensor& qkv_weights,
+                                              const paddle::Tensor& rotary_embs,
+                                              float epsilon,
+                                              int head_dim,
+                                              int num_head) {
   auto dev_ctx = static_cast<const phi::CustomContext*>(
       paddle::experimental::DeviceContextPool::Instance().Get(src.place()));
   auto src_tensor = static_cast<const phi::DenseTensor*>(src.impl().get());
@@ -477,10 +530,8 @@ std::vector<paddle::Tensor> FusedRmsQkvRope(const paddle::Tensor& src,
       static_cast<const phi::DenseTensor*>(ln_scales.impl().get());
   auto qkv_weights_tensor =
       static_cast<const phi::DenseTensor*>(qkv_weights.impl().get());
-  auto cos_tensor = static_cast<const phi::DenseTensor*>(cos.impl().get());
-  auto sin_tensor = static_cast<const phi::DenseTensor*>(sin.impl().get());
-  auto position_ids_tensor =
-      static_cast<const phi::DenseTensor*>(position_ids.impl().get());
+  auto rotary_embs_tensor =
+      static_cast<const phi::DenseTensor*>(rotary_embs.impl().get());
 
   // allocate memory on device.
   int64_t bsz = src.dims()[0];
@@ -503,31 +554,27 @@ std::vector<paddle::Tensor> FusedRmsQkvRope(const paddle::Tensor& src,
   value_states->Resize(phi::make_ddim({bsz, kv_num_head, seq_len, head_dim}));
   dev_ctx->Alloc(value_states.get(), src_tensor->dtype());
 
-  CallFusedRmsQkvRopeKernel(*dev_ctx,
-                            *src_tensor,
-                            *ln_scales_tensor,
-                            *qkv_weights_tensor,
-                            *cos_tensor,
-                            *sin_tensor,
-                            *position_ids_tensor,
-                            query_states.get(),
-                            key_states.get(),
-                            value_states.get(),
-                            phi::Scalar(epsilon),
-                            phi::Scalar(head_dim),
-                            phi::Scalar(num_head));
+  CallFusedRmsQkvRopeKernelV2(*dev_ctx,
+                              *src_tensor,
+                              *ln_scales_tensor,
+                              *qkv_weights_tensor,
+                              *rotary_embs_tensor,
+                              query_states.get(),
+                              key_states.get(),
+                              value_states.get(),
+                              phi::Scalar(epsilon),
+                              phi::Scalar(head_dim),
+                              phi::Scalar(num_head));
   return {paddle::Tensor(query_states),
           paddle::Tensor(key_states),
           paddle::Tensor(value_states)};
 }
 
-std::vector<std::vector<int64_t>> FusedRmsQkvRopeShape(
+std::vector<std::vector<int64_t>> FusedRmsQkvRopeV2Shape(
     const std::vector<int64_t>& src_shape,
     const std::vector<int64_t>& ln_scales_shape,
     const std::vector<int64_t>& qkv_weights_shape,
-    const std::vector<int64_t>& cos_shape,
-    const std::vector<int64_t>& sin_shape,
-    const std::vector<int64_t>& position_ids_shape,
+    const std::vector<int64_t>& rotary_embs_shape,
     float epsilon,
     int head_dim,
     int num_head) {
@@ -540,20 +587,18 @@ std::vector<std::vector<int64_t>> FusedRmsQkvRopeShape(
           {bsz, kv_num_head, seq_len, head_dim}};
 }
 
-std::vector<paddle::DataType> FusedRmsQkvRopeDtype(
+std::vector<paddle::DataType> FusedRmsQkvRopeV2Dtype(
     const paddle::DataType& src_dtype,
     const paddle::DataType& ln_scales_dtype,
     const paddle::DataType& qkv_weights_dtype,
-    const paddle::DataType& cos_dtype,
-    const paddle::DataType& sin_dtype,
-    const paddle::DataType& position_ids_dtype) {
+    const paddle::DataType& rotary_embs_dtype) {
   return {src_dtype, src_dtype, src_dtype};
 }
 
-PD_BUILD_OP(fused_rms_qkv_rope)
-    .Inputs({"src", "ln_scales", "qkv_weights", "cos", "sin", "position_ids"})
+PD_BUILD_OP(fused_rms_qkv_rope_v2)
+    .Inputs({"src", "ln_scales", "qkv_weights", "rotary_embs"})
     .Outputs({"query_states", "key_states", "value_states"})
     .Attrs({"epsilon: float", "head_dim: int", "num_head: int"})
-    .SetKernelFn(PD_KERNEL(FusedRmsQkvRope))
-    .SetInferShapeFn(PD_INFER_SHAPE(FusedRmsQkvRopeShape))
-    .SetInferDtypeFn(PD_INFER_DTYPE(FusedRmsQkvRopeDtype));
+    .SetKernelFn(PD_KERNEL(FusedRmsQkvRopeV2))
+    .SetInferShapeFn(PD_INFER_SHAPE(FusedRmsQkvRopeV2Shape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(FusedRmsQkvRopeV2Dtype));

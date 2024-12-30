@@ -23,7 +23,7 @@ namespace custom_kernel {
 class FusedSdpaProj : public HpuOperator {
  public:
   explicit FusedSdpaProj(synDataType dtype)
-      : HpuOperator("fused_sdpa_proj_"), dtype_(dtype) {}
+      : HpuOperator("fused_sdpa_proj_", false), dtype_(dtype) {}
 
   void AddNode(ConvertTensors& ct, ns_Sdpa::ParamsV2 params) {
     auto inputs = ct.GetTensors();

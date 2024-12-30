@@ -26,6 +26,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -92,7 +93,9 @@ class RuntimeManager {
         status = synDeviceAcquireByModuleId(&deviceId, require_id);
         PD_CHECK(status == synSuccess,
                  "[RUNTIME] synDeviceAcquireByModuleId() failed = ",
-                 status);
+                 status,
+                 " require_id=",
+                 require_id);
       }
     } else {
       // release the old one and acquire a new one
@@ -105,7 +108,9 @@ class RuntimeManager {
       status = synDeviceAcquireByModuleId(&deviceId, require_id);
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synDeviceAcquireByModuleId() failed = ",
-               status);
+               status,
+               " require_id=",
+               require_id);
     }
     Status = 1;
     moduleID = device->id;
@@ -227,9 +232,11 @@ class RuntimeManager {
             << "create builtin stream h2d" << stream_h2d;
       }
 
-      addCache(device, src, size);
+      // addCache(device, src, size);
+      void *ptr = getCachedHostMem(device, size);
+      memcpy(ptr, src, size);
       status = synMemCopyAsync(stream_h2d,
-                               reinterpret_cast<uint64_t>(src),
+                               reinterpret_cast<uint64_t>(ptr),
                                size,
                                reinterpret_cast<uint64_t>(dst),
                                HOST_TO_DRAM);
@@ -250,12 +257,13 @@ class RuntimeManager {
                  status);
       }
 
-      addCache(device, dst, size);
+      // addCache(device, dst, size);
+      void *ptr = getCachedHostMem(device, size);
 
       status = synMemCopyAsync(stream_d2h,
                                reinterpret_cast<uint64_t>(src),
                                size,
-                               reinterpret_cast<uint64_t>(dst),
+                               reinterpret_cast<uint64_t>(ptr),
                                DRAM_TO_HOST);
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synMemCopyAsync() failed = ",
@@ -264,6 +272,7 @@ class RuntimeManager {
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synStreamSynchronize() failed = ",
                status);
+      memcpy(dst, ptr, size);
 
     } else if (flag == 2) {
       if (stream_d2d == nullptr) {
@@ -428,6 +437,24 @@ class RuntimeManager {
         << " size=" << size;
   }
 
+  inline void *getCachedHostMem(const C_Device device, size_t size) {
+    static void *global_ptr = nullptr;
+    static size_t ptr_size = 0;
+
+    if (global_ptr != nullptr && ptr_size >= size) return global_ptr;
+
+    if (ptr_size < size) ptr_size = size;
+
+    if (global_ptr != nullptr) {
+      synHostFree(device->id, global_ptr, 0);
+      global_ptr = nullptr;
+    }
+
+    synStatus status = synHostMalloc(device->id, ptr_size, 0, &global_ptr);
+    PD_CHECK(status == synSuccess, "[RUNTIME] synHostMalloc failed = ", status);
+    return global_ptr;
+  }
+
   void GetUniqueIdSize(size_t *sz) {
     *sz = HCCL_UNIQUE_ID_MAX_BYTES;
     LOG_IF(INFO, FLAGS_intel_hpu_runtime_debug) << "uid size = " << *sz;
@@ -486,7 +513,13 @@ class RuntimeManager {
   void initParser() {
     uint64_t hpu_start_time_ns;
     synProfilerGetCurrentTimeNS(&hpu_start_time_ns);
-    parser = std::make_unique<HpuTraceParser>(hpu_start_time_ns);
+
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    uint64_t wall_start_time_ns = ts.tv_sec * 1000000000 + ts.tv_nsec;
+
+    parser =
+        std::make_unique<HpuTraceParser>(hpu_start_time_ns, wall_start_time_ns);
   }
 
   void exportTrace(C_Profiler prof,
@@ -672,7 +705,7 @@ C_Status Allocate_host(const C_Device device, void **ptr, size_t size) {
 
   PD_CHECK(status == synSuccess, "[RUNTIME] synHostMalloc() failed = ", status);
 
-  return C_FAILED;
+  return C_SUCCESS;
 }
 
 C_Status Deallocate_host(const C_Device device, void *ptr, size_t size) {

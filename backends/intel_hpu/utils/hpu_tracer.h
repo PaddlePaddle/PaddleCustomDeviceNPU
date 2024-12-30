@@ -50,6 +50,10 @@ struct EngineType {
     static std::string host_meta_name = "***Host";
     return name == host_meta_name;
   }
+
+  static bool isKernelEvent(const std::string_view name) {
+    return std::strstr(name.data(), "*TPC") || std::strstr(name.data(), "*MME");
+  }
 };
 
 struct EngineDatabase {
@@ -97,7 +101,7 @@ struct EngineDatabase {
 
 class HpuTraceParser {
  public:
-  explicit HpuTraceParser(uint64_t hpu_start_time);
+  explicit HpuTraceParser(uint64_t hpu_start_time, uint64_t wall_start_time);
 
   ~HpuTraceParser();
 
@@ -112,6 +116,8 @@ class HpuTraceParser {
 
   void initLanes();
   bool isEventInTime(uint64_t start, uint64_t end, uint64_t hpu_stop_time);
+  bool isKernelEvent(const synTraceEvent* events_ptr);
+  bool inHiddenList(const synTraceEvent* events_ptr);
   void convertEventsToActivities(C_Profiler prof,
                                  synTraceEvent* events_ptr,
                                  size_t num_events);

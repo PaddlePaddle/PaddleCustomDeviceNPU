@@ -65,10 +65,19 @@ std::vector<std::vector<int64_t>> MyAddNOpInferShape(
   return {x_shape};
 }
 
+std::vector<paddle::DataType> MyAddNOpInferDtype(
+    const paddle::DataType& x_dtype,
+    const paddle::DataType& y_dtype,
+    const paddle::DataType& z_dtype,
+    int64_t axis) {
+  return {x_dtype};
+}
+
 PD_BUILD_OP(my_add_n)
     .Inputs({"X", "Y", "Z"})
     .Outputs({"Out"})
     .Attrs({"axis: int64_t"})
     .SetKernelFn(PD_KERNEL(MyAddNOp))
-    .SetInferShapeFn(PD_INFER_SHAPE(
-        MyAddNOpInferShape));  // neccessary if the op has muti_inputs
+    .SetInferShapeFn(PD_INFER_SHAPE(MyAddNOpInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(
+        MyAddNOpInferDtype));  // neccessary if the op has muti_inputs
