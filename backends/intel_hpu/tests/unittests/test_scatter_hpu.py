@@ -122,5 +122,74 @@ class test_gather_i32_no_ow(OpTest):
         self.check_output_with_place(self.place)
 
 
+class test_gather_fp32_no_ow(OpTest):
+    def setUp(self):
+        self.set_hpu()
+        self.op_type = "scatter"
+        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.python_api = paddle.scatter
+
+        ref_np = np.ones((3, 2)).astype("float32")
+        index_np = np.array([1]).astype("int32")
+        updates_np = np.random.random((1, 2)).astype("float32")
+
+        output_np = np.copy(ref_np)
+        output_np[index_np] = updates_np
+        self.inputs = {"X": ref_np, "Ids": index_np, "Updates": updates_np}
+        self.outputs = {"Out": output_np}
+        self.attrs = {"overwrite": True}
+
+    def set_hpu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+    def test_check_grad(self):
+        self.check_grad_with_place(
+            self.place,
+            ["X", "Updates"],
+            "Out",
+            check_dygraph=False,
+            numeric_place=paddle.CPUPlace(),
+        )
+
+
+class test_gather_fp32_no_ow_2(test_gather_fp32_no_ow):
+    def setUp(self):
+        self.set_hpu()
+        self.op_type = "scatter"
+        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.python_api = paddle.scatter
+
+        ref_np = np.ones((3, 2)).astype("float32")
+        index_np = np.array([1]).astype("int32")
+        updates_np = np.random.random((1, 2)).astype("float32")
+
+        output_np = np.copy(ref_np)
+        output_np[index_np] += updates_np
+        self.inputs = {"X": ref_np, "Ids": index_np, "Updates": updates_np}
+        self.outputs = {"Out": output_np}
+        self.attrs = {"overwrite": False}
+
+
+class test_gather_fp32_no_ow_3(test_gather_fp32_no_ow):
+    def setUp(self):
+        self.set_hpu()
+        self.op_type = "scatter"
+        self.place = paddle.CustomPlace("intel_hpu", 0)
+
+        ref_np = np.ones((3, 2)).astype("float32")
+        index_np = np.array([1, 2]).astype("int32")
+        updates_np = np.random.random((2, 2)).astype("float32")
+
+        output_np = np.copy(ref_np)
+        output_np[1] = updates_np[0]
+        output_np[2] = updates_np[1]
+        self.inputs = {"X": ref_np, "Ids": index_np, "Updates": updates_np}
+        self.outputs = {"Out": output_np}
+        self.attrs = {"overwrite": True}
+
+
 if __name__ == "__main__":
     unittest.main()
