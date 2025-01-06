@@ -297,7 +297,7 @@ class TestRecompute(unittest.TestCase):
         pos = paddle.randn(shape=[10, 10], dtype="float32")
         pos.stop_gradient = False
 
-        kwargs = {"pos": pos, "use_reentrant": True}
+        kwargs = {"pos": pos, "use_reentrant": True, "offload_indices": [0]}
         loss_ref, param_ref, grad_ref = run_model(
             recompute_block=[2], recompute_kwargs=kwargs
         )
