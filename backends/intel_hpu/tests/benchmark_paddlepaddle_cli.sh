@@ -159,7 +159,7 @@ while IFS=' ' read -r model_name model_path hpu_number; do
                 fi
 
                 log_name=${log_name_prefix}_$(TZ='Asia/Shanghai' date +%F-%H-%M-%S)
-                cmd="python3 predictor.py --model_name_or_path $model_path --inference_model --dtype $dtype --device $device --src_length $input_len --max_length $output_len --total_max_length $total_max_length --batch_size $batch_size --output_file ${log_name}.json --benchmark true"
+                cmd="python3 predictor.py --model_name_or_path $model_path --inference_model --dtype $dtype --device $device --src_length $input_len --max_length $output_len --total_max_length $total_max_length --batch_size $batch_size --output_file ${log_name}.json --decode_strategy greedy_search --benchmark true"
                 echo $cmd
                 # eval $cmd 2>&1 | tee $workspace/${log_name}.log
                 eval $cmd > $workspace/${log_name}.log 2>&1
@@ -169,7 +169,7 @@ while IFS=' ' read -r model_name model_path hpu_number; do
                 last_line=$(tail -n 1 "$workspace/${log_name}.log")
                 if [[ $last_line != *IPS* ]]; then
                     echo "performance data: not found. Log: $workspace/${log_name}.log"
-                    echo "$model_name,$hpu_number,$input_len,$output_len,$batch_size, 'Error',,${log_name}.log, \"$last_line\"" >> $workspace/"$csv_file"
+                    echo "$model_name,$hpu_number,$input_len,$output_len,$batch_size,'Error',,${log_name}.log, \"$last_line\"" >> $workspace/"$csv_file"
                     echo "break the batch size loop"
                     break 
                 else
