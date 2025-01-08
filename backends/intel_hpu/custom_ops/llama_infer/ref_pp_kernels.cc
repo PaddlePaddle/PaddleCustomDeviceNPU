@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #include <dlfcn.h>
+#include <omp.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -45,6 +45,7 @@ void set_value_by_flags(const bool* stop_flags,
                         bool* stop_flags_out,
                         const int bs,
                         int end_length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; bi++) {
     topk_ids[bi] = stop_flags[bi] ? end_ids[0] : topk_ids[bi];
     if (is_in_end(topk_ids[bi], end_ids, end_length)) {
@@ -101,6 +102,7 @@ void set_value_by_flag_and_id(const bool* stop_flags,
                               const int64_t* step_idx,
                               int bs,
                               int length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; bi++) {
     if (!stop_flags[bi]) {
       int64_t* pre_ids_all_now = pre_ids_all + bi * length;
@@ -162,6 +164,7 @@ void min_length_logits_process(T* logits,
                                const int64_t bs,
                                const int64_t length,
                                const int64_t end_length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; ++bi) {
     if (cur_len[bi] < 0) {
       continue;
@@ -180,6 +183,7 @@ void update_repeat_times(const int64_t* pre_ids,
                          const int64_t bs,
                          const int64_t length,
                          const int64_t length_id) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; ++bi) {
     if (cur_len[bi] < 0) {
       continue;
@@ -204,6 +208,7 @@ void update_value_by_repeat_times(const int* repeat_times,
                                   T* logits,
                                   const int64_t bs,
                                   const int64_t length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; ++bi) {
     T* logits_now = logits + bi * length;
     const int* repeat_times_now = repeat_times + bi * length;

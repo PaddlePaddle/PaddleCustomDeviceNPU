@@ -16,9 +16,11 @@ cmake_minimum_required(VERSION 3.10)
 
 project(paddle-intel-hpu CXX C)
 
-set(CMAKE_BUILD_TYPE "Debug")
-set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb")
-set(CMAKE_CXX_FLAGS_RELEASE "$ENV{CXXFLAGS} -O3 -Wall")
+set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_CXX_FLAGS_DEBUG
+    "$ENV{CXXFLAGS} -O0 -Wall -g2 -ggdb -fopenmp -DOMP_THREAD_NUM=16")
+set(CMAKE_CXX_FLAGS_RELEASE
+    "$ENV{CXXFLAGS} -O3 -Wall -fopenmp -DOMP_THREAD_NUM=16")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
