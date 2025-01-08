@@ -113,8 +113,8 @@ std::vector<paddle::Tensor> npu_flash_attention(
     const paddle::Tensor& value,
     const paddle::optional<paddle::Tensor>& fixed_seed_offset,
     const paddle::optional<paddle::Tensor>& attn_mask,
-    std::vector<int64_t> actual_seq_q_len,
-    std::vector<int64_t> actual_seq_kv_len,
+    const paddle::optional<paddle::Tensor>& actual_seq_q_len,
+    const paddle::optional<paddle::Tensor>& actual_seq_kv_len,
     float dropout = 0.0,
     bool casual = false,
     bool return_softmax = false,
@@ -122,6 +122,32 @@ std::vector<paddle::Tensor> npu_flash_attention(
     bool is_triangle_upper_mask = true,
     bool is_varlen = false) {
   auto dev_ctx = getcontext(query);
+
+  std::vector<int64_t> actual_seq_q_len_vec, actual_seq_kv_len_vec;
+  if (is_varlen) {
+    PD_CHECK(
+        actual_seq_q_len.is_initialized() && actual_seq_kv_len.is_initialized(),
+        "When is_varlen is True, actual_seq_q_len and actual_seq_kv_len "
+        "must be provided.");
+    auto actual_seq_q_len_ptr = actual_seq_q_len.get_ptr();
+    auto actual_seq_kv_len_ptr = actual_seq_kv_len.get_ptr();
+    std::vector<int> actual_seq_q_len_vec_(actual_seq_q_len_ptr->numel(), 0);
+    std::vector<int> actual_seq_kv_len_vec_(actual_seq_kv_len_ptr->numel(), 0);
+    phi::memory_utils::Copy(phi::CPUPlace(),
+                            actual_seq_q_len_vec_.data(),
+                            actual_seq_q_len_ptr->place(),
+                            actual_seq_q_len_ptr->data<int>(),
+                            sizeof(int) * actual_seq_q_len_ptr->numel());
+    phi::memory_utils::Copy(phi::CPUPlace(),
+                            actual_seq_kv_len_vec_.data(),
+                            actual_seq_kv_len_ptr->place(),
+                            actual_seq_kv_len_ptr->data<int>(),
+                            sizeof(int) * actual_seq_kv_len_ptr->numel());
+    actual_seq_q_len_vec = std::vector<int64_t>(actual_seq_q_len_vec_.begin(),
+                                                actual_seq_q_len_vec_.end());
+    actual_seq_kv_len_vec = std::vector<int64_t>(actual_seq_kv_len_vec_.begin(),
+                                                 actual_seq_kv_len_vec_.end());
+  }
 
   // q,k,v [batch_size, seq_len, num_heads, head_dim]
   // or [total_len, num_heads, head_dim] (is_varlen = True)
@@ -211,9 +237,9 @@ std::vector<paddle::Tensor> npu_flash_attention(
     int64_t diagonal = 0;
 
     if (is_varlen == true &&
-        actual_seq_q_len.size() == actual_seq_kv_len.size()) {
-      int64_t max_q_value = getMaxDifference(actual_seq_q_len);
-      int64_t max_kv_value = getMaxDifference(actual_seq_kv_len);
+        actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
+      int64_t max_q_value = getMaxDifference(actual_seq_q_len_vec);
+      int64_t max_kv_value = getMaxDifference(actual_seq_kv_len_vec);
       attn_mask_tensor_null->Resize({max_q_value, max_kv_value});
     } else {
       attn_mask_tensor_null->Resize(
@@ -261,11 +287,11 @@ std::vector<paddle::Tensor> npu_flash_attention(
       std::make_shared<phi::DenseTensor>();
 
   if (is_varlen == true &&
-      actual_seq_q_len.size() == actual_seq_kv_len.size()) {
-    int64_t accum = actual_seq_q_len[0] * actual_seq_kv_len[0];
-    for (int64_t i = 1; i < actual_seq_q_len.size(); i++) {
-      accum += ((actual_seq_q_len[i] - actual_seq_q_len[i - 1]) *
-                (actual_seq_kv_len[i] - actual_seq_kv_len[i - 1]));
+      actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
+    int64_t accum = actual_seq_q_len_vec[0] * actual_seq_kv_len_vec[0];
+    for (int64_t i = 1; i < actual_seq_q_len_vec.size(); i++) {
+      accum += ((actual_seq_q_len_vec[i] - actual_seq_q_len_vec[i - 1]) *
+                (actual_seq_kv_len_vec[i] - actual_seq_kv_len_vec[i - 1]));
     }
     numels *= accum;
   } else {
@@ -301,7 +327,7 @@ std::vector<paddle::Tensor> npu_flash_attention(
   int64_t head_num;
   double scale;
   if (is_varlen == true &&
-      actual_seq_q_len.size() == actual_seq_kv_len.size()) {
+      actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
     head_num = query_tensor_dims[1];
     scale = 1.0f / std::sqrt(query_tensor_dims[2]);
   } else {
@@ -317,7 +343,7 @@ std::vector<paddle::Tensor> npu_flash_attention(
       std::make_shared<phi::DenseTensor>();
 
   if (is_varlen == true &&
-      actual_seq_q_len.size() == actual_seq_kv_len.size()) {
+      actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
     int64_t T = query_tensor_dims[0];
     int64_t N = query_tensor_dims[1];
     softmax_max->Resize({T, N, 8});
@@ -352,7 +378,7 @@ std::vector<paddle::Tensor> npu_flash_attention(
       numel_tensor.get(), *dev_ctx, numels);
 
   if (is_varlen == true &&
-      actual_seq_q_len.size() == actual_seq_kv_len.size()) {
+      actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
     char* input_layout_ptr = "TND";
     EXEC_NPU_CMD(aclnnFlashAttentionVarLenScore,
                  *dev_ctx,
@@ -364,8 +390,8 @@ std::vector<paddle::Tensor> npu_flash_attention(
                  padding_mask,
                  *attn_mask_tensor,
                  prefixOptional,
-                 actual_seq_q_len,
-                 actual_seq_kv_len,
+                 actual_seq_q_len_vec,
+                 actual_seq_kv_len_vec,
                  scale,
                  keep_prob,
                  pre_tockens,
@@ -427,13 +453,39 @@ std::vector<paddle::Tensor> npu_flash_attention_grad(
     const paddle::optional<paddle::Tensor>& seed_tensor,
     const paddle::optional<paddle::Tensor>& offset_tensor,
     const paddle::optional<paddle::Tensor>& numel_tensor,
-    std::vector<int64_t> actual_seq_q_len,
-    std::vector<int64_t> actual_seq_kv_len,
+    const paddle::optional<paddle::Tensor>& actual_seq_q_len,
+    const paddle::optional<paddle::Tensor>& actual_seq_kv_len,
     float dropout,
     bool casual,
     bool is_triangle_upper_mask,
     bool is_varlen) {
   auto dev_ctx = getcontext(query);
+
+  std::vector<int64_t> actual_seq_q_len_vec, actual_seq_kv_len_vec;
+  if (is_varlen) {
+    PD_CHECK(
+        actual_seq_q_len.is_initialized() && actual_seq_kv_len.is_initialized(),
+        "When is_varlen is True, actual_seq_q_len and actual_seq_kv_len "
+        "must be provided.");
+    auto actual_seq_q_len_ptr = actual_seq_q_len.get_ptr();
+    auto actual_seq_kv_len_ptr = actual_seq_kv_len.get_ptr();
+    std::vector<int> actual_seq_q_len_vec_(actual_seq_q_len_ptr->numel(), 0);
+    std::vector<int> actual_seq_kv_len_vec_(actual_seq_kv_len_ptr->numel(), 0);
+    phi::memory_utils::Copy(phi::CPUPlace(),
+                            actual_seq_q_len_vec_.data(),
+                            actual_seq_q_len_ptr->place(),
+                            actual_seq_q_len_ptr->data<int>(),
+                            sizeof(int) * actual_seq_q_len_ptr->numel());
+    phi::memory_utils::Copy(phi::CPUPlace(),
+                            actual_seq_kv_len_vec_.data(),
+                            actual_seq_kv_len_ptr->place(),
+                            actual_seq_kv_len_ptr->data<int>(),
+                            sizeof(int) * actual_seq_kv_len_ptr->numel());
+    actual_seq_q_len_vec = std::vector<int64_t>(actual_seq_q_len_vec_.begin(),
+                                                actual_seq_q_len_vec_.end());
+    actual_seq_kv_len_vec = std::vector<int64_t>(actual_seq_kv_len_vec_.begin(),
+                                                 actual_seq_kv_len_vec_.end());
+  }
 
   // q,k,v [batch_size, seq_len, num_heads, head_dim]
   // or [total_len, num_heads, head_dim] (is_varlen = True)
@@ -514,9 +566,9 @@ std::vector<paddle::Tensor> npu_flash_attention_grad(
     int64_t diagonal = 0;
 
     if (is_varlen == true &&
-        actual_seq_q_len.size() == actual_seq_kv_len.size()) {
-      int64_t max_q_value = getMaxDifference(actual_seq_q_len);
-      int64_t max_kv_value = getMaxDifference(actual_seq_kv_len);
+        actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
+      int64_t max_q_value = getMaxDifference(actual_seq_q_len_vec);
+      int64_t max_kv_value = getMaxDifference(actual_seq_kv_len_vec);
       attn_mask_tensor_null->Resize({max_q_value, max_kv_value});
     } else {
       attn_mask_tensor_null->Resize(
@@ -554,7 +606,7 @@ std::vector<paddle::Tensor> npu_flash_attention_grad(
   int64_t head_num;
   double scale;
   if (is_varlen == true &&
-      actual_seq_q_len.size() == actual_seq_kv_len.size()) {
+      actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
     head_num = query_tensor_dims[1];
     scale = 1.0f / std::sqrt(query_tensor_dims[2]);
   } else {
@@ -667,7 +719,7 @@ std::vector<paddle::Tensor> npu_flash_attention_grad(
                *dpse_out);
 #else
   if (is_varlen == true &&
-      actual_seq_q_len.size() == actual_seq_kv_len.size()) {
+      actual_seq_q_len_vec.size() == actual_seq_kv_len_vec.size()) {
     char* input_layout_ptr = "TND";
     EXEC_NPU_CMD(aclnnFlashAttentionUnpaddingScoreGrad,
                  *dev_ctx,
@@ -684,8 +736,8 @@ std::vector<paddle::Tensor> npu_flash_attention_grad(
                  *softmax_out_tensor,
                  *attention_score_out_tensor,
                  prefixOptional,
-                 actual_seq_q_len,
-                 actual_seq_kv_len,
+                 actual_seq_q_len_vec,
+                 actual_seq_kv_len_vec,
                  scale,
                  keep_prob,
                  pre_tockens,
@@ -739,7 +791,9 @@ PD_BUILD_OP(flash_attention_npu)
              "key",
              "value",
              paddle::Optional("fixed_seed_offset"),
-             paddle::Optional("attn_mask")})
+             paddle::Optional("attn_mask"),
+             paddle::Optional("actual_seq_q_len"),
+             paddle::Optional("actual_seq_kv_len")})
     .Outputs({"attention_score",
               "softmax_max",
               "softmax_sum",
@@ -747,9 +801,7 @@ PD_BUILD_OP(flash_attention_npu)
               "seed",
               "offset",
               "numel"})
-    .Attrs({"actual_seq_q_len:std::vector<int64_t>",
-            "actual_seq_kv_len:std::vector<int64_t>",
-            "dropout:float",
+    .Attrs({"dropout:float",
             "causal:bool",
             "return_softmax:bool",
             "is_test:bool",
@@ -771,13 +823,13 @@ PD_BUILD_GRAD_OP(flash_attention_npu)
              "attention_score",
              "seed",
              "offset",
-             "numel"})
+             "numel",
+             paddle::Optional("actual_seq_q_len"),
+             paddle::Optional("actual_seq_kv_len")})
     .Outputs({paddle::Grad("query"),
               paddle::Grad("key"),
               paddle::Grad("value")})
-    .Attrs({"actual_seq_q_len:std::vector<int64_t>",
-            "actual_seq_kv_len:std::vector<int64_t>",
-            "dropout:float",
+    .Attrs({"dropout:float",
             "causal:bool",
             "is_triangle_upper_mask:bool",
             "is_varlen:bool"})

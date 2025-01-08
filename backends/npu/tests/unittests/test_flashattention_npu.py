@@ -70,8 +70,8 @@ class TestNPUFAFP16(unittest.TestCase):
         self.shape = (1, 5, 2048, 128)
         self.dropout = 0.0
         self.fixed_seed_offset = None
-        self.actual_seq_q_len = []
-        self.actual_seq_kv_len = []
+        self.actual_seq_q_len = None
+        self.actual_seq_kv_len = None
         self.causal = False
         self.return_softmax = False
         self.is_test = False
@@ -339,7 +339,9 @@ class TestNPUFAFP16_Varlen(TestNPUFAFP16):
         self.shape = (5, 64, 3, 128)
         # (T, N, D)  T = B * S (If the lengths of S are different, accumulate S.)
         self.trans_shape = (15, 64, 128)
-        self.actual_seq_q_len = self.actual_seq_kv_len = [3, 6, 9, 12, 15]
+        self.actual_seq_q_len = self.actual_seq_kv_len = paddle.to_tensor(
+            [3, 6, 9, 12, 15], dtype=paddle.int32
+        )
         self.is_varlen = True
         self.pass_line = 0.999
 
