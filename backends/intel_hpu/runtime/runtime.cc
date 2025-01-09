@@ -312,9 +312,11 @@ class RuntimeManager {
         << ", stream = " << stream << ", src = " << src << ", dst = " << dst;
     synStatus status = synFail;
     if (flag == 0) {
-      addCache(device, src, size);
+      // addCache(device, src, size);
+      void *ptr = getCachedHostMem(device, size);
+      memcpy(ptr, src, size);
       status = synMemCopyAsync(reinterpret_cast<synStreamHandle>(stream),
-                               reinterpret_cast<uint64_t>(src),
+                               reinterpret_cast<uint64_t>(ptr),
                                size,
                                reinterpret_cast<uint64_t>(dst),
                                HOST_TO_DRAM);
@@ -324,16 +326,23 @@ class RuntimeManager {
                status);
 
     } else if (flag == 1) {
-      addCache(device, dst, size);
+      // addCache(device, dst, size);
+      void *ptr = getCachedHostMem(device, size);
       status = synMemCopyAsync(reinterpret_cast<synStreamHandle>(stream),
                                reinterpret_cast<uint64_t>(src),
                                size,
-                               reinterpret_cast<uint64_t>(dst),
+                               reinterpret_cast<uint64_t>(ptr),
                                DRAM_TO_HOST);
 
       PD_CHECK(status == synSuccess,
                "[RUNTIME] synMemCopyAsync() failed = ",
                status);
+      // TO BE NOTICED, still sync mode copy due to memory map issue.
+      status = synStreamSynchronize(stream_d2h);
+      PD_CHECK(status == synSuccess,
+               "[RUNTIME] synStreamSynchronize() failed = ",
+               status);
+      memcpy(dst, ptr, size);
 
     } else if (flag == 2) {
       status = synMemCopyAsync(reinterpret_cast<synStreamHandle>(stream),
