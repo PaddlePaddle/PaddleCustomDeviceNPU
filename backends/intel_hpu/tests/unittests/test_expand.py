@@ -23,11 +23,15 @@ from tests.op_test import OpTest
 paddle.enable_static()
 SEED = 2021
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestExpandV2HPUOp(OpTest):
     def setUp(self):
         self.set_hpu()
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.op_type = "expand_v2"
         self.init_dtype()
         self.init_data()

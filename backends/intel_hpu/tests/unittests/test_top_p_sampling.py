@@ -14,6 +14,10 @@
 import unittest
 import paddle
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class top_p_sampling_test(unittest.TestCase):
     def is_token_in_targets(self, tokens, target_tensors):

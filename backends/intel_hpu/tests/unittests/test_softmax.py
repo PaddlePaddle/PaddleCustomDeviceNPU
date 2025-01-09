@@ -22,11 +22,15 @@ from tests.op_test import OpTest
 
 SEED = 2021
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestSoftmax(OpTest):
     def setUp(self):
         self.set_npu()
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.op_type = "softmax"
         self.init_dtype()
 

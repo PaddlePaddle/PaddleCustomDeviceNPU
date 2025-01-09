@@ -22,6 +22,10 @@ import paddle
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestIndexSampleOp(OpTest):
     def set_npu(self):
@@ -45,10 +49,14 @@ class TestIndexSampleOp(OpTest):
         self.outputs = {"Out": out}
 
     def test_check_output(self):
-        self.check_output_with_place(paddle.CustomPlace("intel_hpu", 0))
+        self.check_output_with_place(
+            paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
+        )
 
     def test_check_grad(self):
-        self.check_grad_with_place(paddle.CustomPlace("intel_hpu", 0), ["X"], "Out")
+        self.check_grad_with_place(
+            paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id)), ["X"], "Out"
+        )
 
     def config(self):
         """

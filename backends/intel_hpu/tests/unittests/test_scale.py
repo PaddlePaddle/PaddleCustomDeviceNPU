@@ -21,6 +21,10 @@ import paddle
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestHpuScaleOp(OpTest):
     def setUp(self):
@@ -41,7 +45,7 @@ class TestHpuScaleOp(OpTest):
 
     def set_hpu(self):
         self.__class__.use_custom_device = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def init_dtype(self):
         self.dtype = np.float16
@@ -81,7 +85,7 @@ class TestBiasAfterScale(OpTest):
     def setUp(self):
         self.set_npu()
         self.op_type = "scale"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.init_dtype()
 
         self.inputs = {

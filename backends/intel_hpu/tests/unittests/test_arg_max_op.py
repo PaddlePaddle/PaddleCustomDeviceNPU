@@ -22,6 +22,10 @@ import paddle.base.core as core
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestHpuArgMaxOp(OpTest):
     def setUp(self):
@@ -38,7 +42,7 @@ class TestHpuArgMaxOp(OpTest):
 
     def set_hpu(self):
         self.__class__.use_custom_device = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def init_dtype(self):
         self.dtype = np.int32

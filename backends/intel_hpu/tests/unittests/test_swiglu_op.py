@@ -20,6 +20,10 @@ import paddle.nn.functional as F
 import paddle.incubate.nn.functional.swiglu as swigluimpl
 from tests.op_test import convert_float_to_uint16, convert_uint16_to_float
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 def swiglu_naive(x, y=None):
     if y is None:
@@ -30,7 +34,7 @@ def swiglu_naive(x, y=None):
 #  只有X，Y为空
 class TestSwigluFP16OnlyX(unittest.TestCase):
     def setUp(self):
-        self.npu_place = paddle.CustomPlace("intel_hpu", 0)
+        self.npu_place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.shape = (20, 512)
         self.init_dtype()
 
@@ -158,7 +162,7 @@ class TestSwigluFP32BothXY(TestSwigluFP16BothXY):
 
 class TestSwigluFP16BothXY3D(TestSwigluFP16BothXY):
     def setUp(self):
-        self.npu_place = paddle.CustomPlace("intel_hpu", 0)
+        self.npu_place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.shape = (2, 20, 512)
         self.init_dtype()
 

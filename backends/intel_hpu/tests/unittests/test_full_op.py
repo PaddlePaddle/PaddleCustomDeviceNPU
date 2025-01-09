@@ -22,6 +22,10 @@ from paddle.base.framework import convert_np_dtype_to_dtype_
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestHPU(OpTest):
     def setUp(self):
@@ -43,7 +47,7 @@ class TestHPU(OpTest):
     def set_npu(self):
         self.__class__.use_custom_device = True
         self.__class__.no_need_check_grad = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def init_dtype(self):
         self.dtype = np.float32
@@ -72,7 +76,7 @@ class TestHPU_BOOL(OpTest):
     def set_npu(self):
         self.__class__.use_custom_device = True
         self.__class__.no_need_check_grad = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def init_dtype(self):
         self.dtype = np.bool

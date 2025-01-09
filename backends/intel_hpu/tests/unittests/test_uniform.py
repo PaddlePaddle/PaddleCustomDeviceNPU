@@ -26,6 +26,10 @@ import paddle.base as base
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestUniformRandomOp(OpTest):
     def setUp(self):
@@ -111,7 +115,7 @@ class TestNPUUniformRandomOp(OpTest):
 
     def set_npu(self):
         self.__class__.use_custom_device = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def init_dtype(self):
         self.dtype = np.float32
@@ -129,7 +133,7 @@ class TestNPUUniformRandomOp(OpTest):
 class TestNPUUniformRandomOpSelectedRows(unittest.TestCase):
     def get_places(self):
         places = [core.CPUPlace()]
-        places.append(core.CustomPlace("intel_hpu", 0))
+        places.append(core.CustomPlace("intel_hpu", int(intel_hpus_module_id)))
         return places
 
     def test_check_output(self):

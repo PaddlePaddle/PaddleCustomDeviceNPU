@@ -25,6 +25,10 @@ from tests.op_test import (
     convert_uint16_to_float,
 )
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestNPUAbsBF16(OpTest):
     def setUp(self):
@@ -44,7 +48,7 @@ class TestNPUAbsBF16(OpTest):
     def set_npu(self):
         self.__class__.use_custom_device = True
         self.__class__.no_need_check_grad = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def test_check_output(self):
         self.check_output_with_place(self.place)

@@ -29,6 +29,10 @@ from tests.op_test import (
 
 SEED = 2021
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 @skip_check_grad_ci(reason="[skip INTEL HPU cast grad check] not implemented yet.")
 class TestCastBF16(OpTest):
@@ -37,7 +41,7 @@ class TestCastBF16(OpTest):
         self.init_dtype()
         self.init_shape()
         self.op_type = "cast"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
         ipt = np.random.random(size=self.shape) + 1
         x = convert_float_to_uint16(ipt.astype(self.input_dtype))
@@ -230,7 +234,7 @@ class TestCastOpFp32ToFp64(OpTest):
     def setUp(self):
         self.set_npu()
         self.op_type = "cast"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
         ipt = np.random.random(size=[10, 10])
         self.inputs = {"X": ipt.astype("float32")}

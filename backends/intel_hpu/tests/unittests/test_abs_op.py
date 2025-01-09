@@ -21,6 +21,10 @@ import paddle
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestNPUAbs(OpTest):
     def setUp(self):
@@ -39,7 +43,7 @@ class TestNPUAbs(OpTest):
     def set_npu(self):
         self.__class__.use_custom_device = True
         self.__class__.no_need_check_grad = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def init_dtype(self):
         self.dtype = np.float32

@@ -23,6 +23,10 @@ from tests.op_test import skip_check_grad_ci
 
 SEED = 2021
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 @skip_check_grad_ci(
     reason="reduce_max is discontinuous non-derivable function,"
@@ -32,7 +36,7 @@ class TestConcatOp(OpTest):
     def setUp(self):
         self.set_npu()
         self.op_type = "concat"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.init_dtype()
         self.init_test_data()
 

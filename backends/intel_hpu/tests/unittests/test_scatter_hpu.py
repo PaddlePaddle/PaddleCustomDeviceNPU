@@ -21,12 +21,16 @@ import paddle
 paddle.enable_static()
 SEED = 2021
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class test_gather_i64_ow(OpTest):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
         x = np.array([[1, 2], [3, 4], [5, 6]]).astype("float32")
         index = np.array([2, 1, 0, 1]).astype("int64")
@@ -49,7 +53,7 @@ class test_gather_i64_no_ow(OpTest):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.python_api = paddle.scatter
 
         x = np.array([[1, 2], [3, 4], [5, 6]]).astype("float32")
@@ -76,7 +80,7 @@ class test_gather_i32_ow(OpTest):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
         x = np.array([[1, 2], [3, 4], [5, 6]]).astype("float32")
         index = np.array([2, 1, 0, 1]).astype("int32")
@@ -99,7 +103,7 @@ class test_gather_i32_no_ow(OpTest):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.python_api = paddle.scatter
 
         x = np.array([[1, 2], [3, 4], [5, 6]]).astype("float32")
@@ -126,7 +130,7 @@ class test_gather_fp32_no_ow(OpTest):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.python_api = paddle.scatter
 
         ref_np = np.ones((3, 2)).astype("float32")
@@ -159,7 +163,7 @@ class test_gather_fp32_no_ow_2(test_gather_fp32_no_ow):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.python_api = paddle.scatter
 
         ref_np = np.ones((3, 2)).astype("float32")
@@ -177,7 +181,7 @@ class test_gather_fp32_no_ow_3(test_gather_fp32_no_ow):
     def setUp(self):
         self.set_hpu()
         self.op_type = "scatter"
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
         ref_np = np.ones((3, 2)).astype("float32")
         index_np = np.array([1, 2]).astype("int32")

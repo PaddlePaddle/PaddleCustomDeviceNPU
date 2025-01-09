@@ -22,6 +22,9 @@ import paddle
 
 paddle.enable_static()
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
 
 # class TestAny8DOp(OpTest):
 #     def setUp(self):
@@ -35,10 +38,10 @@ paddle.enable_static()
 
 #     def set_hpu(self):
 #         self.__class__.use_custom_device = True
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_check_output(self):
-#         self.check_output_with_place(self.place)
+#         self.check_output_with_place(self.place)int(intel_hpus_module_id)
 
 
 class TestAnyOpWithDim(OpTest):
@@ -51,7 +54,7 @@ class TestAnyOpWithDim(OpTest):
 
     def set_hpu(self):
         self.__class__.use_custom_device = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def test_check_output(self):
         self.check_output_with_place(self.place)
@@ -69,7 +72,7 @@ class TestAnyOpWithDim(OpTest):
 
 #     def set_hpu(self):
 #         self.__class__.use_custom_device = True
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_check_output(self):
 #         self.check_output_with_place(self.place)
@@ -87,7 +90,7 @@ class TestAnyOpWithKeepDim(OpTest):
 
     def set_hpu(self):
         self.__class__.use_custom_device = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def test_check_output(self):
         self.check_output_with_place(self.place)
@@ -107,7 +110,7 @@ class TestAnyOpWithKeepDim(OpTest):
 
 #     def set_hpu(self):
 #         self.__class__.use_custom_device = True
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_check_output(self):
 #         self.check_output_with_place(self.place)
