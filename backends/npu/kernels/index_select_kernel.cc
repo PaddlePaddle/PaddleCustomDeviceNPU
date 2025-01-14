@@ -77,10 +77,9 @@ void IndexSelectNPUKernel(const Context& dev_ctx,
 
   if (x.place() == index.place()) {
     EXEC_NPU_CMD(aclnnIndexSelect, dev_ctx, x, dim_, index, *output);
-  } else{
+  } else {
     phi::DenseTensor index_copy;
-    phi::DenseTensorMeta index_copy_meta = {index.dtype(),
-                                            index.dims()};
+    phi::DenseTensorMeta index_copy_meta = {index.dtype(), index.dims()};
     index_copy.set_meta(index_copy_meta);
     TensorCopy(dev_ctx, index, false, &index_copy, x.place());
     EXEC_NPU_CMD(aclnnIndexSelect, dev_ctx, x, dim_, index_copy, *output);
