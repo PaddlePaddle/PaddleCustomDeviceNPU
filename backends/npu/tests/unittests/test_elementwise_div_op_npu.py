@@ -130,8 +130,27 @@ class TestElementwiseDivNet(unittest.TestCase):
             f.stop_gradient = True
             g = paddle.divide(e, f)
 
-            fc_1 = paddle.static.nn.fc(x=g, size=128)
-            prediction = paddle.static.nn.fc(x=fc_1, size=2, activation="softmax")
+            fc_1 = paddle.static.nn.fc(
+                x=g,
+                size=128,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+            )
+            prediction = paddle.static.nn.fc(
+                x=fc_1,
+                size=2,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+                activation="softmax",
+            )
 
             cost = paddle.nn.functional.cross_entropy(input=prediction, label=label)
             loss = paddle.mean(cost)

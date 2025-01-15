@@ -133,12 +133,44 @@ class TestReduceSumNet(unittest.TestCase):
             b = paddle.static.data(name="b", shape=[2, 3, 4], dtype="float32")
             label = paddle.static.data(name="label", shape=[2, 1], dtype="int64")
 
-            a_1 = paddle.static.nn.fc(x=a, size=4, num_flatten_dims=2, activation=None)
-            b_1 = paddle.static.nn.fc(x=b, size=4, num_flatten_dims=2, activation=None)
+            a_1 = paddle.static.nn.fc(
+                x=a,
+                size=4,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+                num_flatten_dims=2,
+                activation=None,
+            )
+            b_1 = paddle.static.nn.fc(
+                x=b,
+                size=4,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+                num_flatten_dims=2,
+                activation=None,
+            )
             z = paddle.add(a_1, b_1)
             z_1 = self.set_reduce_sum_function(z)
 
-            prediction = paddle.static.nn.fc(x=z_1, size=2, activation="softmax")
+            prediction = paddle.static.nn.fc(
+                x=z_1,
+                size=2,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+                activation="softmax",
+            )
 
             cost = paddle.nn.functional.cross_entropy(input=prediction, label=label)
             loss = paddle.mean(cost)

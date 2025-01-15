@@ -50,13 +50,13 @@ class LinearTestCase(unittest.TestCase):
 
     def test_weight(self):
         paddle.seed(100)
-        weight_attr = paddle.nn.initializer.Normal(0, 1.0)
+        weight_attr = paddle.nn.initializer.Constant(value=0.5)
         paddle.set_device("cpu")
         linear_1 = paddle.nn.Linear(2, 3, weight_attr=weight_attr)
         paddle.nn.utils._stride_column(linear_1.weight)
         except_1 = linear_1.weight.numpy()
 
-        linear_2 = paddle.nn.Linear(2, 3)
+        linear_2 = paddle.nn.Linear(2, 3, weight_attr=weight_attr)
         except_2 = linear_2.weight.numpy()
 
         paddle.set_device("npu:0")
@@ -64,7 +64,7 @@ class LinearTestCase(unittest.TestCase):
         paddle.nn.utils._stride_column(linear_1.weight)
         np.testing.assert_allclose(linear_1.weight.numpy(), except_1, rtol=1e-05)
 
-        linear_2 = paddle.nn.Linear(2, 3)
+        linear_2 = paddle.nn.Linear(2, 3, weight_attr=weight_attr)
         np.testing.assert_allclose(linear_2.weight.numpy(), except_2, rtol=1e-05)
 
 

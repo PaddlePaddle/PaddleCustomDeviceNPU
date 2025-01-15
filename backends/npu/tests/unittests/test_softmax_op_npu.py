@@ -77,9 +77,27 @@ class TestSoftmaxNet(unittest.TestCase):
             d = paddle.sqrt(c)
 
             # 4 x 128
-            fc_1 = paddle.static.nn.fc(x=d, size=128)
+            fc_1 = paddle.static.nn.fc(
+                x=d,
+                size=128,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+            )
             # 4 x 2
-            prediction = paddle.static.nn.fc(x=fc_1, size=2)
+            prediction = paddle.static.nn.fc(
+                x=fc_1,
+                size=2,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+            )
 
             # 4 x 2
             prob = paddle.nn.functional.softmax(prediction, axis=1)

@@ -135,7 +135,17 @@ class TestMomentumV2(unittest.TestCase):
         with base.program_guard(main):
             x = paddle.static.data(name="x", shape=[-1, 13], dtype="float32")
             y = paddle.static.data(name="y", shape=[-1, 1], dtype="float32")
-            y_predict = paddle.static.nn.fc(x, size=1, activation=None)
+            y_predict = paddle.static.nn.fc(
+                x,
+                size=1,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+                activation=None,
+            )
             cost = paddle.nn.functional.square_error_cost(input=y_predict, label=y)
             avg_cost = paddle.mean(cost)
 
@@ -257,7 +267,17 @@ class TestMomentumOpWithDecayAPI(unittest.TestCase):
         with base.program_guard(main):
             x = paddle.static.data(name="x", shape=[-1, 13], dtype="float32")
             y = paddle.static.data(name="y", shape=[-1, 1], dtype="float32")
-            y_predict = paddle.static.nn.fc(x, size=1, activation=None)
+            y_predict = paddle.static.nn.fc(
+                x,
+                size=1,
+                weight_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=0.5)
+                ),
+                bias_attr=paddle.ParamAttr(
+                    initializer=paddle.nn.initializer.Constant(value=1.0)
+                ),
+                activation=None,
+            )
             cost = paddle.nn.functional.square_error_cost(input=y_predict, label=y)
             avg_cost = paddle.mean(cost)
 
