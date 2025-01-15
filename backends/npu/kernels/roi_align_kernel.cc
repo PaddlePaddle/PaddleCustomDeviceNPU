@@ -18,16 +18,28 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void RoiAlignKernel(const Context& dev_ctx,
-                    const phi::DenseTensor& x,
-                    const phi::DenseTensor& boxes,
-                    const paddle::optional<phi::DenseTensor>& boxes_num,
-                    int pooled_height,
-                    int pooled_width,
-                    float spatial_scale,
-                    int sampling_ratio,
-                    bool aligned,
-                    phi::DenseTensor* out) {
+void CastKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                phi::DataType dtype,
+                phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void ConcatKernel(const Context& dev_ctx,
+                  const std::vector<const phi::DenseTensor*>& ins,
+                  const phi::Scalar& axis_scalar,
+                  phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void AclopRoiAlignKernel(const Context& dev_ctx,
+                         const phi::DenseTensor& x,
+                         const phi::DenseTensor& boxes,
+                         const paddle::optional<phi::DenseTensor>& boxes_num,
+                         int pooled_height,
+                         int pooled_width,
+                         float spatial_scale,
+                         int sampling_ratio,
+                         bool aligned,
+                         phi::DenseTensor* out) {
   dev_ctx.template Alloc<T>(out);
   auto roi_end_mode = 0;
   PADDLE_ENFORCE_EQ(
@@ -171,6 +183,163 @@ void RoiAlignKernel(const Context& dev_ctx,
     const auto& runner_c3 =
         NpuOpRunner("Cast", {out_fp}, {*out}, {{"dst_type", src_dtype}});
     runner_c3.Run(stream);
+  }
+}
+
+template <typename T, typename Context>
+void RoiAlignKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    const phi::DenseTensor& boxes,
+                    const paddle::optional<phi::DenseTensor>& boxes_num,
+                    int pooled_height,
+                    int pooled_width,
+                    float spatial_scale,
+                    int sampling_ratio,
+                    bool aligned,
+                    phi::DenseTensor* out) {
+  DO_COMPATIBILITY(
+      aclnnRoiAlign,
+      (custom_kernel::AclopRoiAlignKernel<T, Context>(dev_ctx,
+                                                      x,
+                                                      boxes,
+                                                      boxes_num,
+                                                      pooled_height,
+                                                      pooled_width,
+                                                      spatial_scale,
+                                                      sampling_ratio,
+                                                      aligned,
+                                                      out)));
+
+  PADDLE_ENFORCE_EQ(
+      aligned,
+      false,
+      phi::errors::InvalidArgument(
+          "ROIAlignNPU only support Aligned attribute equaled to False"));
+
+  dev_ctx.template Alloc<T>(out);
+  auto stream = dev_ctx.stream();
+
+  int boxes_batch_size;
+  std::vector<float> roi_batch_id_data((boxes.dims()[0]));
+  int batch_size = x.dims()[0];
+  if (boxes_num) {
+    boxes_batch_size = boxes_num->numel();
+    PADDLE_ENFORCE_EQ(
+        boxes_batch_size,
+        batch_size,
+        phi::errors::InvalidArgument(
+            "The batch size of rois and the batch size of images "
+            " must be the same. But received the batch size of rois is %d, "
+            "and the batch size of images is %d",
+            boxes_batch_size,
+            batch_size));
+
+    std::vector<int> boxes_num_data;
+    TensorToVector(dev_ctx, *boxes_num, dev_ctx, &boxes_num_data);
+    int start = 0;
+    // transfrom boxes_num to roi_batch_id_data
+    for (int n = 0; n < boxes_batch_size; ++n) {
+      for (int i = start; i < start + boxes_num_data[n]; ++i) {
+        roi_batch_id_data[i] = static_cast<float>(n);
+      }
+      start += boxes_num_data[n];
+    }
+  } else {
+    auto lod = boxes.lod();
+    PADDLE_ENFORCE_EQ(
+        lod.empty(),
+        false,
+        phi::errors::InvalidArgument("Input(ROIs) Tensor of ROIAlignOp "
+                                     "does not contain LoD information."));
+    auto boxes_lod = lod.back();
+    boxes_batch_size = boxes_lod.size() - 1;
+    PADDLE_ENFORCE_EQ(
+        boxes_batch_size,
+        batch_size,
+        phi::errors::InvalidArgument(
+            "The boxes_batch_size and imgs "
+            "batch_size must be the same. But received boxes_batch_size = %d, "
+            "batch_size = %d",
+            boxes_batch_size,
+            batch_size));
+    int boxes_num_with_lod = boxes_lod[boxes_batch_size];
+    PADDLE_ENFORCE_EQ(
+        boxes.dims()[0],
+        boxes_num_with_lod,
+        phi::errors::InvalidArgument(
+            "The actual number of rois and the number of rois "
+            "provided from Input(RoIsLoD) in RoIAlign must be the same."
+            " But received actual number of rois is %d, and the number "
+            "of rois from RoIsLoD is %d",
+            boxes.dims()[0],
+            boxes_num_with_lod));
+    for (int n = 0; n < boxes_batch_size; ++n) {
+      for (std::size_t i = boxes_lod[n]; i < boxes_lod[n + 1]; ++i) {
+        roi_batch_id_data[i] = n;
+      }
+    }
+  }
+
+  phi::DenseTensor boxes_fp(boxes);
+  if (x.dtype() != phi::DataType::FLOAT32) {
+    // cast boxes dtype to float32
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, boxes, phi::DataType::FLOAT32, &boxes_fp);
+  }
+
+  phi::DenseTensor boxes_num_fp;
+  TensorFromVector<float>(dev_ctx, roi_batch_id_data, dev_ctx, &boxes_num_fp);
+
+  phi::DenseTensor boxes_num_int;
+  phi::DenseTensorMeta boxes_num_int_meta = {phi::DataType::INT32,
+                                             boxes_num_fp.dims()};
+  boxes_num_int.set_meta(boxes_num_int_meta);
+  custom_kernel::CastKernel<T, Context>(
+      dev_ctx, boxes_num_fp, phi::DataType::INT32, &boxes_num_int);
+
+  if (sampling_ratio < 0) {
+    sampling_ratio = 0;
+  }
+  char* roi_end_mode_str = "avg";
+
+  if (x.dtype() == phi::DataType::FLOAT32) {
+    EXEC_NPU_CMD(aclnnRoiAlign,
+                 dev_ctx,
+                 x,
+                 boxes_fp,
+                 boxes_num_int,
+                 roi_end_mode_str,
+                 pooled_height,
+                 pooled_width,
+                 sampling_ratio,
+                 spatial_scale,
+                 *out);
+  } else {
+    // cast x to float32
+    phi::DenseTensor x_fp;
+    phi::DenseTensorMeta x_meta = {phi::DataType::FLOAT32, x.dims()};
+    x_fp.set_meta(x_meta);
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, x, phi::DataType::FLOAT32, &x_fp);
+
+    // cast out
+    phi::DenseTensor out_fp;
+    phi::DenseTensorMeta out_meta = {phi::DataType::FLOAT32, out->dims()};
+    out_fp.set_meta(out_meta);
+    dev_ctx.template Alloc<float>(&out_fp);
+    EXEC_NPU_CMD(aclnnRoiAlign,
+                 dev_ctx,
+                 x_fp,
+                 boxes_fp,
+                 boxes_num_int,
+                 roi_end_mode_str,
+                 pooled_height,
+                 pooled_width,
+                 sampling_ratio,
+                 spatial_scale,
+                 out_fp);
+
+    custom_kernel::CastKernel<T, Context>(dev_ctx, out_fp, out->dtype(), out);
   }
 }
 
