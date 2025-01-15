@@ -1,0 +1,1 @@
+../../Paddle/test/collective/fleet/hybrid_parallel_sharding_model_with_fusion_amp.py
