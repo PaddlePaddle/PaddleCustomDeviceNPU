@@ -509,7 +509,8 @@ void SetTensorValueNPUKernel(const Context& dev_ctx,
     const auto& runner3 =
         NpuOpRunner("Cast", {tmp_out}, {*out}, {{"dst_type", ACL_DOUBLE}});
     runner3.Run(stream);
-  } else if (x.dtype() == phi::DataType::INT64) {
+  } else if (x.dtype() == phi::DataType::INT64 ||
+             x.dtype() == phi::DataType::BOOL) {
     tmp_x_meta = {phi::DataType::INT32, x.dims()};
     tmp_value_meta = {phi::DataType::INT32, value.dims()};
     tmp_out_meta = {phi::DataType::INT32, out->dims()};
@@ -601,6 +602,7 @@ PD_REGISTER_PLUGIN_KERNEL(set_value,
 #else
 #endif
                           double,
+                          bool,
                           int,
                           int64_t) {
 }
@@ -615,6 +617,7 @@ PD_REGISTER_PLUGIN_KERNEL(set_value_with_tensor,
 #else
 #endif
                           double,
+                          bool,
                           int,
                           int64_t) {
 }
