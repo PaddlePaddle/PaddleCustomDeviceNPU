@@ -31,16 +31,16 @@ inline void UniformRealDistribution(T* data,
 }
 
 template <typename T, typename Context>
-void UniformRawKernel(const Context& dev_ctx,
-                      const phi::IntArray& shape,
-                      phi::DataType dtype,
-                      const phi::Scalar& min,
-                      const phi::Scalar& max,
-                      int seed,
-                      int diag_num,
-                      int diag_step,
-                      float diag_val,
-                      phi::DenseTensor* out) {
+void UniformRawKernelCPU(const Context& dev_ctx,
+                         const phi::IntArray& shape,
+                         phi::DataType dtype,
+                         const phi::Scalar& min,
+                         const phi::Scalar& max,
+                         int seed,
+                         int diag_num,
+                         int diag_step,
+                         float diag_val,
+                         phi::DenseTensor* out) {
   out->Resize(phi::make_ddim(shape.GetData()));
   VLOG(4) << out->dims();
   T* data = dev_ctx.template Alloc<T>(out);
@@ -84,6 +84,32 @@ void UniformRawKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
+void UniformRawKernel(const Context& dev_ctx,
+                      const phi::IntArray& shape,
+                      phi::DataType dtype,
+                      const phi::Scalar& min,
+                      const phi::Scalar& max,
+                      int seed,
+                      int diag_num,
+                      int diag_step,
+                      float diag_val,
+                      phi::DenseTensor* out) {
+  DO_COMPATIBILITY(
+      aclnnInplaceUniform,
+      (custom_kernel::UniformRawKernelCPU<T, Context>(
+          dev_ctx, shape, dtype, min, max, seed, 0, 0, 0.0f, out)));
+
+  out->Resize(phi::make_ddim(shape.GetData()));
+  dev_ctx.template Alloc<T>(out);
+  double from = min.to<double>();
+  double to = max.to<double>();
+  uint64_t offset_int64 = 0;
+  uint64_t seed_int64 = static_cast<uint64_t>(seed);
+  EXEC_NPU_CMD(
+      aclnnInplaceUniform, dev_ctx, *out, from, to, seed_int64, offset_int64);
+}
+
+template <typename T, typename Context>
 void UniformKernel(const Context& dev_ctx,
                    const phi::IntArray& shape,
                    phi::DataType dtype,
@@ -91,7 +117,7 @@ void UniformKernel(const Context& dev_ctx,
                    const phi::Scalar& max,
                    int seed,
                    phi::DenseTensor* out) {
-  custom_kernel::UniformRawKernel<T>(
+  custom_kernel::UniformRawKernel<T, Context>(
       dev_ctx, shape, dtype, min, max, seed, 0, 0, 0.0f, out);
 }
 
