@@ -111,6 +111,12 @@ class TestCase9(TestTransposeOp):
         self.axis = (6, 1, 3, 5, 0, 2, 4, 7)
 
 
+class TestCase10(TestTransposeOp):
+    def init_shape_axis(self):
+        self.shape = []
+        self.axis = []
+
+
 class TestTransposeOpFP16(TestTransposeOp):
     def init_dtype(self):
         self.dtype = np.float16

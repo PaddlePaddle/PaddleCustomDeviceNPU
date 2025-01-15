@@ -113,5 +113,21 @@ class TestAny8DOpWithKeepDim(OpTest):
         self.check_output_with_place(self.place)
 
 
+class TestAnyOpWithInputDim(OpTest):
+    def setUp(self):
+        self.set_npu()
+        self.op_type = "reduce_any"
+        self.place = paddle.CustomPlace("npu", 0)
+        self.inputs = {"X": np.random.randint(0, 2, ()).astype("bool")}
+        self.attrs = {"dim": ()}
+        self.outputs = {"Out": self.inputs["X"]}
+
+    def set_npu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+
 if __name__ == "__main__":
     unittest.main()

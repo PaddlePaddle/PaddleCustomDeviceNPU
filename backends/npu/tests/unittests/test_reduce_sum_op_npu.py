@@ -89,6 +89,12 @@ class TestReduceSumOp5D(TestReduceSum):
         self.axis = (-1, -2)
 
 
+class TestReduceSumOp0D(TestReduceSum):
+    def initTestCase(self):
+        self.shape = ()
+        self.axis = ()
+
+
 @check_run_big_shape_test()
 class TestReduceSumOpRank1(TestReduceSum):
     def initTestCase(self):

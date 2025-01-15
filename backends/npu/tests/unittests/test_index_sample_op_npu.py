@@ -144,6 +144,24 @@ class TestCase7(TestCase5):
         self.index_type = "int64"
 
 
+class TestCase8(TestIndexSampleOp):
+    def config(self):
+        self.__class__.no_need_check_grad = True
+        self.x_shape = (1, 200)
+        self.dtype = "float32"
+        self.index_shape = (1, 200)
+        self.index_type = "int64"
+
+
+class TestCase9(TestIndexSampleOp):
+    def config(self):
+        self.__class__.no_need_check_grad = True
+        self.x_shape = (1, 200)
+        self.dtype = "float32"
+        self.index_shape = (1, 200)
+        self.index_type = "int32"
+
+
 class TestIndexSampleShape(unittest.TestCase):
     def test_shape(self):
         paddle.enable_static()

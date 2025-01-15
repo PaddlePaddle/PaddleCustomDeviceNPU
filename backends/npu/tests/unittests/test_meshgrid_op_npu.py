@@ -293,5 +293,24 @@ class TestMeshgridOp8(unittest.TestCase):
         paddle.enable_static()
 
 
+class TestMeshgridOp9(TestMeshgridOp):
+    def init_test_data(self):
+        self.shape = self.get_x_shape()
+        ins = []
+        outs = []
+        for i in range(len(self.shape)):
+            ins.append(np.random.random(self.shape[i]).astype(self.dtype))
+
+        for i in range(len(self.shape)):
+            out_reshape = [1] * len(self.shape)
+            out_reshape[i] = self.shape[i][0] if self.shape[i] else 1
+            out_temp = np.reshape(ins[i], out_reshape)
+            outs.append(np.broadcast_to(out_temp, [100, 1]))
+        return ins, outs
+
+    def get_x_shape(self):
+        return [[100], []]
+
+
 if __name__ == "__main__":
     unittest.main()

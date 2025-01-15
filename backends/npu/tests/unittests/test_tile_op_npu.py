@@ -250,8 +250,11 @@ class TestTileOpBool(OpTest):
 # Situation 7: input x is Double
 class TestTileOpDouble(unittest.TestCase):
     def setUp(self):
-        self.input = np.random.randint(10, size=(2, 10, 5)).astype("double")
+        self.init_input()
         self.place = paddle.CustomPlace("npu", 0)
+
+    def init_input(self):
+        self.input = np.random.randint(10, size=(2, 10, 5)).astype("double")
 
     def functional(self, place):
         input = paddle.to_tensor(self.input, place=place)
@@ -272,6 +275,11 @@ class TestTileOpDouble(unittest.TestCase):
 
         np.testing.assert_allclose(out_npu, out_cpu)
         np.testing.assert_allclose(grad_npu, grad_cpu)
+
+
+class TestTileOpBool1(TestTileOpDouble):
+    def init_input(self):
+        self.input = np.random.randint(1, size=(2, 10, 5)).astype("bool")
 
 
 # Situation 8: input x is FP16
