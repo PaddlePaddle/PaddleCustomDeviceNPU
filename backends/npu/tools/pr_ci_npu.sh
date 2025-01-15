@@ -103,6 +103,10 @@ function card_test() {
 
     testcases=$1
     cardnumber=$2
+
+    echo ${testcase}
+    echo ${cardnumber}
+    
     parallel_level_base=${CTEST_PARALLEL_LEVEL:-1}
 
     # get the NPU device count, XPU device count is one
