@@ -43,9 +43,6 @@ void ArgMinKernel(const Context& dev_ctx,
         .AddAttr("dtype", ConvertToNpuDtype(dtype));
     runner.Run(stream);
   } else if (dtype == phi::DataType::INT64) {
-    // TODO(songkai05): core dump happend when the dtype of CANN op ArgMin's
-    // output is int64, so we compute the int32 result and cast it to int64 when
-    // param dtype is INT64 temporarily.
     NPUAttributeMap attrs = {{"dtype", ConvertToNpuDtype(dtype)}};
 
     auto op_runner = [](const std::vector<phi::DenseTensor>& inputs,
