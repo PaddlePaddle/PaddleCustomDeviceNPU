@@ -1136,10 +1136,10 @@ void SquareKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
-void SquareGradKernel(const Context& dev_ctx,
-                      const phi::DenseTensor& x,
-                      const phi::DenseTensor& dout,
-                      phi::DenseTensor* dx) {
+void AclopSquareGradKernel(const Context& dev_ctx,
+                           const phi::DenseTensor& x,
+                           const phi::DenseTensor& dout,
+                           phi::DenseTensor* dx) {
   auto stream = dev_ctx.stream();
 
   auto factor = static_cast<float>(2.0);
@@ -1159,6 +1159,31 @@ void SquareGradKernel(const Context& dev_ctx,
   const auto& runner_mul_2 =
       NpuOpRunner("Mul", {dout, x_muls_factor}, {*dx}, {});
   runner_mul_2.Run(stream);
+}
+
+template <typename T, typename Context>
+void SquareGradKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      const phi::DenseTensor& dout,
+                      phi::DenseTensor* dx) {
+  DO_COMPATIBILITY(
+      aclnnMul,
+      (custom_kernel::AclopSquareGradKernel<T, Context>(dev_ctx, x, dout, dx)));
+  DO_COMPATIBILITY(
+      aclnnMuls,
+      (custom_kernel::AclopSquareGradKernel<T, Context>(dev_ctx, x, dout, dx)));
+
+  // Step 1: Compute x_muls_factor = 2 * x
+  phi::DenseTensor x_muls_factor;
+  phi::DenseTensorMeta x_muls_factor_meta = {x.dtype(), x.dims()};
+  x_muls_factor.set_meta(x_muls_factor_meta);
+  dev_ctx.template Alloc<T>(&x_muls_factor);
+  phi::Scalar acl_scalar = 2;
+  EXEC_NPU_CMD(aclnnMuls, dev_ctx, x, acl_scalar, x_muls_factor);
+
+  // Step 2: Compute dx = dout * factor * x
+  dev_ctx.template Alloc<T>(dx);
+  EXEC_NPU_CMD(aclnnMul, dev_ctx, dout, x_muls_factor, *dx);
 }
 
 template <typename T, typename Context>
