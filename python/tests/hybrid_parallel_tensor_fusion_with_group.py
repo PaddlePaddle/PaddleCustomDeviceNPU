@@ -1,0 +1,1 @@
+../../Paddle/test/collective/fleet/hybrid_parallel_tensor_fusion_with_group.py

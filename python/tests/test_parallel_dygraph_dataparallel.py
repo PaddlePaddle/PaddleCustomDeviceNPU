@@ -1,0 +1,1 @@
+../../Paddle/test/legacy_test/test_parallel_dygraph_dataparallel.py
