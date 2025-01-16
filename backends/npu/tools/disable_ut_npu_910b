@@ -3,3 +3,5 @@ test_check_nan_inf_op_npu
 test_conv3d_op_npu
 test_elementwise_mod_op_npu
 test_matmulv2_op_npu
+test_zero_dim_tensor_npu
+test_group_norm_op_npu
