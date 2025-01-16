@@ -252,8 +252,10 @@ void ArgsortGradKernel(const Context& dev_ctx,
 
   // Do full assign
   if (axis == -1 || axis + 1 == in_dims.size()) {
-    FullAssignNPU<Context, T, int64_t>(
-        dev_ctx, in_dims, out_grad, indices, in_grad);
+    // FullAssignNPU<Context, T, int64_t>(
+    //     dev_ctx, in_dims, out_grad, indices, in_grad);
+    AclopFullAssignNPU<Context, T, int64_t>(
+        dev_ctx, stream, in_dims, out_grad, indices, in_grad);
   } else {
     std::vector<int> perm;
     for (int i = 0; i < in_dims.size(); i++) {
@@ -285,8 +287,11 @@ void ArgsortGradKernel(const Context& dev_ctx,
     trans_dx.set_meta(trans_dx_meta);
     dev_ctx.template Alloc<T>(&trans_dx);
 
-    FullAssignNPU<Context, T, int64_t>(
-        dev_ctx, trans_dims, trans_dout, trans_ids, &trans_dx);
+    // FullAssignNPU<Context, T, int64_t>(
+    //     dev_ctx, trans_dims, trans_dout, trans_ids, &trans_dx);
+
+    AclopFullAssignNPU<Context, T, int64_t>(
+        dev_ctx, stream, trans_dims, trans_dout, trans_ids, &trans_dx);
 
     custom_kernel::TransposeKernel<T, Context>(
         dev_ctx, trans_dx, perm, in_grad);
