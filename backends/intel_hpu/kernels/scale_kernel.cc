@@ -33,6 +33,11 @@ class Scale : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+        section = createSection();
+    }
+
     std::string guid_full = "constant_f32";
     std::string name_scaler = guid_ + "full_scaler";
     std::string name_bias = guid_ + "full_bias";
@@ -95,7 +100,8 @@ class Scale : public HpuOperator {
                                  inputs[0].type,
                                  inputs[0].dims,
                                  true,
-                                 inputs[0].name);
+                                 inputs[0].name,
+                                 section);
     mul_in.push_back(x_tensor);
     mul_in.push_back(scaler_tensor);
 
@@ -128,7 +134,8 @@ class Scale : public HpuOperator {
                                    outputs[0].type,
                                    outputs[0].dims,
                                    true,
-                                   outputs[0].name);
+                                   outputs[0].name,
+                                   section);
     add_out.push_back(out_tensor);
 
     status = synNodeCreate(graphHandle_,
@@ -154,6 +161,11 @@ class ScaleCast : public HpuOperator {
   void AddNode(ConvertTensors& ct, ScaleParams& params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
+
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+        section = createSection();
+    }
 
     std::string guid_full = "constant_f32";
     std::string name_scaler = guid_ + "full_scaler";
@@ -225,7 +237,8 @@ class ScaleCast : public HpuOperator {
                                  inputs[0].type,
                                  inputs[0].dims,
                                  true,
-                                 inputs[0].name);
+                                 inputs[0].name,
+                                 section);
     cast_in.push_back(x_tensor);
 
     std::vector<synTensor> cast_out;
@@ -307,7 +320,8 @@ class ScaleCast : public HpuOperator {
                                    outputs[0].type,
                                    outputs[0].dims,
                                    true,
-                                   outputs[0].name);
+                                   outputs[0].name,
+                                   section);
     final_cast_out.push_back(out_tensor);
 
     status = synNodeCreate(graphHandle_,
@@ -354,7 +368,8 @@ void ScaleKernel(const Context& dev_ctx,
   params.biasParams.constant.f = bias;
 
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, ScaleParams>("scaleKernel", inputs_dims, &params);
+  std::string op_name = (x.data() == out->data()) ? "_scaleKernel" : "scaleKernel";
+  op_info.prepareOpInfo<T, ScaleParams>(op_name, inputs_dims, &params);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {

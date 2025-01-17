@@ -31,13 +31,19 @@ class Squeeze : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+      section = createSection();
+    }
+
     std::vector<synTensor> syn_inputs;
     for (size_t i = 0; i < inputs.size(); i++) {
       syn_inputs.push_back(createTensor(inputs[i].dims.size(),
                                         inputs[i].type,
                                         inputs[i].dims,
                                         true,
-                                        inputs[i].name));
+                                        inputs[i].name,
+                                        section));
     }
 
     std::vector<synTensor> syn_outputs;
@@ -46,7 +52,8 @@ class Squeeze : public HpuOperator {
                                          outputs[i].type,
                                          outputs[i].dims,
                                          true,
-                                         outputs[i].name));
+                                         outputs[i].name,
+                                         section));
     }
 
     synStatus status = synNodeCreate(graphHandle_,
@@ -73,13 +80,19 @@ class SqueezeNull : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+      section = createSection();
+    }
+
     std::vector<synTensor> syn_inputs;
     for (size_t i = 0; i < inputs.size(); i++) {
       syn_inputs.push_back(createTensor(inputs[i].dims.size(),
                                         inputs[i].type,
                                         inputs[i].dims,
                                         true,
-                                        inputs[i].name));
+                                        inputs[i].name,
+                                        section));
     }
 
     std::vector<synTensor> syn_outputs;
@@ -88,7 +101,8 @@ class SqueezeNull : public HpuOperator {
                                          outputs[i].type,
                                          outputs[i].dims,
                                          true,
-                                         outputs[i].name));
+                                         outputs[i].name,
+                                         section));
     }
 
     synStatus status = synNodeCreate(graphHandle_,
@@ -130,10 +144,11 @@ void SqueezeKernel(const Context& dev_ctx,
 
   synRecipeHandle recipe = nullptr;
 
+  std::string op_name = (x.data() == out->data()) ? "_SqueezeKernel" : "SqueezeKernel";
   if (axes.size() == 0) {
     OpCacheOperator op_info;
     std::vector<DIMS> inputs_dims = ct.GetDims();
-    op_info.prepareOpInfo<T, nullptr_t>("SqueezeKernel", inputs_dims, nullptr);
+    op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
     recipe = op_info.GetRecipe();
     if (recipe == nullptr) {
       SqueezeNull op;
@@ -156,7 +171,7 @@ void SqueezeKernel(const Context& dev_ctx,
     params.params.axis = static_cast<int32_t>(x.dims().size()) - 1 - dim;
     std::vector<DIMS> inputs_dims = ct.GetDims();
     op_info.prepareOpInfo<T, SqueezeParams>(
-        "SqueezeKernel", inputs_dims, &params);
+        op_name, inputs_dims, &params);
     recipe = op_info.GetRecipe();
     if (recipe == nullptr) {
       Squeeze op;
