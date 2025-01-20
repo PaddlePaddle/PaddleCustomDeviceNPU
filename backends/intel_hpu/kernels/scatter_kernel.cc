@@ -21,69 +21,163 @@
 
 namespace custom_kernel {
 
-template <typename T, typename Context>
-void ExpandKernel(const Context& dev_ctx,
-                  const phi::DenseTensor& x,
-                  const phi::IntArray& shape,
-                  phi::DenseTensor* out);
-
-template <typename T, typename Context>
-void CastKernel(const Context& dev_ctx,
-                const phi::DenseTensor& x,
-                phi::DataType dtype,
-                phi::DenseTensor* out);
-
-template <typename T, typename Context>
-void FullKernel(const Context& dev_ctx,
-                const phi::IntArray& shape,
-                const phi::Scalar& val,
-                phi::DataType dtype,
-                phi::DenseTensor* out);
-
-template <typename T, typename Context>
-void FullLikeKernel(const Context& dev_ctx,
-                    const phi::DenseTensor& x,
-                    const phi::Scalar& val,
-                    phi::DataType dtype,
-                    phi::DenseTensor* out);
-
-struct ScatterParams {
-  ns_ScatterKernel::Params params;
-};
-
 class Scatter : public HpuOperator {
  public:
   Scatter() : HpuOperator("scatter_fwd_") {}
 
-  void AddNode(ConvertTensors& ct, ScatterParams params, bool is_inplace) {
-    auto inputs = ct.GetTensors();
-    auto outputs = ct.GetTensors(false);
+  static void BuildRecipeName(std::string& recipe_name,
+                              synDataType dtype,
+                              bool is_inplace,
+                              bool cast,
+                              bool overwrite) {
+    recipe_name = "ScatterKernel";
+    if (is_inplace) {
+      recipe_name += "i_";
+    }
+    if (cast) {
+      recipe_name += "c_";
+    }
+    if (overwrite) {
+      recipe_name += "o_";
+    }
+    recipe_name += SynDataTypeToStr(dtype);
+  }
 
-    std::vector<synTensor> syn_inputs;
-    synSectionHandle section_shared = nullptr;
-    for (size_t i = 0; i < inputs.size(); i++) {
-      if (i == 0 && is_inplace) {
-        section_shared = createSection();
-        syn_inputs.push_back(createTensor(inputs[i].dims.size(),
-                                          inputs[i].type,
-                                          inputs[i].dims,
-                                          true,
-                                          inputs[i].name,
-                                          section_shared));
-      } else {
-        syn_inputs.push_back(createTensor(inputs[i].dims.size(),
-                                          inputs[i].type,
-                                          inputs[i].dims,
-                                          true,
-                                          inputs[i].name));
-      }
+  synTensor AddCastNode(const ConvertTensors& ct, bool cast) {
+    auto inputs = ct.GetTensors();
+    synTensor syn_inputs[1] = {createTensor(inputs[1].dims.size(),
+                                            inputs[1].type,
+                                            inputs[1].dims,
+                                            true,
+                                            inputs[1].name)};
+
+    if (!cast) {
+      return syn_inputs[0];
     }
 
+    synTensor syn_outputs[1] = {createTensor(inputs[1].dims.size(),
+                                             syn_type_int32,
+                                             inputs[1].dims,
+                                             false,
+                                             "index_dst")};
+
+    std::string cast_guid = "cast_i64_to_i32";
+    std::string name = guid_ + cast_guid.c_str();
+
+    synStatus status = synNodeCreate(graphHandle_,
+                                     syn_inputs,
+                                     syn_outputs,
+                                     1,
+                                     1,
+                                     nullptr,
+                                     0,
+                                     cast_guid.c_str(),
+                                     name.c_str(),
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] ScatterKernel AddCastNode() failed =  ",
+             status);
+
+    return syn_outputs[0];
+  }
+
+  synTensor AddExpandNode(synTensor expandSrc, const ConvertTensors& ct) {
+    auto inputs = ct.GetTensors();
+    synTensor syn_inputs[1] = {expandSrc};
+    synTensor syn_outputs[1] = {createTensor(inputs[2].dims.size(),
+                                             syn_type_int32,
+                                             inputs[2].dims,
+                                             false,
+                                             "expand_dst")};
+
+    std::string expand_guid = "broadcast";
+    std::string name = guid_ + expand_guid.c_str();
+
+    synStatus status = synNodeCreate(graphHandle_,
+                                     syn_inputs,
+                                     syn_outputs,
+                                     1,
+                                     1,
+                                     nullptr,
+                                     0,
+                                     expand_guid.c_str(),
+                                     name.c_str(),
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] ScatterKernel AddExpandNode() failed = ",
+             status);
+
+    return syn_outputs[0];
+  }
+
+  synTensor AddZeroNode(const ConvertTensors& ct) {
+    auto scalar_zero = phi::Scalar(0.f);
+    auto inputs = ct.GetTensors();
+    ns_ConstantKernel::Params params;
+    params.constant.f = scalar_zero.to<float>();
+
+    std::string full = "constant_" + SynDataTypeToStr(inputs[2].type);
+
+    synTensor syn_outputs[1] = {createTensor(
+        inputs[2].dims.size(), inputs[2].type, inputs[2].dims, false, "zeros")};
+    synStatus status = synNodeCreate(graphHandle_,
+                                     nullptr,
+                                     syn_outputs,
+                                     0,
+                                     1,
+                                     &params,
+                                     sizeof(params),
+                                     full.c_str(),
+                                     "full_zero",
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] ScatterKernel AddZeroNode () failed = ",
+             status);
+    return syn_outputs[0];
+  }
+
+  synTensor AddOverwriteNode(const ConvertTensors& ct,
+                             synTensor index_tensor,
+                             synTensor* update_tensor,
+                             ns_ScatterKernel::Params params,
+                             bool is_inplace,
+                             bool is_output_persist = true) {
+    auto inputs = ct.GetTensors();
+    auto outputs = ct.GetTensors(false);
+    std::vector<synTensor> syn_inputs;
+    synSectionHandle section_shared = nullptr;
+
+    // handle x tensor
+    if (is_inplace) {
+      section_shared = createSection();
+    }
+    syn_inputs.push_back(createTensor(inputs[0].dims.size(),
+                                      inputs[0].type,
+                                      inputs[0].dims,
+                                      true,
+                                      inputs[0].name,
+                                      section_shared));
+    // handle index tensor
+    syn_inputs.push_back(index_tensor);
+    // handle update tensor
+    if (update_tensor != nullptr) {
+      syn_inputs.push_back(*update_tensor);
+    } else {
+      syn_inputs.push_back(createTensor(inputs[2].dims.size(),
+                                        inputs[2].type,
+                                        inputs[2].dims,
+                                        true,
+                                        inputs[2].name));
+    }
+    // handle output tensor
     std::vector<synTensor> syn_outputs;
     syn_outputs.push_back(createTensor(outputs[0].dims.size(),
                                        outputs[0].type,
                                        outputs[0].dims,
-                                       true,
+                                       is_output_persist,
                                        outputs[0].name,
                                        section_shared));
 
@@ -93,67 +187,68 @@ class Scatter : public HpuOperator {
                                      syn_outputs.data(),
                                      syn_inputs.size(),
                                      syn_outputs.size(),
-                                     &params.params,
-                                     sizeof(params.params),
+                                     &params,
+                                     sizeof(params),
                                      guid_.c_str(),
-                                     "Scatter",
+                                     "ScatterOverwrite",
                                      nullptr,
                                      nullptr);
-    PD_CHECK(
-        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] ScatterKernel AddScatterNode failed = ",
+             status);
+
+    return syn_outputs[0];
   }
-};
 
-class ScatterAdd : public HpuOperator {
- public:
-  ScatterAdd() : HpuOperator("unsorted_scatter_add_fwd_") {}
-
-  void AddNode(ConvertTensors& ct, ScatterParams params) {
+  void AddAddNode(const ConvertTensors& ct,
+                  synTensor x,
+                  synTensor index,
+                  ns_ScatterKernel::Params params) {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
+    std::string node_name =
+        "unsorted_scatter_add_fwd_" + SynDataTypeToStr(inputs[0].type);
 
     std::vector<synTensor> syn_inputs;
-    for (size_t i = 0; i < inputs.size(); i++) {
-      syn_inputs.push_back(createTensor(inputs[i].dims.size(),
-                                        inputs[i].type,
-                                        inputs[i].dims,
-                                        true,
-                                        inputs[i].name));
-    }
+    syn_inputs.push_back(x);
+    syn_inputs.push_back(index);
+    syn_inputs.push_back(createTensor(inputs[2].dims.size(),
+                                      inputs[2].type,
+                                      inputs[2].dims,
+                                      true,
+                                      inputs[2].name));
 
     std::vector<synTensor> syn_outputs;
-    for (size_t i = 0; i < outputs.size(); i++) {
-      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
-                                         outputs[i].type,
-                                         outputs[i].dims,
-                                         true,
-                                         outputs[i].name));
-    }
-
-    guid_ = guid_ + SynDataTypeToStr(inputs[0].type);
+    syn_outputs.push_back(createTensor(outputs[0].dims.size(),
+                                       outputs[0].type,
+                                       outputs[0].dims,
+                                       true,
+                                       outputs[0].name));
 
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
                                      syn_outputs.data(),
                                      syn_inputs.size(),
                                      syn_outputs.size(),
-                                     &params.params,
-                                     sizeof(params.params),
-                                     guid_.c_str(),
-                                     "ScatterAdd",
+                                     &params,
+                                     sizeof(params),
+                                     node_name.c_str(),
+                                     "ScatterNoOverwrite",
                                      nullptr,
                                      nullptr);
-    PD_CHECK(
-        status == synSuccess, "[RUNTIME] synNodeCreate () failed = %d", status);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] ScatterKernel AddAddNode () failed = ",
+             status);
   }
 };
 
 template <typename T, typename Context>
-void ScatterKernelOverwrite(const Context& dev_ctx,
-                            const phi::DenseTensor& x,
-                            const phi::DenseTensor& index,
-                            const phi::DenseTensor& update,
-                            phi::DenseTensor* out) {
+void ScatterKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   const phi::DenseTensor& index,
+                   const phi::DenseTensor& update,
+                   bool overwrite,
+                   phi::DenseTensor* out) {
   PD_CHECK(index.dtype() == phi::DataType::INT32 ||
                index.dtype() == phi::DataType::INT64,
            "Scatter requires the index type be either int32 or int64");
@@ -174,177 +269,56 @@ void ScatterKernelOverwrite(const Context& dev_ctx,
                                      "be either int32 or int64."));
   }
 
-  phi::DenseTensor index_i32;
-  phi::DenseTensor fake_index(index);
-  phi::DenseTensor* expand_src = &fake_index;
-  phi::DenseTensorMeta fake_meta({index.dtype(), {phi::make_ddim(index_dims)}});
-  fake_index.set_meta(fake_meta);
-
-  if (index.dtype() == phi::DataType::INT64) {
-    index_i32.Resize(phi::make_ddim(index_dims));
-    dev_ctx.template Alloc<int32_t>(&index_i32);
-
-    custom_kernel::CastKernel<int64_t, Context>(
-        dev_ctx, fake_index, phi::DataType::INT32, &index_i32);
-    expand_src = &index_i32;
-  }
-
-  phi::IntArray out_shape(update_dims);
-  phi::DenseTensor index_expand;
-  index_expand.Resize(phi::make_ddim(update_dims));
-  dev_ctx.template Alloc<int32_t>(&index_expand);
-
-  custom_kernel::ExpandKernel<int32_t, Context>(
-      dev_ctx, *expand_src, out_shape, &index_expand);
-
+  // generate kernel name
   dev_ctx.template Alloc<T>(out);
   bool is_inplace = (out->data() == x.data());
+  bool cast = (index.dtype() == phi::DataType::INT64);
+  std::string recipe_name;
+
+  auto dtype = PDDataTypeToSynDataType(x.dtype());
+  Scatter::BuildRecipeName(recipe_name, dtype, is_inplace, cast, overwrite);
+
+  // prepare kernel parameters
+  phi::DenseTensor index_new(index);
+  phi::DenseTensorMeta meta({index.dtype(), {phi::make_ddim(index_dims)}});
+  index_new.set_meta(meta);
 
   ConvertTensors ct;
   ct.Add(x);
-  ct.Add(index_expand);
+  ct.Add(index_new);
   ct.Add(update);
   ct.Add(out, false);
 
   OpCacheOperator op_info;
-  ScatterParams params;
-  params.params.axis = x.dims().size() - 1;
+  ns_ScatterKernel::Params params;
+  params.axis = x.dims().size() - 1;
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  // need to add different nodes for inplace and non-inplace scatter
-  if (is_inplace) {
-    op_info.prepareOpInfo<T, ScatterParams>(
-        "ScatterKernel_", inputs_dims, &params);
-  } else {
-    op_info.prepareOpInfo<T, ScatterParams>(
-        "ScatterKernel", inputs_dims, &params);
-  }
+
+  // build scatter kernel if needed
+  op_info.prepareOpInfo<T, ns_ScatterKernel::Params>(
+      recipe_name, inputs_dims, &params);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
     Scatter op;
-    op.AddNode(ct, params, is_inplace);
+    auto index_tensor = op.AddCastNode(ct, cast);
+    auto expand_tensor = op.AddExpandNode(index_tensor, ct);
+    if (overwrite) {
+      op.AddOverwriteNode(ct, expand_tensor, nullptr, params, is_inplace);
+    } else {
+      auto zero_tensor = op.AddZeroNode(ct);
+      auto scatter_ow_tensor = op.AddOverwriteNode(
+          ct, expand_tensor, &zero_tensor, params, false, false);
+      op.AddAddNode(ct, scatter_ow_tensor, expand_tensor, params);
+    }
     op.Compile();
     op_info.setOp(op);
-
     recipe = op_info.GetRecipe();
   }
 
   std::map<std::string, uint64_t> tensors = ct.GetDeviceAddr();
   RecipeRunner runner(recipe);
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
-}
-
-template <typename T, typename Context>
-void ScatterKernelAdd(const Context& dev_ctx,
-                      const phi::DenseTensor& x,
-                      const phi::DenseTensor& index,
-                      const phi::DenseTensor& update,
-                      phi::DenseTensor* out) {
-  PD_CHECK(index.dtype() == phi::DataType::INT32 ||
-               index.dtype() == phi::DataType::INT64,
-           "ScatterAdd requires the index type be either int32 or int64");
-
-  auto index_dims = phi::vectorize<int>(index.dims());
-  auto update_dims = phi::vectorize<int>(update.dims());
-  PD_CHECK(
-      update_dims[0] == index_dims[0],
-      "ScatterAdd requires the 1st dim of update match the 1st dim of index");
-
-  if (index_dims.size() == 2) {
-    PD_CHECK(index_dims[1] != 1,
-             "ScatterAdd's index 2nd dim must be 1 for 2D index");
-  } else if (index_dims.size() == 1) {
-    index_dims.push_back(1);
-  } else {
-    PADDLE_THROW(
-        phi::errors::InvalidArgument("Scatter requires the index type "
-                                     "be either int32 or int64."));
-  }
-
-  phi::DenseTensor index_i32;
-  phi::DenseTensor fake_index(index);
-  phi::DenseTensor* expand_src = &fake_index;
-  phi::DenseTensorMeta fake_meta({index.dtype(), {phi::make_ddim(index_dims)}});
-  fake_index.set_meta(fake_meta);
-
-  if (index.dtype() == phi::DataType::INT64) {
-    index_i32.Resize(phi::make_ddim(index_dims));
-    dev_ctx.template Alloc<int32_t>(&index_i32);
-
-    custom_kernel::CastKernel<int64_t, Context>(
-        dev_ctx, fake_index, phi::DataType::INT32, &index_i32);
-    expand_src = &index_i32;
-  }
-
-  phi::IntArray out_shape(update_dims);
-  phi::DenseTensor index_expand;
-  index_expand.Resize(phi::make_ddim(update_dims));
-  dev_ctx.template Alloc<int32_t>(&index_expand);
-
-  custom_kernel::ExpandKernel<int32_t, Context>(
-      dev_ctx, *expand_src, out_shape, &index_expand);
-
-  dev_ctx.template Alloc<T>(out);
-
-  ConvertTensors ct;
-  ct.Add(x);
-  ct.Add(index_expand);
-  ct.Add(update);
-  ct.Add(out, false);
-
-  OpCacheOperator op_info;
-  ScatterParams params;
-  params.params.axis = x.dims().size() - 1;
-  std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, ScatterParams>(
-      "ScatterAddKernel", inputs_dims, &params);
-  auto recipe = op_info.GetRecipe();
-
-  if (recipe == nullptr) {
-    ScatterAdd op;
-
-    op.AddNode(ct, params);
-
-    op.Compile();
-
-    op_info.setOp(op);
-
-    recipe = op_info.GetRecipe();
-  }
-
-  std::map<std::string, uint64_t> tensors = ct.GetDeviceAddr();
-  RecipeRunner runner(recipe);
-  runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
-}
-
-template <typename T, typename Context>
-void ScatterKernel(const Context& dev_ctx,
-                   const phi::DenseTensor& x,
-                   const phi::DenseTensor& index,
-                   const phi::DenseTensor& update,
-                   bool overwrite,
-                   phi::DenseTensor* out) {
-  if (overwrite) {
-    ScatterKernelOverwrite<T, Context>(dev_ctx, x, index, update, out);
-  } else {
-    auto value = static_cast<T>(0);
-
-    phi::DenseTensor zero;
-    phi::DenseTensorMeta zero_meta = {update.dtype(), update.dims()};
-    zero.set_meta(zero_meta);
-    custom_kernel::FullLikeKernel<T, Context>(
-        dev_ctx, update, phi::Scalar(value), zero.dtype(), &zero);
-
-    phi::DenseTensor x1;
-    phi::Copy(dev_ctx, x, dev_ctx.GetPlace(), false, &x1);
-
-    phi::DenseTensor x2;
-    phi::DenseTensorMeta x2_meta = {x.dtype(), x.dims()};
-    x2.set_meta(x2_meta);
-    ScatterKernelOverwrite<T, Context>(dev_ctx, x1, index, zero, &x2);
-
-    ScatterKernelAdd<T, Context>(dev_ctx, x2, index, update, out);
-  }
 }
 
 }  // namespace custom_kernel
