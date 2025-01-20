@@ -43,8 +43,11 @@ class Scatter : public HpuOperator {
     recipe_name += SynDataTypeToStr(dtype);
   }
 
-  synTensor AddCastNode(const ConvertTensors& ct, bool cast) {
-    auto inputs = ct.GetTensors();
+  synTensor AddCastNode(ConvertTensors* ct, bool cast) {
+    PD_CHECK(ct != nullptr,
+             "[RUNTIME] ScatterKernel AddCastNode() ct is nullptr");
+
+    auto inputs = ct->GetTensors();
     synTensor syn_inputs[1] = {createTensor(inputs[1].dims.size(),
                                             inputs[1].type,
                                             inputs[1].dims,
@@ -82,8 +85,11 @@ class Scatter : public HpuOperator {
     return syn_outputs[0];
   }
 
-  synTensor AddExpandNode(synTensor expandSrc, const ConvertTensors& ct) {
-    auto inputs = ct.GetTensors();
+  synTensor AddExpandNode(synTensor expandSrc, ConvertTensors* ct) {
+    PD_CHECK(ct != nullptr,
+             "[RUNTIME] ScatterKernel AddExpandNode() ct is nullptr");
+
+    auto inputs = ct->GetTensors();
     synTensor syn_inputs[1] = {expandSrc};
     synTensor syn_outputs[1] = {createTensor(inputs[2].dims.size(),
                                              syn_type_int32,
@@ -112,9 +118,12 @@ class Scatter : public HpuOperator {
     return syn_outputs[0];
   }
 
-  synTensor AddZeroNode(const ConvertTensors& ct) {
+  synTensor AddZeroNode(ConvertTensors* ct) {
+    PD_CHECK(ct != nullptr,
+             "[RUNTIME] ScatterKernel AddZeroNode() ct is nullptr");
+
     auto scalar_zero = phi::Scalar(0.f);
-    auto inputs = ct.GetTensors();
+    auto inputs = ct->GetTensors();
     ns_ConstantKernel::Params params;
     params.constant.f = scalar_zero.to<float>();
 
@@ -139,14 +148,17 @@ class Scatter : public HpuOperator {
     return syn_outputs[0];
   }
 
-  synTensor AddOverwriteNode(const ConvertTensors& ct,
+  synTensor AddOverwriteNode(ConvertTensors* ct,
                              synTensor index_tensor,
                              synTensor* update_tensor,
                              ns_ScatterKernel::Params params,
                              bool is_inplace,
                              bool is_output_persist = true) {
-    auto inputs = ct.GetTensors();
-    auto outputs = ct.GetTensors(false);
+    PD_CHECK(ct != nullptr,
+             "[RUNTIME] ScatterKernel AddOverwriteNode() ct is nullptr");
+
+    auto inputs = ct->GetTensors();
+    auto outputs = ct->GetTensors(false);
     std::vector<synTensor> syn_inputs;
     synSectionHandle section_shared = nullptr;
 
@@ -200,12 +212,15 @@ class Scatter : public HpuOperator {
     return syn_outputs[0];
   }
 
-  void AddAddNode(const ConvertTensors& ct,
+  void AddAddNode(ConvertTensors* ct,
                   synTensor x,
                   synTensor index,
                   ns_ScatterKernel::Params params) {
-    auto inputs = ct.GetTensors();
-    auto outputs = ct.GetTensors(false);
+    PD_CHECK(ct != nullptr,
+             "[RUNTIME] ScatterKernel AddOverwriteNode() ct is nullptr");
+
+    auto inputs = ct->GetTensors();
+    auto outputs = ct->GetTensors(false);
     std::string node_name =
         "unsorted_scatter_add_fwd_" + SynDataTypeToStr(inputs[0].type);
 
@@ -301,15 +316,15 @@ void ScatterKernel(const Context& dev_ctx,
 
   if (recipe == nullptr) {
     Scatter op;
-    auto index_tensor = op.AddCastNode(ct, cast);
-    auto expand_tensor = op.AddExpandNode(index_tensor, ct);
+    auto index_tensor = op.AddCastNode(&ct, cast);
+    auto expand_tensor = op.AddExpandNode(index_tensor, &ct);
     if (overwrite) {
-      op.AddOverwriteNode(ct, expand_tensor, nullptr, params, is_inplace);
+      op.AddOverwriteNode(&ct, expand_tensor, nullptr, params, is_inplace);
     } else {
-      auto zero_tensor = op.AddZeroNode(ct);
+      auto zero_tensor = op.AddZeroNode(&ct);
       auto scatter_ow_tensor = op.AddOverwriteNode(
-          ct, expand_tensor, &zero_tensor, params, false, false);
-      op.AddAddNode(ct, scatter_ow_tensor, expand_tensor, params);
+          &ct, expand_tensor, &zero_tensor, params, false, false);
+      op.AddAddNode(&ct, scatter_ow_tensor, expand_tensor, params);
     }
     op.Compile();
     op_info.setOp(op);
