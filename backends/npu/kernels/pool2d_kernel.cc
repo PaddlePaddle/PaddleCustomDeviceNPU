@@ -205,10 +205,10 @@ void Pool2dKernel(const Context& dev_ctx,
     } else if (pooling_type == "avg") {
       std::vector<int64_t> vec = phi::vectorize<int64_t>(out_data_dims);
       EXEC_NPU_CMD(aclnnAdaptiveAvgPool2d,
-                  dev_ctx,
-                  transformed_input,
-                  vec,
-                  transformed_output);
+                   dev_ctx,
+                   transformed_input,
+                   vec,
+                   transformed_output);
     }
 
     if (pooling_type == "avg" && channel_last) {
