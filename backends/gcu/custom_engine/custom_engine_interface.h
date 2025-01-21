@@ -13,13 +13,20 @@
 // limitations under the License.
 
 #pragma once
+#include "paddle/fluid/custom_engine/custom_engine_ext.h"
 #include "paddle/phi/extension.h"
 
-namespace paddle {
-namespace dialect {
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void InitPluginCustomEngine(void*);
-void RegisterCustomEngineOp();
+C_Status RegisterCustomEngineOp();
+C_Status CustomEngineOpLower(C_CustomEngineLowerParams* lower_param);
+C_Status GraphEngineBuild(C_CustomEngineInstruction instruction);
+C_Status GraphEngineExecute(C_CustomEngineInstruction instruction);
 
-}  // namespace dialect
-}  // namespace paddle
+void InitPluginCustomEngine(CustomEngineParams* params);
+
+#ifdef __cplusplus
+} /* extern "c" */
+#endif

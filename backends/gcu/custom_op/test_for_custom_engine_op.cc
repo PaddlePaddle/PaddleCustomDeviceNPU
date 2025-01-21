@@ -54,7 +54,7 @@ void TestCustomEngineOp() {
       std::vector<pir::Value>{const_op1.result(0), const_op2.result(0)});
 
   pir::OpInfo custom_engine_op_info =
-      ctx->GetRegisteredOpInfo(paddle::dialect::CustomEngineOp::name());
+      ctx->GetRegisteredOpInfo(custom_engine::CustomEngineOp::name());
 
   std::vector<pir::Type> out_types;
   out_types.emplace_back(
@@ -90,7 +90,7 @@ void TestCustomEngineOp() {
 
   builder.Insert(op1);
 
-  auto op2 = builder.Build<paddle::dialect::CustomEngineOp>(
+  auto op2 = builder.Build<custom_engine::CustomEngineOp>(
       buildin_combine_op.result(0),
       std::vector<std::string>{"input_0", "input_1"},
       std::vector<std::string>{"output_0"},
@@ -110,7 +110,7 @@ void TestCustomEngineOp() {
 }
 
 void RunTestCustomEngineOp() {
-  paddle::dialect::RegisterCustomEngineOp();
+  (void)RegisterCustomEngineOp();
   TestCustomEngineOp();
 }
 }  // namespace

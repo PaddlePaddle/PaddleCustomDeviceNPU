@@ -40,6 +40,7 @@ include(external/topscc)
 
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(/opt/tops/include)
+include_directories(${PADDLE_INC_DIR}/build)
 
 option(WITH_KERNELS "compile with custom kernels" ON)
 option(WITH_TESTING "compile with unit testing" OFF)

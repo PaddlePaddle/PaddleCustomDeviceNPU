@@ -40,6 +40,7 @@
 #define ECCL_CHECK(func) CHECK_COMMON(func, ecclSuccess)
 #define TOPSATEN_CHECK(func) CHECK_COMMON(func, TOPSATEN_STATUS_SUCCESS)
 #define TOPSOP_CHECK(func) CHECK_COMMON(func, TOPSOP_STATUS_SUCCESS)
+#define TOPSGRAPH_CHECK(func) CHECK_COMMON(func, TOPS_GRAPH_SUCCESS)
 
 #ifdef __cplusplus
 extern "C" {

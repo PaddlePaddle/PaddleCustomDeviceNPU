@@ -1,4 +1,4 @@
-// Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
+#include <vector>
 
-#include "paddle/pir/include/pass/pass_registry.h"
+#include "custom_engine/ir_translator/translator_registry.h"
 
-USE_PIR_PASS(addn_replace_pass);
-USE_PIR_PASS(gcu_op_marker_pass);
-USE_PIR_PASS(gcu_sub_graph_extract_pass);
-USE_PIR_PASS(gcu_replace_with_engine_op_pass);
+namespace custom_engine {
+
+static GcuOpPtr TranslateAbs(
+    GcuBuilderPtr gcu_builder,
+    const pir::Operation *op,
+    const std::vector<std::vector<GcuOpPtr>> &gcu_op_inputs) {
+  auto input = *(gcu_op_inputs[0][0]);
+  return std::make_shared<GcuOp>(builder::Abs(input));
+}
+
+}  // namespace custom_engine
+
+REGISTER_OP_TRANSLATOR(pd_op_abs, custom_engine::TranslateAbs)

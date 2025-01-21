@@ -57,5 +57,6 @@ PADDLE_GCU_1.0 {
         XcclGroupEnd;
         XcclSend;
         XcclRecv;
+        InitPluginCustomEngine;
     local: *;
 };

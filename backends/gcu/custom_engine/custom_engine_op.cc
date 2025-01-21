@@ -16,20 +16,19 @@
 
 #include "paddle/fluid/pir/dialect/operator/utils/utils.h"
 
-namespace paddle {
-namespace dialect {
-
+namespace custom_engine {
 const char *CustomEngineOp::attributes_name[2] = {"input_names",
                                                   "output_names"};
 
 OpInfoTuple CustomEngineOp::GetOpInfo() {
   std::vector<paddle::dialect::OpInputInfo> inputs = {
-      OpInputInfo("x",
-                  "pir::VectorType<paddle::dialect::DenseTensorType>",
-                  false,
-                  false,
-                  false,
-                  false)};
+      paddle::dialect::OpInputInfo(
+          "x",
+          "pir::VectorType<paddle::dialect::DenseTensorType>",
+          false,
+          false,
+          false,
+          false)};
 
   std::vector<paddle::dialect::OpAttributeInfo> attributes = {
       paddle::dialect::OpAttributeInfo(
@@ -38,13 +37,14 @@ OpInfoTuple CustomEngineOp::GetOpInfo() {
           "output_names", "pir::ArrayAttribute", "")};
 
   std::vector<paddle::dialect::OpOutputInfo> outputs = {
-      OpOutputInfo("out",
-                   "pir::VectorType<paddle::dialect::DenseTensorType>",
-                   false,
-                   false)};
+      paddle::dialect::OpOutputInfo(
+          "out",
+          "pir::VectorType<paddle::dialect::DenseTensorType>",
+          false,
+          false)};
 
   paddle::dialect::OpRunTimeInfo run_time_info =
-      OpRunTimeInfo("", {""}, "", {""}, {}, {}, {}, {});
+      paddle::dialect::OpRunTimeInfo("", {}, "", {}, {}, {}, {}, {});
 
   return std::make_tuple(
       inputs, attributes, outputs, run_time_info, "gcu_engine_op");
@@ -98,7 +98,7 @@ void CustomEngineOp::Build(pir::Builder &builder,             // NOLINT
     } else {
       out_types.emplace_back(pir::DenseTensorType::get(
           pir::IrContext::Instance(),
-          TransToIrDataType(outputs_dtype[i]),
+          paddle::dialect::TransToIrDataType(outputs_dtype[i]),
           phi::DDim(outputs_shape[i].data(), outputs_shape[i].size()),
           phi::DataLayout::kNCHW,
           phi::LoD(),
@@ -110,6 +110,35 @@ void CustomEngineOp::Build(pir::Builder &builder,             // NOLINT
   argument_outputs.emplace_back(out_vector_type);
 
   argument.AddOutputs(argument_outputs.begin(), argument_outputs.end());
+  argument.AddRegion(nullptr);
+  pir::PassStopGradientsDefaultly(argument);
+}
+
+void CustomEngineOp::Build(pir::Builder &builder,             // NOLINT
+                           pir::OperationArgument &argument,  // NOLINT
+                           pir::Value x,
+                           const std::vector<std::string> &input_names,
+                           const std::vector<std::string> &output_names,
+                           const std::vector<pir::Type> &outputs_type) {
+  VLOG(3) << "Start building CustomEngineOp";
+
+  VLOG(3) << "Builder construction inputs";
+  std::vector<pir::Value> argument_inputs = {x};
+  argument.AddInputs(argument_inputs);
+
+  VLOG(3) << "Builder construction attributes";
+
+  ADD_VEC_ATTRIBUTE(pir::StrAttribute, input_names);
+  ADD_VEC_ATTRIBUTE(pir::StrAttribute, output_names);
+
+  VLOG(3) << "Builder construction outputs";
+  pir::Type out_vector_type =
+      pir::VectorType::get(pir::IrContext::Instance(), outputs_type);
+  //   std::vector<pir::Type> argument_outputs;
+  //   argument_outputs.emplace_back(out_vector_type);
+  //   argument.AddOutputs(argument_outputs.begin(), argument_outputs.end());
+  argument.AddOutput(out_vector_type);
+  argument.AddRegion(nullptr);
   pir::PassStopGradientsDefaultly(argument);
 }
 
@@ -165,7 +194,22 @@ void CustomEngineOp::VerifySig() {
   VLOG(3) << "End Verifying for: CustomEngineOp.";
 }
 
-}  // namespace dialect
-}  // namespace paddle
+pir::Block *CustomEngineOp::block() {
+  pir::Region &region = (*this)->region(0);
+  if (region.empty()) region.emplace_back();
+  return &region.front();
+}
 
-IR_DEFINE_EXPLICIT_TYPE_ID(paddle::dialect::CustomEngineOp)
+pir::Block *CustomEngineOp::block() const {
+  pir::Region &region = (*this)->region(0);
+  PADDLE_ENFORCE_EQ(
+      region.empty(),
+      false,
+      ::common::errors::Unavailable(
+          "Required CustomEngineOp's region must not be emptpy."));
+  return &region.front();
+}
+
+}  // namespace custom_engine
+
+IR_DEFINE_EXPLICIT_TYPE_ID(custom_engine::CustomEngineOp)
