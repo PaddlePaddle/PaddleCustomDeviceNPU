@@ -260,7 +260,7 @@ void TileGradKernelImpl(const Context& dev_ctx,
     dev_ctx.template Alloc<float>(&cast_out_grad);
     custom_kernel::CastKernel<T, Context>(
         dev_ctx, out_grad, phi::DataType::FLOAT32, &cast_out_grad);
-    
+
     phi::DenseTensorMeta out_meta = {phi::DataType::FLOAT32, x_grad->dims()};
     cast_x_grad.set_meta(out_meta);
     dev_ctx.template Alloc<float>(&cast_x_grad);
@@ -271,30 +271,31 @@ void TileGradKernelImpl(const Context& dev_ctx,
 
   // slice 3. aclnnSliceV2
   EXEC_NPU_CMD(aclnnSliceV2,
-                dev_ctx,
-                cast_out_grad,
-                starts,
-                x_grad_dims,
-                axes,
-                steps,
-                cast_x_grad);
+               dev_ctx,
+               cast_out_grad,
+               starts,
+               x_grad_dims,
+               axes,
+               steps,
+               cast_x_grad);
   
   // slice 4.fix slice not support FP64 issue use cast(2)
   if (out_grad.dtype() == phi::DataType::FLOAT64) {
     custom_kernel::CastKernel<T, Context>(
         dev_ctx, cast_x_grad, phi::DataType::FLOAT64, x_grad);
-  } 
+  }
 
   // if out_grad not BOOL, need scale product of repeat_times
   if (out_grad.dtype() != phi::DataType::BOOL) {
     int product = 1;
     for (int value : repeat_times) {
-        product *= value;
+      product *= value;
     }
 
     phi::Scalar in_scale = product;
     phi::Scalar in_bias = 0;
-    custom_kernel::ScaleKernel<T, Context>(dev_ctx, *x_grad, in_scale, in_bias, true, x_grad);
+    custom_kernel::ScaleKernel<T, Context>(
+        dev_ctx, *x_grad, in_scale, in_bias, true, x_grad);
   }
 
   x_grad->Resize(phi::make_ddim(origin_x_dims));
@@ -368,7 +369,7 @@ void TileGradKernel(const Context& dev_ctx,
                                    reshape_dims_vec,
                                    reduce_dims_vec,
                                    origin_x_dims,
-                                   repeat_times_data,     
+                                   repeat_times_data,
                                    x_grad);
   }
 }
