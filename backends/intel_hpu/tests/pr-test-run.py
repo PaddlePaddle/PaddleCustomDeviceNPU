@@ -27,6 +27,14 @@ pdpd_pcd_unit_test_path = os.environ.get(
 os.environ.setdefault("GAUDI2_CI", "1")
 
 
+def get_substring_after_colon(input_string):
+    parts = input_string.split(":")
+    if len(parts) > 1:
+        return parts[0], parts[1]
+    else:
+        return input_string, ""
+
+
 def case_command(command, test_case=None, test_suite=None):
     output = ""
     output += f"Command: {command}\n"
@@ -57,9 +65,10 @@ def case_command(command, test_case=None, test_suite=None):
 
 def run_unit_test(test_suite, test_case, cmd_env=""):
     testcase_name = test_case.get("testcase_name", "")
+    testcase_subcase_name = test_case.get("testcase_subcase_name", "")
     testcase_path = test_case.get("testcase_path", "")
 
-    run_cmd = f"python {testcase_path}"
+    run_cmd = f"python {testcase_path} {testcase_subcase_name}"
     _env = os.environ.copy()
     for opt in cmd_env.split():
         _env.setdefault(opt.split("=")[0], opt.split("=")[1])
@@ -118,6 +127,7 @@ for file in os.listdir(os.path.dirname(pdpd_pcd_unittest_path)):
         absfile = os.path.join(os.path.dirname(pdpd_pcd_unittest_path), file)
         test_case_dict = {}
         test_case_dict["testcase_name"] = file
+        test_case_dict["testcase_subcase_name"] = ""
         test_case_dict["testcase_path"] = absfile
         test_case_dict_lst.append(test_case_dict)
 
@@ -127,9 +137,12 @@ if cmd_args["junit"]:
     ts.setPlatform(test_platform)
 
 match_test_case_name = ""
+match_sub_test_case_name = ""
 if cmd_args["k"]:
     match_test_case_name = cmd_args["k"]
-    match_test_case_name = match_test_case_name.strip()
+    match_test_case_name, match_sub_test_case_name = get_substring_after_colon(
+        match_test_case_name.strip()
+    )
 
 script_path = os.path.dirname(os.path.realpath(__file__))
 os.chdir(script_path)
@@ -138,9 +151,12 @@ for test_case in test_case_dict_lst:
     testcase_name = test_case.get("testcase_name", "")
     if match_test_case_name and match_test_case_name not in testcase_name:
         continue
+    test_case["testcase_subcase_name"] = match_sub_test_case_name
     run_unit_test(ts, test_case)
 
 if cmd_args["junit"]:
     with open(cmd_args["junit"], "w+") as f:
         f.write(ts.toString())
-    print(ts.toString(True))
+
+print("-------------Summary--------------")
+ts.print_attr_dict()

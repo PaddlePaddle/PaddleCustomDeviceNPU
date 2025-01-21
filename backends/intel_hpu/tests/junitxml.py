@@ -101,19 +101,23 @@ class jTestSuite(jXMLBase):
         super().__init__("testsuite")
         self.setName(name)
         self._case_lst = list()
-        for i in ["disabled", "tests", "passed", "errors", "failures", "skipped"]:
+        for i in ["tested", "passed", "errors", "failed", "skipped", "disabled"]:
             self._attr_dict[i] = 0
         self._attr_dict["kernel"] = subprocess.getoutput("uname -r")
         self._attr_dict["os"] = (
             "wsl" if "microsoft" in platform.platform().lower() else "linux"
         )
 
+    def print_attr_dict(self):
+        for k, v in self._attr_dict.items():
+            print(f"{k} : {v}")
+
     def setPlatform(self, platform):
         self._attr_dict["platform"] = platform
 
     def addCase(self, case: jTestCase):
         if case.result == jResult.FAIL:
-            self._attr_dict["failures"] += 1
+            self._attr_dict["failed"] += 1
         elif case.result == jResult.ERROR:
             self._attr_dict["errors"] += 1
         elif case.result == jResult.SKIP:
@@ -125,7 +129,7 @@ class jTestSuite(jXMLBase):
         self._case_lst.append(case)
 
     def covertET(self) -> et:
-        self._attr_dict["tests"] = len(self._case_lst)
+        self._attr_dict["tested"] = len(self._case_lst)
         elem = super().covertET()
         for jxml in self._case_lst:
             elem.append(jxml.covertET())
