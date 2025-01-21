@@ -176,6 +176,7 @@ void Pool2dKernel(const Context& dev_ctx,
     // AdaptiveAvgPool2d only support NCHW
     phi::DenseTensor transformed_input, transformed_output;
     if (pooling_type == "avg" && channel_last) {
+      std::vector<int> in_trans_perm = {0, 3, 1, 2};
       transformed_input.Resize(common::make_dim(
           in_x_dims[0], in_x_dims[3], in_x_dims[1], in_x_dims[2]));
       dev_ctx.template Alloc<T>(&transformed_input);
@@ -183,33 +184,41 @@ void Pool2dKernel(const Context& dev_ctx,
           common::make_dim(out_dims[0], out_dims[3], out_dims[1], out_dims[2]));
       dev_ctx.template Alloc<T>(&transformed_output);
 
-      const auto& trans_runner =
-          NpuOpRunner("TransData",
-                      {in_x_tensor},
-                      {transformed_input},
-                      {{"src_format", std::string("NHWC")},
-                       {"dst_format", std::string("NCHW")}});
-      trans_runner.Run(dev_ctx.stream());
+      NpuOpRunner in_trans_runner;
+      in_trans_runner.SetType("Transpose")
+          .AddInput(in_x_tensor)
+          .AddInput(dev_ctx, std::move(in_trans_perm))
+          .AddOutput(transformed_input);
+      in_trans_runner.Run(dev_ctx.stream());
     } else {
       transformed_input = in_x_tensor;
       transformed_output = out_tensor;
     }
 
-    const auto& runner =
-        NpuOpRunner(pooling_mode,
-                    {transformed_input},
-                    {transformed_output},
-                    {{"output_size", phi::vectorize<int>(out_data_dims)}});
-    runner.Run(dev_ctx.stream());
+    if (pooling_type == "max") {
+      const auto& runner =
+          NpuOpRunner(pooling_mode,
+                      {transformed_input},
+                      {transformed_output},
+                      {{"output_size", phi::vectorize<int>(out_data_dims)}});
+      runner.Run(dev_ctx.stream());
+    } else if (pooling_type == "avg") {
+      std::vector<int64_t> vec = phi::vectorize<int64_t>(out_data_dims);
+      EXEC_NPU_CMD(aclnnAdaptiveAvgPool2d,
+                  dev_ctx,
+                  transformed_input,
+                  vec,
+                  transformed_output);
+    }
 
     if (pooling_type == "avg" && channel_last) {
-      const auto& trans_runner =
-          NpuOpRunner("TransData",
-                      {transformed_output},
-                      {out_tensor},
-                      {{"src_format", std::string("NCHW")},
-                       {"dst_format", std::string("NHWC")}});
-      trans_runner.Run(dev_ctx.stream());
+      std::vector<int> out_trans_perm = {0, 2, 3, 1};
+      NpuOpRunner out_trans_runner;
+      out_trans_runner.SetType("Transpose")
+          .AddInput(transformed_output)
+          .AddInput(dev_ctx, std::move(out_trans_perm))
+          .AddOutput(out_tensor);
+      out_trans_runner.Run(dev_ctx.stream());
     }
   } else {
     std::string pooling_mode = "AvgPoolV2";
