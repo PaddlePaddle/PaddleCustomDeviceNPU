@@ -370,7 +370,10 @@ inline void NpuBroadcast(const Context& dev_ctx,
     dev_ctx.template Alloc<T>(&tmp_tensor);
 
     // float64 fix
-    std::vector<int64_t> final_expand_shape(tmp_tensor_dims);
+    std::vector<int64_t> final_expand_shape;
+    for (int64_t i = 0; i < tmp_tensor_dims.size(); ++i) {
+      final_expand_shape.push_back(tmp_tensor_dims[i]);
+    }
     if (tmp_src.dtype() == phi::DataType::FLOAT64) {
       phi::DenseTensor cast_x;
       phi::DenseTensorMeta meta(tmp_src.meta());
