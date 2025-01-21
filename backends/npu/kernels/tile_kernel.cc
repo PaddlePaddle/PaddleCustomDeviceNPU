@@ -278,7 +278,7 @@ void TileGradKernelImpl(const Context& dev_ctx,
                axes,
                steps,
                cast_x_grad);
-  
+
   // slice 4.fix slice not support FP64 issue use cast(2)
   if (out_grad.dtype() == phi::DataType::FLOAT64) {
     custom_kernel::CastKernel<T, Context>(
