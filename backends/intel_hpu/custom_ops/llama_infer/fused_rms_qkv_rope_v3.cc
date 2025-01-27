@@ -126,8 +126,6 @@ class FusedRmsQkvRopeV3 : public HpuOperator {
              "[RUNTIME] FusedRmsQkvRopeKernel synNodeCreate (matmul) failed = ",
              status);
 
-    mul_outputs.push_back(qkv_out);
-
     auto reshape_dims = ins[0];
     reshape_dims[2] = params.num_head + 2 * params.kv_num_head;
     reshape_dims.push_back(params.head_dim);
