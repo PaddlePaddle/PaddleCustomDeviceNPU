@@ -119,7 +119,8 @@ void LogicalOrKernel(const Context& dev_ctx,
   LogicalParams params;
   params.op = "or";
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  std::string op_name = (x.data() == out->data()) ? "_LogicalOrKernel" : "LogicalOrKernel";
+  std::string op_name =
+      (x.data() == out->data()) ? "_LogicalOrKernel" : "LogicalOrKernel";
   op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
@@ -153,7 +154,8 @@ void LogicalAndKernel(const Context& dev_ctx,
   LogicalParams params;
   params.op = "and";
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  std::string op_name = (x.data() == out->data()) ? "_LogicalAndKernel" : "LogicalAndKernel";
+  std::string op_name =
+      (x.data() == out->data()) ? "_LogicalAndKernel" : "LogicalAndKernel";
   op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 

@@ -35,7 +35,7 @@ class Scale : public HpuOperator {
 
     synSectionHandle section = nullptr;
     if (inputs[0].device_addr == outputs[0].device_addr) {
-        section = createSection();
+      section = createSection();
     }
 
     std::string guid_full = "constant_f32";
@@ -164,7 +164,7 @@ class ScaleCast : public HpuOperator {
 
     synSectionHandle section = nullptr;
     if (inputs[0].device_addr == outputs[0].device_addr) {
-        section = createSection();
+      section = createSection();
     }
 
     std::string guid_full = "constant_f32";
@@ -368,7 +368,8 @@ void ScaleKernel(const Context& dev_ctx,
   params.biasParams.constant.f = bias;
 
   OpCacheOperator op_info;
-  std::string op_name = (x.data() == out->data()) ? "_scaleKernel" : "scaleKernel";
+  std::string op_name =
+      (x.data() == out->data()) ? "_scaleKernel" : "scaleKernel";
   op_info.prepareOpInfo<T, ScaleParams>(op_name, inputs_dims, &params);
   auto recipe = op_info.GetRecipe();
 

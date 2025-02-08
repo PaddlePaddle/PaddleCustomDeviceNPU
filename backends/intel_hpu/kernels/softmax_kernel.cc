@@ -38,10 +38,10 @@ class SoftmaxOperator : public HpuOperator {
       section = createSection();
     }
 
-    synTensor inputs[ins.size()] = {
-        createTensor(ins[0].dims.size(), datatype, ins[0].dims, true, "input", section)};
-    synTensor outputs[outs.size()] = {
-        createTensor(outs[0].dims.size(), datatype, outs[0].dims, true, "output", section)};
+    synTensor inputs[ins.size()] = {createTensor(
+        ins[0].dims.size(), datatype, ins[0].dims, true, "input", section)};
+    synTensor outputs[outs.size()] = {createTensor(
+        outs[0].dims.size(), datatype, outs[0].dims, true, "output", section)};
 
     synStatus status = synNodeCreate(graphHandle_,
                                      inputs,
@@ -90,7 +90,8 @@ void SoftmaxKernel(const Context& dev_ctx,
   auto recipe = op_info.GetRecipe();
   if (recipe == nullptr) {
     // compile
-    std::string op_node_name = (x.data() == out->data()) ? "_softmax_op" : "softmax_op";
+    std::string op_node_name =
+        (x.data() == out->data()) ? "_softmax_op" : "softmax_op";
     SoftmaxOperator op(op_info.guid_, op_node_name);
     op.AddNode(ct, op_info.datatype_, params);
 

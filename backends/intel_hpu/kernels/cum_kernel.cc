@@ -119,7 +119,8 @@ void CumsumKernel(const Context& dev_ctx,
   ct.Add(out, false);
   if (recipe == nullptr) {
     // compile
-    std::string op_node_name = (input_tensor.data() == out->data()) ? "_cumsum_op" : "cumsum_op";
+    std::string op_node_name =
+        (input_tensor.data() == out->data()) ? "_cumsum_op" : "cumsum_op";
     CumsumOperator op(op_info.guid_, op_node_name);
     op.AddNode(ct, params);
     op.Compile();

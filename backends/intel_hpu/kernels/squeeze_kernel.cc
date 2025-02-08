@@ -144,7 +144,8 @@ void SqueezeKernel(const Context& dev_ctx,
 
   synRecipeHandle recipe = nullptr;
 
-  std::string op_name = (x.data() == out->data()) ? "_SqueezeKernel" : "SqueezeKernel";
+  std::string op_name =
+      (x.data() == out->data()) ? "_SqueezeKernel" : "SqueezeKernel";
   if (axes.size() == 0) {
     OpCacheOperator op_info;
     std::vector<DIMS> inputs_dims = ct.GetDims();
@@ -170,8 +171,7 @@ void SqueezeKernel(const Context& dev_ctx,
     SqueezeParams params;
     params.params.axis = static_cast<int32_t>(x.dims().size()) - 1 - dim;
     std::vector<DIMS> inputs_dims = ct.GetDims();
-    op_info.prepareOpInfo<T, SqueezeParams>(
-        op_name, inputs_dims, &params);
+    op_info.prepareOpInfo<T, SqueezeParams>(op_name, inputs_dims, &params);
     recipe = op_info.GetRecipe();
     if (recipe == nullptr) {
       Squeeze op;
