@@ -56,6 +56,65 @@ class SetTensorValue : public HpuOperator {
   std::string pName_;
 };
 
+class SetTensorValueExp : public HpuOperator {
+ public:
+  SetTensorValueExp(std::string guid_prefix, std::string node_name)
+      : HpuOperator(guid_prefix), pName_(node_name) {}
+  void AddNode(const std::vector<DIMS>& ins,
+               const std::vector<DIMS>& outs,
+               synDataType datatype,
+               synSliceParams params,
+               std::vector<int64_t> new_dims) {
+    assert(ins.size() == 2 && "input size should be 2");
+    assert(outs.size() == 1 && "output size should be 1");
+
+    synSectionHandle section = createSection();
+
+    synTensor syn_inputs[1] = {
+        createTensor(ins[1].size(), datatype, ins[1], true, "value")};
+    auto value_exp = createTensor(
+        new_dims.size(), datatype, new_dims, false, "value_broadcast");
+    synTensor syn_outputs[1] = {value_exp};
+
+    synStatus status = synNodeCreate(graphHandle_,
+                                     syn_inputs,
+                                     syn_outputs,
+                                     1,
+                                     1,
+                                     nullptr,
+                                     0,
+                                     "broadcast",
+                                     "Expand",
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (broadcast) failed = ",
+             status);
+
+    synTensor inputs[ins.size()] = {
+        createTensor(ins[0].size(), datatype, ins[0], true, "input", section),
+        value_exp};
+    synTensor outputs[outs.size()] = {createTensor(
+        outs[0].size(), datatype, outs[0], true, "output", section)};
+
+    status = synNodeCreate(graphHandle_,
+                           inputs,
+                           outputs,
+                           ins.size(),
+                           outs.size(),
+                           &params,
+                           sizeof(params),
+                           guid_.c_str(),
+                           pName_.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (SetTensorValueExp) failed = ",
+             status);
+  }
+  std::string pName_;
+};
+
 template <typename T, typename Context>
 void SetTensorValueKernel(const Context& dev_ctx,
                           const phi::DenseTensor& x,
@@ -67,8 +126,12 @@ void SetTensorValueKernel(const Context& dev_ctx,
                           const std::vector<int64_t>& decrease_axes,
                           const std::vector<int64_t>& none_axes,
                           phi::DenseTensor* out) {
+  VLOG(6) << "Call HPU SetTensorValueKernel";
   auto starts_v = starts.GetData();
   auto ends_v = ends.GetData();
+
+  const auto& x_dims = x.dims();
+  const auto& value_dims = value.dims();
 
   PADDLE_ENFORCE_EQ(
       starts_v.size(),
@@ -88,7 +151,20 @@ void SetTensorValueKernel(const Context& dev_ctx,
                     out->data<T>(),
                     phi::errors::InvalidArgument(
                         "The input ptr must be equal to output ptr."));
-  // ToDo: handle decrease_axes and none_axes in future
+
+  auto new_dims = x_dims;
+
+  for (uint64_t i = 0; i < axes.size(); i++) {
+    new_dims[axes[i]] = ends[i] - starts[i];
+  }
+  uint64_t v_sum = 1;
+  uint64_t v_new_sum = 1;
+  for (int i = 0; i < value_dims.size(); i++) {
+    v_sum = v_sum * value_dims[i];
+  }
+  for (int i = 0; i < new_dims.size(); i++) {
+    v_new_sum = v_new_sum * new_dims[i];
+  }
 
   synSliceParams params = {{0}};
   for (int i = 0; i < in_dims.size(); i++) {
@@ -102,23 +178,49 @@ void SetTensorValueKernel(const Context& dev_ctx,
     params.ends[in_dims.size() - 1 - axes[i]] = ends[i];
   }
 
-  std::vector<int64_t> input_dim = phi::vectorize<int64_t>(x.dims());
-  std::vector<int64_t> value_dim = phi::vectorize<int64_t>(value.dims());
-  std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
+  synRecipeHandle recipe;
+  if (v_sum != v_new_sum) {
+    std::vector<int64_t> input_dim = phi::vectorize<int64_t>(x_dims);
+    std::vector<int64_t> value_dim = phi::vectorize<int64_t>(value.dims());
+    std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
+    std::vector<int64_t> value_new_dim = phi::vectorize<int64_t>(new_dims);
 
-  OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, synSliceParams>(
-      "slice_insert", {input_dim, value_dim}, &params);
+    OpCacheOperator op_info;
+    op_info.prepareOpInfo<T, synSliceParams>(
+        "slice_insert_expand", {input_dim, value_dim, value_new_dim}, &params);
 
-  auto recipe = op_info.GetRecipe();
-  if (recipe == nullptr) {
-    // compile
-    SetTensorValue op("slice_insert", "SliceInsert");
-    op.AddNode(
-        {input_dim, value_dim}, {outputs_dim}, op_info.datatype_, params);
-    op.Compile();
-    op_info.setOp(op);
     recipe = op_info.GetRecipe();
+    if (recipe == nullptr) {
+      // compile
+      SetTensorValueExp op("slice_insert", "SliceInsert");
+      op.AddNode({input_dim, value_dim},
+                 {outputs_dim},
+                 op_info.datatype_,
+                 params,
+                 value_new_dim);
+      op.Compile();
+      op_info.setOp(op);
+      recipe = op_info.GetRecipe();
+    }
+  } else {
+    std::vector<int64_t> input_dim = phi::vectorize<int64_t>(x_dims);
+    std::vector<int64_t> value_dim = phi::vectorize<int64_t>(new_dims);
+    std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
+
+    OpCacheOperator op_info;
+    op_info.prepareOpInfo<T, synSliceParams>(
+        "slice_insert", {input_dim, value_dim}, &params);
+
+    recipe = op_info.GetRecipe();
+    if (recipe == nullptr) {
+      // compile
+      SetTensorValue op("slice_insert", "SliceInsert");
+      op.AddNode(
+          {input_dim, value_dim}, {outputs_dim}, op_info.datatype_, params);
+      op.Compile();
+      op_info.setOp(op);
+      recipe = op_info.GetRecipe();
+    }
   }
 
   // runtime
@@ -186,4 +288,5 @@ PD_REGISTER_PLUGIN_KERNEL(set_value_with_tensor,
                           float,
                           phi::dtype::float16,
                           phi::dtype::bfloat16,
+                          // int,
                           int64_t) {}
