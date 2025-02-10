@@ -48,9 +48,7 @@
   }                                                    \
   }  // namespace pir
 
-namespace paddle {
-namespace dialect {
-
+namespace custom_engine {
 class CustomEngineOp
     : public pir::Op<CustomEngineOp, paddle::dialect::OpYamlInfoInterface> {
  public:
@@ -68,13 +66,22 @@ class CustomEngineOp
                     std::vector<std::vector<int64_t>> outputs_shape,
                     std::vector<phi::DataType> outputs_dtype);
 
+  static void Build(pir::Builder &builder,             // NOLINT
+                    pir::OperationArgument &argument,  // NOLINT
+                    pir::Value x,
+                    const std::vector<std::string> &input_names,
+                    const std::vector<std::string> &output_names,
+                    const std::vector<pir::Type> &outputs_type);
+
   void VerifySig();
+
+  pir::Block *block();
+  pir::Block *block() const;
 
   pir::Value x() { return operand_source(0); }
   pir::Value out() { return result(0); }
 };
 
-}  // namespace dialect
-}  // namespace paddle
+}  // namespace custom_engine
 
-IR_DECLARE_EXPLICIT_PLUGIN_TYPE_ID(paddle::dialect::CustomEngineOp)
+IR_DECLARE_EXPLICIT_PLUGIN_TYPE_ID(custom_engine::CustomEngineOp)
