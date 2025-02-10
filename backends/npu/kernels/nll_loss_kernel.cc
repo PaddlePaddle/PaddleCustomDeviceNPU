@@ -296,13 +296,18 @@ void NllLossGradKernel(const Context& dev_ctx,
 }
 }  // namespace custom_kernel
 
-PD_REGISTER_PLUGIN_KERNEL(
-    nll_loss, npu, ALL_LAYOUT, custom_kernel::NllLossRawKernel, float, double) {
-}
+PD_REGISTER_PLUGIN_KERNEL(nll_loss,
+                          npu,
+                          ALL_LAYOUT,
+                          custom_kernel::NllLossRawKernel,
+                          float,
+                          phi::dtype::float16,
+                          double) {}
 
 PD_REGISTER_PLUGIN_KERNEL(nll_loss_grad,
                           npu,
                           ALL_LAYOUT,
                           custom_kernel::NllLossGradKernel,
                           float,
+                          phi::dtype::float16,
                           double) {}

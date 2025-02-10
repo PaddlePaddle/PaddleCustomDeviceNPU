@@ -18,18 +18,12 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void CastKernel(const Context& dev_ctx,
-                const phi::DenseTensor& x,
-                phi::DataType dtype,
-                phi::DenseTensor* out);
-
-template <typename T, typename Context>
-void ScaleKernel(const Context& dev_ctx,
-                 const phi::DenseTensor& x,
-                 const phi::Scalar& in_scale,
-                 const phi::Scalar& in_bias,
-                 bool bias_after_scale,
-                 phi::DenseTensor* out);
+void SumKernel(const Context& dev_ctx,
+               const phi::DenseTensor& x,
+               const phi::IntArray& axes,
+               phi::DataType out_dtype,
+               bool keep_dim,
+               phi::DenseTensor* out);
 
 template <typename T, typename Context>
 void AclopTileKernelImpl(const Context& dev_ctx,
@@ -226,8 +220,9 @@ void TileGradKernelImpl(const Context& dev_ctx,
                         const std::vector<int64_t>& reshape_dims_vec,
                         const std::vector<int64_t>& reduce_dims_vec,
                         const std::vector<int64_t>& origin_x_dims,
-                        const std::vector<int64_t>& repeat_times,
                         phi::DenseTensor* x_grad) {
+  // dev_ctx.template Alloc<T>(x_grad);
+  // auto stream = dev_ctx.stream();
   DO_COMPATIBILITY(
       aclnnSliceV2,
       (custom_kernel::AclopTileGradKernelImpl<T, Context>(dev_ctx,
@@ -236,69 +231,96 @@ void TileGradKernelImpl(const Context& dev_ctx,
                                                           reduce_dims_vec,
                                                           origin_x_dims,
                                                           x_grad)));
-
-  // slice 1.input: x_grad_dims, starts, axes, steps
-  std::vector<int64_t> x_grad_dims = origin_x_dims;
-  if (out_grad.dims().size() > origin_x_dims.size()) {
-    int diff = out_grad.dims().size() - origin_x_dims.size();
-    x_grad_dims.insert(x_grad_dims.begin(), diff, 1);
-  }
-
-  std::vector<int64_t> starts(out_grad.dims().size(), 0);
-  std::vector<int64_t> axes;
-  for (int i = 0; i < out_grad.dims().size(); i++) {
-    axes.push_back(i);
-  }
-  std::vector<int64_t> steps(axes.size(), 1);
-
-  // slice 2.fix slice not support FP64 issue use cast(1)
-  dev_ctx.template Alloc<T>(x_grad);
-  phi::DenseTensor cast_out_grad, cast_x_grad;
-  if (out_grad.dtype() == phi::DataType::FLOAT64) {
-    phi::DenseTensorMeta meta = {phi::DataType::FLOAT32, out_grad.dims()};
-    cast_out_grad.set_meta(meta);
-    dev_ctx.template Alloc<float>(&cast_out_grad);
-    custom_kernel::CastKernel<T, Context>(
-        dev_ctx, out_grad, phi::DataType::FLOAT32, &cast_out_grad);
-
-    phi::DenseTensorMeta out_meta = {phi::DataType::FLOAT32, x_grad->dims()};
-    cast_x_grad.set_meta(out_meta);
-    dev_ctx.template Alloc<float>(&cast_x_grad);
-  } else {
-    cast_out_grad = out_grad;
-    cast_x_grad = *x_grad;
-  }
-
-  // slice 3. aclnnSliceV2
-  EXEC_NPU_CMD(aclnnSliceV2,
-               dev_ctx,
-               cast_out_grad,
-               starts,
-               x_grad_dims,
-               axes,
-               steps,
-               cast_x_grad);
-
-  // slice 4.fix slice not support FP64 issue use cast(2)
-  if (out_grad.dtype() == phi::DataType::FLOAT64) {
-    custom_kernel::CastKernel<T, Context>(
-        dev_ctx, cast_x_grad, phi::DataType::FLOAT64, x_grad);
-  }
-
-  // if out_grad not BOOL, need scale product of repeat_times
   if (out_grad.dtype() != phi::DataType::BOOL) {
-    int product = 1;
-    for (int value : repeat_times) {
-      product *= value;
+    phi::DenseTensor dout(out_grad);
+    if (reshape_dims_vec.size() >= 10) {
+      // paddle only supports access to dimension 0 to 9 by 2025/1/16
+      // so we need to split the dims into two parts, and then do sum twice.
+      bool keep_dim = false;
+
+      // reshape_dims
+      std::vector<int64_t> reshape_dims_vec_first(reshape_dims_vec.begin(),
+                                                  reshape_dims_vec.begin() + 6);
+      std::vector<int64_t> reshape_dims_vec_second(reshape_dims_vec.begin() + 6,
+                                                   reshape_dims_vec.end());
+      int remain_dim = 1;
+      for (auto& p : reshape_dims_vec_second) {
+        remain_dim *= p;
+      }
+      reshape_dims_vec_first.push_back(remain_dim);
+      std::vector<int64_t> vec_x_grad_dims =
+          phi::vectorize<int64_t>(x_grad->dims());
+      reshape_dims_vec_second.insert(reshape_dims_vec_second.begin(),
+                                     vec_x_grad_dims.begin(),
+                                     vec_x_grad_dims.begin() + 3);
+
+      // reduce_dims
+      std::vector<int64_t> reduce_dims_vec_first(reduce_dims_vec.begin(),
+                                                 reduce_dims_vec.begin() + 3);
+      std::vector<int64_t> reduce_dims_vec_second(reduce_dims_vec.begin() + 3,
+                                                  reduce_dims_vec.end());
+      for (auto& p : reduce_dims_vec_second) {
+        p -= 3;
+      }
+      phi::IntArray reduce_dims_arry_first(reduce_dims_vec_first);
+      phi::IntArray reduce_dims_arry_second(reduce_dims_vec_second);
+
+      // sum (first part)
+      dout.Resize(phi::make_ddim(reshape_dims_vec_first));
+      phi::DenseTensor* x_grad_first = new phi::DenseTensor();
+      std::vector<int64_t> vec_x_grad_first_dims(vec_x_grad_dims.begin(),
+                                                 vec_x_grad_dims.begin() + 3);
+      vec_x_grad_first_dims.push_back(remain_dim);
+
+      x_grad_first->Resize(phi::make_ddim(vec_x_grad_first_dims));
+      custom_kernel::SumKernel<T, Context>(dev_ctx,
+                                           dout,
+                                           reduce_dims_arry_first,
+                                           x_grad->dtype(),
+                                           keep_dim,
+                                           x_grad_first);
+      x_grad_first->Resize(phi::make_ddim(reshape_dims_vec_second));
+
+      // sum (second part)
+      custom_kernel::SumKernel<T, Context>(dev_ctx,
+                                           *x_grad_first,
+                                           reduce_dims_arry_second,
+                                           x_grad->dtype(),
+                                           keep_dim,
+                                           x_grad);
+      x_grad->Resize(phi::make_ddim(origin_x_dims));
+      delete x_grad_first;
+    } else {
+      dout.Resize(phi::make_ddim(reshape_dims_vec));
+      bool keep_dim = false;
+      phi::IntArray reduce_dims_arry(reduce_dims_vec);
+      custom_kernel::SumKernel<T, Context>(
+          dev_ctx, dout, reduce_dims_arry, x_grad->dtype(), keep_dim, x_grad);
+      x_grad->Resize(phi::make_ddim(origin_x_dims));
     }
-
-    phi::Scalar in_scale = product;
-    phi::Scalar in_bias = 0;
-    custom_kernel::ScaleKernel<T, Context>(
-        dev_ctx, *x_grad, in_scale, in_bias, true, x_grad);
+  } else {
+    dev_ctx.template Alloc<T>(x_grad);
+    std::vector<int64_t> x_grad_dims = origin_x_dims;
+    if (out_grad.dims().size() > origin_x_dims.size()) {
+      int diff = out_grad.dims().size() - origin_x_dims.size();
+      x_grad_dims.insert(x_grad_dims.begin(), diff, 1);
+    }
+    std::vector<int64_t> starts(out_grad.dims().size(), 0);
+    std::vector<int64_t> axes;
+    for (int i = 0; i < out_grad.dims().size(); i++) {
+      axes.push_back(i);
+    }
+    std::vector<int64_t> steps(axes.size(), 1);
+    EXEC_NPU_CMD(aclnnSliceV2,
+                 dev_ctx,
+                 out_grad,
+                 starts,
+                 x_grad_dims,
+                 axes,
+                 steps,
+                 *x_grad);
+    x_grad->Resize(phi::make_ddim(origin_x_dims));
   }
-
-  x_grad->Resize(phi::make_ddim(origin_x_dims));
 }
 
 template <typename T, typename Context>
@@ -369,7 +391,6 @@ void TileGradKernel(const Context& dev_ctx,
                                    reshape_dims_vec,
                                    reduce_dims_vec,
                                    origin_x_dims,
-                                   repeat_times_data,
                                    x_grad);
   }
 }
