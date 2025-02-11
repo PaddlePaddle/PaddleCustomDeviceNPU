@@ -49,8 +49,9 @@ class SetTensorValue : public HpuOperator {
                                      pName_.c_str(),
                                      nullptr,
                                      nullptr);
-    PD_CHECK(
-        status == synSuccess, "[RUNTIME] synNodeCreate () failed = ", status);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (SetTensorValue) failed = ",
+             status);
   }
   std::string pName_;
 };
@@ -184,4 +185,5 @@ PD_REGISTER_PLUGIN_KERNEL(set_value_with_tensor,
                           custom_kernel::SetTensorValueKernel,
                           float,
                           phi::dtype::float16,
-                          phi::dtype::bfloat16) {}
+                          phi::dtype::bfloat16,
+                          int64_t) {}

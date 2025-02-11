@@ -25,34 +25,22 @@ class Range : public HpuOperator {
  public:
   Range() : HpuOperator("range") {}
   void AddNode(ConvertTensors& ct, RangeParams& params) {
-    auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
-    std::vector<synTensor> syn_inputs;
-    for (size_t i = 0; i < inputs.size(); i++) {
-      syn_inputs.push_back(createTensor(inputs[i].dims.size(),
-                                        inputs[i].type,
-                                        inputs[i].dims,
-                                        true,
-                                        inputs[i].name));
-    }
-
     std::vector<synTensor> syn_outputs;
-    for (size_t i = 0; i < outputs.size(); i++) {
-      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
-                                         outputs[i].type,
-                                         outputs[i].dims,
-                                         true,
-                                         outputs[i].name));
-    }
+    syn_outputs.push_back(createTensor(outputs[0].dims.size(),
+                                       outputs[0].type,
+                                       outputs[0].dims,
+                                       true,
+                                       outputs[0].name));
 
     std::string guid = guid_ + "_" + SynDataTypeToStr(outputs[0].type);
 
     synStatus status = synNodeCreate(graphHandle_,
-                                     syn_inputs.data(),
+                                     nullptr,
                                      syn_outputs.data(),
-                                     syn_inputs.size(),
-                                     syn_outputs.size(),
+                                     0,
+                                     1,
                                      &params.params,
                                      sizeof(params.params),
                                      guid.c_str(),
@@ -64,11 +52,65 @@ class Range : public HpuOperator {
   }
 };
 
-void GetSize(int32_t start, int32_t end, int32_t step, int64_t* size) {
-  PADDLE_ENFORCE_NE(step,
-                    0,
-                    phi::errors::InvalidArgument("The step of range op should "
-                                                 "not be 0."));
+class RangeI64 : public HpuOperator {
+ public:
+  RangeI64() : HpuOperator("range") {}
+  void AddNode(ConvertTensors& ct, RangeParams& params) {
+    auto outputs = ct.GetTensors(false);
+
+    std::vector<synTensor> range_out;
+    range_out.push_back(createTensor(outputs[0].dims.size(),
+                                     syn_type_int32,
+                                     outputs[0].dims,
+                                     false,
+                                     "range_out"));
+    std::string guid = guid_ + "_i32";
+    synStatus status = synNodeCreate(graphHandle_,
+                                     nullptr,
+                                     range_out.data(),
+                                     0,
+                                     1,
+                                     &params.params,
+                                     sizeof(params.params),
+                                     guid.c_str(),
+                                     "Range",
+                                     nullptr,
+                                     nullptr);
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = ", status);
+
+    std::vector<synTensor> syn_outputs;
+    syn_outputs.push_back(createTensor(outputs[0].dims.size(),
+                                       outputs[0].type,
+                                       outputs[0].dims,
+                                       true,
+                                       outputs[0].name));
+    std::string guid_cast = "cast_i32_to_i64";
+
+    status = synNodeCreate(graphHandle_,
+                           range_out.data(),
+                           syn_outputs.data(),
+                           range_out.size(),
+                           syn_outputs.size(),
+                           nullptr,
+                           0,
+                           guid_cast.c_str(),
+                           "Cast",
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (range/cast) failed = ",
+             status);
+  }
+};
+
+template <typename T>
+void GetSize(T start, T end, T step, int64_t* size) {
+  PADDLE_ENFORCE_NE(
+      step,
+      0,
+      phi::errors::InvalidArgument("The step of range op should not be 0."));
+
   if (start < end) {
     PADDLE_ENFORCE_GT(
         step,
@@ -76,7 +118,57 @@ void GetSize(int32_t start, int32_t end, int32_t step, int64_t* size) {
         phi::errors::InvalidArgument(
             "The step should be greater than 0 while start < end."));
   }
-  *size = std::ceil(std::abs((end - start) / step));
+
+  if (start > end) {
+    PADDLE_ENFORCE_LT(step,
+                      0,
+                      phi::errors::InvalidArgument(
+                          "The step should be less than 0 while start > end."));
+  }
+
+  *size = std::is_integral<T>::value
+              ? ((std::abs(end - start) + std::abs(step) - 1) / std::abs(step))
+              : std::ceil(std::abs((end - start) / step));
+}
+
+void GetSize(phi::dtype::float16 start,
+             phi::dtype::float16 end,
+             phi::dtype::float16 step,
+             int64_t* size) {
+  PADDLE_ENFORCE_NE(static_cast<float>(step),
+                    0,
+                    phi::errors::InvalidArgument("The step of range op should "
+                                                 "not be 0."));
+  if (static_cast<float>(start) < static_cast<float>(end)) {
+    PADDLE_ENFORCE_GT(
+        static_cast<float>(step),
+        0,
+        phi::errors::InvalidArgument(
+            "The step should be greater than 0 while start < end."));
+  }
+  *size =
+      std::ceil(std::abs((static_cast<float>(end) - static_cast<float>(start)) /
+                         static_cast<float>(step)));
+}
+
+void GetSize(phi::dtype::bfloat16 start,
+             phi::dtype::bfloat16 end,
+             phi::dtype::bfloat16 step,
+             int64_t* size) {
+  PADDLE_ENFORCE_NE(static_cast<float>(step),
+                    0,
+                    phi::errors::InvalidArgument("The step of range op should "
+                                                 "not be 0."));
+  if (static_cast<float>(start) < static_cast<float>(end)) {
+    PADDLE_ENFORCE_GT(
+        static_cast<float>(step),
+        0,
+        phi::errors::InvalidArgument(
+            "The step should be greater than 0 while start < end."));
+  }
+  *size =
+      std::ceil(std::abs((static_cast<float>(end) - static_cast<float>(start)) /
+                         static_cast<float>(step)));
 }
 
 template <typename T, typename Context>
@@ -85,6 +177,7 @@ void ArangeTensorKernel(const Context& dev_ctx,
                         const phi::DenseTensor& end_t,
                         const phi::DenseTensor& step_t,
                         phi::DenseTensor* out) {
+  VLOG(6) << "call HPU ArangeTensorKernel";
   phi::DenseTensor n;
   n.Resize(start_t.dims());
   T* n_data = dev_ctx.template HostAlloc<T>(&n);
@@ -99,10 +192,7 @@ void ArangeTensorKernel(const Context& dev_ctx,
   T step = n_data[0];
 
   int64_t size = 0;
-  GetSize(static_cast<int32_t>(start),
-          static_cast<int32_t>(end),
-          static_cast<int32_t>(step),
-          &size);
+  GetSize(start, end, step, &size);
 
   out->Resize(phi::make_ddim({size}));
   dev_ctx.template Alloc<T>(out);
@@ -118,9 +208,9 @@ void ArangeTensorKernel(const Context& dev_ctx,
     params.params.limit.f = static_cast<float>(end);
     params.params.delta.f = static_cast<float>(step);
   } else {
-    params.params.start.i = static_cast<float>(start);
-    params.params.limit.i = static_cast<float>(end);
-    params.params.delta.i = static_cast<float>(step);
+    params.params.start.i = static_cast<int32_t>(start);
+    params.params.limit.i = static_cast<int32_t>(end);
+    params.params.delta.i = static_cast<int32_t>(step);
   }
 
   std::vector<DIMS> inputs_dims = ct.GetDims();
@@ -129,13 +219,19 @@ void ArangeTensorKernel(const Context& dev_ctx,
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
-    Range op;
-
-    op.AddNode(ct, params);
-    op.Compile();
-    op_info.setOp(op);
-
-    recipe = op_info.GetRecipe();
+    if (std::is_same<T, int64_t>::value) {
+      RangeI64 op;
+      op.AddNode(ct, params);
+      op.Compile();
+      op_info.setOp(op);
+      recipe = op_info.GetRecipe();
+    } else {
+      Range op;
+      op.AddNode(ct, params);
+      op.Compile();
+      op_info.setOp(op);
+      recipe = op_info.GetRecipe();
+    }
   }
 
   std::map<std::string, uint64_t> tensors = ct.GetDeviceAddr();
@@ -149,6 +245,7 @@ void ArangeKernel(const Context& dev_ctx,
                   const phi::Scalar& end,
                   const phi::Scalar& step,
                   phi::DenseTensor* out) {
+  VLOG(6) << "call HPU ArangeKernel";
   dev_ctx.template Alloc<T>(out);
 
   ConvertTensors ct;
@@ -195,8 +292,6 @@ PD_REGISTER_PLUGIN_KERNEL(arange_tensor,
                           custom_kernel::ArangeTensorKernel,
                           int64_t,
                           int,
-                          int16_t,
-                          int8_t,
                           phi::dtype::bfloat16,
                           phi::dtype::float16,
                           float) {
@@ -211,8 +306,6 @@ PD_REGISTER_PLUGIN_KERNEL(arange,
                           custom_kernel::ArangeKernel,
                           int64_t,
                           int,
-                          int16_t,
-                          int8_t,
                           phi::dtype::bfloat16,
                           phi::dtype::float16,
                           float) {}

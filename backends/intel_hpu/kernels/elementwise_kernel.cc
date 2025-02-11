@@ -30,8 +30,12 @@ void FullKernel(const Context& dev_ctx,
 
 class BinaryOperator : public HpuOperator {
  public:
-  BinaryOperator(std::string guid_prefix, std::string node_name)
-      : HpuOperator(guid_prefix), pName_(node_name) {}
+  BinaryOperator(std::string guid_prefix,
+                 std::string node_name,
+                 bool in_place = false)
+      : HpuOperator(guid_prefix), pName_(node_name) {
+    inPlace_ = in_place;
+  }
 
   void AddNode(const std::vector<DIMS>& ins,
                const std::vector<DIMS>& outs,
@@ -39,11 +43,16 @@ class BinaryOperator : public HpuOperator {
     assert(ins.size() == 2 && "input size should be 2");
     assert(outs.size() == 1 && "output size should be 1");
 
+    synSectionHandle section = nullptr;
+    if (inPlace_) {
+      section = createSection();
+    }
+
     synTensor inputs[ins.size()] = {
-        createTensor(ins[0].size(), datatype, ins[0], true, "x"),
+        createTensor(ins[0].size(), datatype, ins[0], true, "x", section),
         createTensor(ins[1].size(), datatype, ins[1], true, "y")};
-    synTensor outputs[outs.size()] = {
-        createTensor(outs[0].size(), datatype, outs[0], true, "output")};
+    synTensor outputs[outs.size()] = {createTensor(
+        outs[0].size(), datatype, outs[0], true, "output", section)};
     synStatus status = synNodeCreate(graphHandle_,
                                      inputs,
                                      outputs,
@@ -60,6 +69,7 @@ class BinaryOperator : public HpuOperator {
              status);
   }
   std::string pName_;
+  bool inPlace_;
 };
 
 #define BINARY_RAW_KERNEL(kernel_func, node_name)                            \
@@ -79,6 +89,7 @@ class BinaryOperator : public HpuOperator {
     if (x_dim.size() == 0) {                                                 \
       x_dim.push_back(1);                                                    \
     }                                                                        \
+    bool in_place = (x.data() == out->data());                               \
     std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims()); \
     if (outputs_dim.size() == 0) {                                           \
       outputs_dim.push_back(1);                                              \
@@ -89,7 +100,8 @@ class BinaryOperator : public HpuOperator {
     auto recipe = op_info.GetRecipe();                                       \
                                                                              \
     if (recipe == nullptr) {                                                 \
-      BinaryOperator op(op_info.guid_, #node_name);                          \
+      std::string op_node_name = in_place ? "_" #node_name : #node_name;     \
+      BinaryOperator op(op_info.guid_, op_node_name, in_place);              \
       op.AddNode({x_dim, y_dim}, {outputs_dim}, op_info.datatype_);          \
       op.Compile();                                                          \
       op_info.setOp(op);                                                     \

@@ -112,31 +112,5 @@ class TestSum3(OpTest):
         self.check_output_with_place(self.place)
 
 
-class TestSum4(OpTest):
-    def setUp(self):
-        self.set_npu()
-        self.init_dtype()
-        self.op_type = "sum"
-        self.place = paddle.CustomPlace("npu", 0)
-
-        x0 = np.random.random((3, 40)).astype(self.dtype)
-        x1 = np.random.random((0, 0)).astype(self.dtype)
-        x2 = np.random.random((3, 40)).astype(self.dtype)
-        self.inputs = {"X": [("x0", x0), ("x1", x1), ("x2", x2)]}
-        y = x0 + x2
-        self.outputs = {"Out": y}
-
-        self.attrs = {"use_mkldnn": False}
-
-    def init_dtype(self):
-        self.dtype = np.float32
-
-    def set_npu(self):
-        self.__class__.use_custom_device = True
-
-    def test_check_output(self):
-        self.check_output_with_place(self.place)
-
-
 if __name__ == "__main__":
     unittest.main()

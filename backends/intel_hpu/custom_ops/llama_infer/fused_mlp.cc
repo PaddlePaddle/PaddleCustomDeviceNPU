@@ -495,7 +495,25 @@ std::vector<paddle::Tensor> FusedMlpForward(
   return {out};
 }
 
+std::vector<std::vector<int64_t>> FusedMlpInferShape(
+    const std::vector<int64_t>& x_shape,
+    const std::vector<int64_t>& proj_weight_shape,
+    const paddle::optional<std::vector<int64_t>>& up_weight_shape,
+    const std::vector<int64_t>& down_weight_shape) {
+  return {x_shape};
+}
+
+std::vector<paddle::DataType> FusedMlpInferDtype(
+    const paddle::DataType& x_dtype,
+    const paddle::DataType& proj_weight_dtype,
+    const paddle::optional<paddle::DataType>& up_weight_dtype,
+    const paddle::DataType& down_weight_dtype) {
+  return {x_dtype};
+}
+
 PD_BUILD_OP(fused_mlp)
     .Inputs({"x", "proj_weight", paddle::Optional("up_weight"), "down_weight"})
     .Outputs({"out"})
-    .SetKernelFn(PD_KERNEL(FusedMlpForward));
+    .SetKernelFn(PD_KERNEL(FusedMlpForward))
+    .SetInferShapeFn(PD_INFER_SHAPE(FusedMlpInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(FusedMlpInferDtype));

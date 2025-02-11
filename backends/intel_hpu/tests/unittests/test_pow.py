@@ -28,11 +28,15 @@ from tests.utils import static_guard
 paddle.enable_static()
 SEED = 2021
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestActivation(OpTest):
     def set_npu(self):
         self.__class__.use_custom_device = True
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def setUp(self):
         self.set_npu()
@@ -177,7 +181,7 @@ def ref_leaky_relu(x, alpha=0.01):
 #     def setUp(self):
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-1, 1, [10, 12]).astype("float32")
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         paddle.enable_static()
@@ -268,7 +272,7 @@ def ref_leaky_relu(x, alpha=0.01):
 #     def setUp(self):
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-1, 1, [11, 17]).astype("float32")
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         paddle.enable_static()
@@ -341,7 +345,7 @@ def ref_leaky_relu(x, alpha=0.01):
 #     def setUp(self):
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-3, 3, [10, 12]).astype("float32")
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 #         self.executed_api()
 
 #     def executed_api(self):
@@ -531,7 +535,7 @@ class TestReluAPI(unittest.TestCase):
     def setUp(self):
         np.random.seed(1024)
         self.x_np = np.random.uniform(-1, 1, [10, 12]).astype("float32")
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.executed_api()
 
     def executed_api(self):
@@ -599,7 +603,7 @@ class TestReluAPI(unittest.TestCase):
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-1, 10, [10, 12]).astype(np.float64)
 #         self.x_np[np.abs(self.x_np) < 0.005] = 0.02
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         paddle.enable_static()
@@ -700,7 +704,7 @@ class TestSqrt(TestActivation):
 #         self.out = np.sqrt(convert_uint16_to_float(self.x))
 
 #     def test_check_output(self):
-#         self.check_output_with_place(paddle.CustomPlace("intel_hpu", 0), atol=0.004)
+#         self.check_output_with_place(paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id)), atol=0.004)
 
 #     def test_check_grad(self):
 #         pass
@@ -726,7 +730,7 @@ class TestSqrt(TestActivation):
 #         self.out = 1.0 / np.sqrt(convert_uint16_to_float(self.x))
 
 #     def test_check_output(self):
-#         self.check_output_with_place(paddle.CustomPlace("intel_hpu", 0), atol=0.004)
+#         self.check_output_with_place(paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id)), atol=0.004)
 
 #     def test_check_grad(self):
 #         pass
@@ -774,7 +778,7 @@ class TestTanhAPI(unittest.TestCase):
         self.dtype = "float32"
         np.random.seed(1024)
         self.x_np = np.random.uniform(-1, 1, [10, 12]).astype(self.dtype)
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
         self.executed_api()
 
     def executed_api(self):
@@ -842,7 +846,7 @@ class TestFloor(TestActivation):
 #     def setUp(self):
 #         self.set_npu()
 #         self.op_type = "softshrink"
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 #         self.init_dtype()
 #         self.init_shape()
 
@@ -884,7 +888,7 @@ class TestFloor(TestActivation):
 #         self.threshold = 0.8
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(0.25, 10, [10, 12]).astype(np.float64)
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         paddle.enable_static()
@@ -967,7 +971,7 @@ class TestFloor(TestActivation):
 #         self.threshold = 15
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-1, 1, [10, 12]).astype(np.float64)
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         paddle.enable_static()
@@ -1050,7 +1054,7 @@ class TestSin(TestActivation):
 #     def setUp(self):
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-1, 1, [10, 12]).astype(np.float64)
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         with static_guard():
@@ -1115,7 +1119,7 @@ class TestSiluAPI(unittest.TestCase):
     def setUp(self):
         np.random.seed(1024)
         self.x_np = np.random.uniform(-1, 1, [11, 17]).astype("float32")
-        self.place = paddle.CustomPlace("intel_hpu", 0)
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
     def test_static_api(self):
         with static_guard():
@@ -1176,7 +1180,7 @@ class TestSiluAPI(unittest.TestCase):
 #     def setUp(self):
 #         np.random.seed(1024)
 #         self.x_np = np.random.uniform(-1, 1, [10, 12]).astype(np.float64)
-#         self.place = paddle.CustomPlace("intel_hpu", 0)
+#         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
 
 #     def test_static_api(self):
 #         with static_guard():

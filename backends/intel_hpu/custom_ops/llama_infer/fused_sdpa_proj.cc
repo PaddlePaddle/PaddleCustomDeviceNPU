@@ -275,10 +275,8 @@ std::vector<paddle::Tensor> FusedSdpaProj(const paddle::Tensor& query_states,
 
   // allocate memory on device.
   int64_t bsz = query_states.dims()[0];
-  int64_t num_head = query_states.dims()[1];
   int64_t seq_len = query_states.dims()[2];
-  int64_t head_dim = query_states.dims()[3];
-  int hidden_size = num_head * head_dim;
+  int hidden_size = linear_weights.dims()[1];
 
   std::shared_ptr<phi::DenseTensor> out_linear =
       std::make_shared<phi::DenseTensor>();
@@ -303,10 +301,8 @@ std::vector<std::vector<int64_t>> FusedSdpaProjShape(
     const std::vector<int64_t>& attn_mask_shape,
     const std::vector<int64_t>& linear_weights_shape) {
   int64_t bsz = query_states_shape[0];
-  int64_t num_head = query_states_shape[1];
   int64_t seq_len = query_states_shape[2];
-  int64_t head_dim = query_states_shape[3];
-  int hidden_size = num_head * head_dim;
+  int hidden_size = linear_weights_shape[1];
   return {{bsz, seq_len, hidden_size}};
 }
 

@@ -31,13 +31,19 @@ class CumsumOperator : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+      section = createSection();
+    }
+
     std::vector<synTensor> syn_inputs;
     for (size_t i = 0; i < inputs.size(); i++) {
       syn_inputs.push_back(createTensor(inputs[i].dims.size(),
                                         inputs[i].type,
                                         inputs[i].dims,
                                         true,
-                                        inputs[i].name));
+                                        inputs[i].name,
+                                        section));
     }
 
     std::vector<synTensor> syn_outputs;
@@ -46,7 +52,8 @@ class CumsumOperator : public HpuOperator {
                                          outputs[i].type,
                                          outputs[i].dims,
                                          true,
-                                         outputs[i].name));
+                                         outputs[i].name,
+                                         section));
     }
 
     std::string guid = +"cumsum_fwd_" + SynDataTypeToStr(inputs[0].type);
@@ -112,7 +119,9 @@ void CumsumKernel(const Context& dev_ctx,
   ct.Add(out, false);
   if (recipe == nullptr) {
     // compile
-    CumsumOperator op(op_info.guid_, "cumsum_op");
+    std::string op_node_name =
+        (input_tensor.data() == out->data()) ? "_cumsum_op" : "cumsum_op";
+    CumsumOperator op(op_info.guid_, op_node_name);
     op.AddNode(ct, params);
     op.Compile();
     op_info.setOp(op);

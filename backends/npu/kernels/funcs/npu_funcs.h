@@ -22,6 +22,12 @@ limitations under the License. */
 
 namespace custom_kernel {
 
+template <typename T, typename Context>
+void CastKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                phi::DataType dtype,
+                phi::DenseTensor* out);
+
 /**
  * CPU -> NPU
  * NPU -> CPU
@@ -362,13 +368,35 @@ inline void NpuBroadcast(const Context& dev_ctx,
     auto tmp_tensor_dims = phi::slice_ddim(dst_dims, 0, axis + src_dims.size());
     tmp_tensor.Resize(tmp_tensor_dims);
     dev_ctx.template Alloc<T>(&tmp_tensor);
-    NpuOpRunner runner;
-    runner.SetType("Expand")
-        .AddInput(tmp_src)
-        .AddInput(dev_ctx, phi::vectorize<int64_t>(tmp_tensor_dims))
-        .AddOutput(tmp_tensor);
-    auto stream = dev_ctx.stream();
-    runner.Run(stream);
+
+    // float64 fix
+    std::vector<int64_t> final_expand_shape;
+    for (int64_t i = 0; i < tmp_tensor_dims.size(); ++i) {
+      final_expand_shape.push_back(tmp_tensor_dims[i]);
+    }
+    if (tmp_src.dtype() == phi::DataType::FLOAT64) {
+      phi::DenseTensor cast_x;
+      phi::DenseTensorMeta meta(tmp_src.meta());
+      meta.dtype = phi::DataType::FLOAT32;
+      cast_x.set_meta(meta);
+
+      custom_kernel::CastKernel<T, Context>(
+          dev_ctx, tmp_src, phi::DataType::FLOAT32, &cast_x);
+
+      phi::DenseTensor cast_out;
+      phi::DenseTensorMeta cast_out_meta = {phi::DataType::FLOAT32,
+                                            tmp_tensor.dims()};
+      cast_out.set_meta(cast_out_meta);
+      dev_ctx.template Alloc<float>(&cast_out);
+
+      EXEC_NPU_CMD(aclnnExpand, dev_ctx, cast_x, final_expand_shape, cast_out);
+      custom_kernel::CastKernel<T, Context>(
+          dev_ctx, cast_out, phi::DataType::FLOAT64, &tmp_tensor);
+    } else {
+      EXEC_NPU_CMD(
+          aclnnExpand, dev_ctx, tmp_src, final_expand_shape, tmp_tensor);
+    }
+
     tmp_src = tmp_tensor;
     tmp_src.Resize(tmp_tensor_dims);
   } else {

@@ -153,9 +153,25 @@ void IndexCopyForward(const paddle::Tensor& input,
       *dev_ctx, *input_tensor, phi::Scalar(dim), *index_tensor, *source_tensor);
 }
 
+std::vector<std::vector<int64_t>> IndexCopyInferShape(
+    const std::vector<int64_t>& input_shape,
+    const std::vector<int64_t>& index_shape,
+    const std::vector<int64_t>& source_shape) {
+  return {input_shape};
+}
+
+std::vector<paddle::DataType> IndexCopyInferDtype(
+    const paddle::DataType& input_dtype,
+    const paddle::DataType& index_dtype,
+    const paddle::DataType& source_dtype) {
+  return {input_dtype};
+}
+
 PD_BUILD_OP(index_copy)
     .Inputs({"input", "index", "source"})
     .Outputs({"out"})
     .Attrs({"dim: int"})
     .SetInplaceMap({{"input", "out"}})
-    .SetKernelFn(PD_KERNEL(IndexCopyForward));
+    .SetKernelFn(PD_KERNEL(IndexCopyForward))
+    .SetInferShapeFn(PD_INFER_SHAPE(IndexCopyInferShape))
+    .SetInferDtypeFn(PD_INFER_DTYPE(IndexCopyInferDtype));

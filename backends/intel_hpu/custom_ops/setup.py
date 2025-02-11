@@ -28,7 +28,7 @@ def main():
     setup(
         name="paddlenlp_ops",
         version="0.0.0",
-        description="PaddleNLP NPU CustomOps",
+        description="PaddleNLP INTEL_HPU CustomOps",
         long_description="",
         long_description_content_type="text/markdown",
         author_email="Paddle-better@baidu.com",
@@ -50,7 +50,7 @@ def main():
         distclass=BinaryDistribution,
         entry_points={"console_scripts": []},
         classifiers=[],
-        keywords="PaddleNLP NPU CustomOps",
+        keywords="PaddleNLP INTEL_HPU CustomOps",
     )
 
 

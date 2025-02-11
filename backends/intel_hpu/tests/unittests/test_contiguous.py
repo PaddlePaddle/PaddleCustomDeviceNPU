@@ -19,6 +19,10 @@ import paddle
 import unittest
 import numpy as np
 
+import os
+
+intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+
 
 class TestContiguous(unittest.TestCase):
     def setUp(self):

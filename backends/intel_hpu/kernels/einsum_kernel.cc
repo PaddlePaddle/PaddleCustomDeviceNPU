@@ -84,7 +84,7 @@ void EinsumKernel(const Context& dev_ctx,
   EinsumParams params;
   params.params = synEinsumParams(equation.c_str());
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, EinsumParams>("GatherKernel", inputs_dims, &params);
+  op_info.prepareOpInfo<T, EinsumParams>("EinsumKernel", inputs_dims, &params);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {

@@ -12,42 +12,198 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "habanalabs/perf_lib_layer_params.h"
+#include "habanalabs/synapse_api.h"
+#include "habanalabs/synapse_common_types.h"
 #include "kernels/funcs.h"
 #include "kernels/hpu_operator.h"
+#include "utils/utils.h"
 
 namespace custom_kernel {
 
-template <typename T, typename Context>
-void AbsKernel(const Context& dev_ctx,
-               const phi::DenseTensor& x,
-               phi::DenseTensor* out);
+struct ReduceAnyParams {
+  // ns_Reduction::ParamsV2 params;
+  // std::vector<int64_t> dims;
+  ns_Reduction::Params params;
+  int dim;
+  bool keep_dim;
+};
 
-template <typename T, typename Context>
-void SumKernel(const Context& dev_ctx,
-               const phi::DenseTensor& x,
-               const phi::IntArray& dims,
-               phi::DataType out_dtype,
-               bool keep_dim,
-               phi::DenseTensor* out);
+class ReduceAny : public HpuOperator {
+ public:
+  ReduceAny() : HpuOperator("any_") {}
 
-template <typename T, typename Context>
-void NotEqualKernel(const Context& dev_ctx,
-                    const phi::DenseTensor& x,
-                    const phi::DenseTensor& y,
-                    phi::DenseTensor* out);
+  void AddNode(ConvertTensors& ct, ReduceAnyParams& params) {
+    auto inputs = ct.GetTensors();
+    auto outputs = ct.GetTensors(false);
 
-template <typename T, typename Context>
-void FullKernel(const Context& dev_ctx,
-                const phi::IntArray& shape,
-                const phi::Scalar& val,
-                phi::DataType dtype,
-                phi::DenseTensor* out);
+    std::string guid_cast = "cast_i8_to_i32";
+    std::string guid_sum = "reduce_sum_fwd_i32";
+    std::string guid_full = "constant_i32";
+    std::string guid_not_eq = "not_equal_fwd_i32";
+    std::string guid_reshape = "reshape";
 
-template <typename T, typename Context>
-void CastKernel(const Context& dev_ctx,
-                const phi::DenseTensor& x,
-                phi::DataType dtype,
-                phi::DenseTensor* out);
+    std::string name_cast = guid_ + "cast";
+    std::string name_sum = guid_ + "sum";
+    std::string name_full = guid_ + "full";
+    std::string name_not_eq = guid_ + "not_eq";
+    std::string name_reshape = guid_ + "reshape";
+
+    synStatus status = synFail;
+
+    std::vector<synTensor> x_i8;
+    x_i8.push_back(createTensor(inputs[0].dims.size(),
+                                inputs[0].type,
+                                inputs[0].dims,
+                                true,
+                                inputs[0].name));
+    std::vector<synTensor> x_i32;
+    x_i32.push_back(createTensor(inputs[0].dims.size(),
+                                 syn_type_int32,
+                                 inputs[0].dims,
+                                 false,
+                                 "x_cast"));
+
+    status = synNodeCreate(graphHandle_,
+                           x_i8.data(),
+                           x_i32.data(),
+                           x_i8.size(),
+                           x_i32.size(),
+                           nullptr,
+                           0,
+                           guid_cast.c_str(),
+                           name_cast.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (any/cast) failed = ",
+             status);
+
+    auto reshape_dims = inputs[0].dims;
+    auto reduced_dims = inputs[0].dims;
+    if (params.dim == -1) {
+      reshape_dims =
+          std::vector<int64_t>({static_cast<int64_t>(inputs[0].num_elements)});
+      reduced_dims = std::vector<int64_t>({1});
+    } else {
+      reduced_dims[params.dim] = 1;
+    }
+    std::vector<synTensor> reduce_inputs;
+
+    reduce_inputs.push_back(createTensor(
+        reshape_dims.size(), syn_type_int32, reshape_dims, false, "reduce_in"));
+
+    status = synNodeCreate(graphHandle_,
+                           x_i32.data(),
+                           reduce_inputs.data(),
+                           x_i32.size(),
+                           reduce_inputs.size(),
+                           nullptr,
+                           0,
+                           guid_reshape.c_str(),
+                           name_reshape.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (any/reshape) failed = ",
+             status);
+
+    std::vector<synTensor> reduce_outputs;
+
+    reduce_outputs.push_back(createTensor(reduced_dims.size(),
+                                          syn_type_int32,
+                                          reduced_dims,
+                                          false,
+                                          "reduce_out"));
+
+    status = synNodeCreate(graphHandle_,
+                           reduce_inputs.data(),
+                           reduce_outputs.data(),
+                           reduce_inputs.size(),
+                           reduce_outputs.size(),
+                           &params.params,
+                           sizeof(params.params),
+                           guid_sum.c_str(),
+                           name_sum.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (any/sum) failed = ",
+             status);
+
+    std::vector<synTensor> reshape_outputs;
+    auto reshape_out = createTensor(outputs[0].dims.size(),
+                                    syn_type_int32,
+                                    outputs[0].dims,
+                                    false,
+                                    "reshape_out");
+    reshape_outputs.push_back(reshape_out);
+    status = synNodeCreate(graphHandle_,
+                           reduce_outputs.data(),
+                           reshape_outputs.data(),
+                           reduce_outputs.size(),
+                           reshape_outputs.size(),
+                           nullptr,
+                           0,
+                           guid_reshape.c_str(),
+                           name_reshape.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (any/reshape) failed = ",
+             status);
+
+    std::vector<int64_t> zero_dims = {1};
+
+    std::vector<synTensor> zero_out;
+    auto zero_tensor = createTensor(
+        zero_dims.size(), syn_type_int32, zero_dims, false, "zero_tensor");
+    zero_out.push_back(zero_tensor);
+
+    ns_ConstantKernel::Params zeroParams;
+    zeroParams.constant.i = 0;
+    status = synNodeCreate(graphHandle_,
+                           nullptr,
+                           zero_out.data(),
+                           0,
+                           zero_out.size(),
+                           &zeroParams,
+                           sizeof(zeroParams),
+                           guid_full.c_str(),
+                           name_full.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (any/full) failed = ",
+             status);
+
+    std::vector<synTensor> syn_inputs;
+    syn_inputs.push_back(reshape_out);
+    syn_inputs.push_back(zero_tensor);
+
+    std::vector<synTensor> syn_outputs;
+    syn_outputs.push_back(createTensor(outputs[0].dims.size(),
+                                       outputs[0].type,
+                                       outputs[0].dims,
+                                       true,
+                                       outputs[0].name));
+
+    status = synNodeCreate(graphHandle_,
+                           syn_inputs.data(),
+                           syn_outputs.data(),
+                           syn_inputs.size(),
+                           syn_outputs.size(),
+                           nullptr,
+                           0,
+                           guid_not_eq.c_str(),
+                           name_not_eq.c_str(),
+                           nullptr,
+                           nullptr);
+    PD_CHECK(status == synSuccess,
+             "[RUNTIME] synNodeCreate (any/not_equal) failed = ",
+             status);
+  }
+};
 
 template <typename T, typename Context>
 void AnyKernel(const Context& dev_ctx,
@@ -55,37 +211,53 @@ void AnyKernel(const Context& dev_ctx,
                const std::vector<int64_t>& dims,
                bool keep_dim,
                phi::DenseTensor* out) {
-  phi::DenseTensor x_f32;
-  phi::DenseTensorMeta x_f32_meta({phi::DataType::FLOAT32, x.dims()});
-  x_f32.set_meta(x_f32_meta);
-  custom_kernel::CastKernel<T, Context>(
-      dev_ctx, x, phi::DataType::FLOAT32, &x_f32);
+  dev_ctx.template Alloc<T>(out);
+  ConvertTensors ct;
+  ct.Add(x);
+  ct.Add(out, false);
 
-  phi::DenseTensor abs_out;
-  phi::DenseTensorMeta abs_meta({x_f32.dtype(), x_f32.dims()});
-  abs_out.set_meta(abs_meta);
-  custom_kernel::AbsKernel<float, Context>(dev_ctx, x_f32, &abs_out);
+  ReduceAnyParams params;
+  // params.params.keepDim = keep_dim;
+  // params.params.reductionDimensionMask = 0;
+  params.keep_dim = keep_dim;
+  params.dim = -1;
+  params.params.reductionDimension = 0;
 
-  phi::DenseTensor sum_out;
-  auto new_shape = x_f32.dims();
-  for (size_t i = 0; i < dims.size(); i++) {
-    auto d = CanonicalAxis(dims[i], x_f32.dims().size());
-    new_shape[d] = 1;
+  if (dims.size() != 0) {
+    PD_CHECK(dims.size() == 1,
+             "Any / Reduction only support axis = 1 but got ",
+             dims.size());
+    auto rank = static_cast<int32_t>(x.dims().size());
+    // for (auto dim : dims) {
+    //   if(dim < 0)
+    //     dim = rank + dim;
+    //   params.dims.push_back(dim);
+    //   params.params.reductionDimensionMask |= (1 << (rank - 1 - dim));
+    // }
+    auto dim = CanonicalAxis(static_cast<int64_t>(dims[0]),
+                             static_cast<int64_t>(rank));
+    params.dim = dim;
+    params.params.reductionDimension = rank - 1 - dim;
   }
-  phi::DenseTensorMeta sum_meta({x_f32.dtype(), new_shape});
-  sum_out.set_meta(sum_meta);
-  custom_kernel::SumKernel<float, Context>(
-      dev_ctx, abs_out, dims, x_f32.dtype(), true, &sum_out);
 
-  phi::DenseTensor zero;
-  phi::DenseTensorMeta zero_meta({x_f32.dtype(), {1}});
-  zero.set_meta(zero_meta);
-  std::vector<int64_t> shape_vec = {1};
-  phi::IntArray scalar_shape(shape_vec);
-  custom_kernel::FullKernel<float, Context>(
-      dev_ctx, scalar_shape, phi::Scalar(0.), x_f32.dtype(), &zero);
+  OpCacheOperator op_info;
+  std::vector<DIMS> in_out_dims = ct.GetDims();
+  std::vector<DIMS> out_dims = ct.GetDims(false);
+  in_out_dims.insert(in_out_dims.end(), out_dims.begin(), out_dims.end());
+  op_info.prepareOpInfo<T, ReduceAnyParams>("AnyKernel", in_out_dims, &params);
+  auto recipe = op_info.GetRecipe();
 
-  custom_kernel::NotEqualKernel<float, Context>(dev_ctx, sum_out, zero, out);
+  if (recipe == nullptr) {
+    ReduceAny op;
+    op.AddNode(ct, params);
+    op.Compile();
+    op_info.setOp(op);
+    recipe = op_info.GetRecipe();
+  }
+
+  RecipeRunner runner(recipe);
+  auto tensors = ct.GetDeviceAddr();
+  runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
 }  // namespace custom_kernel

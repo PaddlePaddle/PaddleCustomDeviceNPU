@@ -11,8 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 #include <dlfcn.h>
+#include <omp.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -45,6 +45,7 @@ void set_value_by_flags(const bool* stop_flags,
                         bool* stop_flags_out,
                         const int bs,
                         int end_length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; bi++) {
     topk_ids[bi] = stop_flags[bi] ? end_ids[0] : topk_ids[bi];
     if (is_in_end(topk_ids[bi], end_ids, end_length)) {
@@ -62,16 +63,21 @@ std::vector<paddle::Tensor> GetStopFlagsMulti(const paddle::Tensor& topk_ids,
   std::vector<int64_t> shape = topk_ids.shape();
   int64_t bs_now = shape[0];
   int64_t end_length = end_ids.shape()[0];
-  auto topk_ids_out = topk_ids.copy_to(topk_ids.place(), false);
-  auto stop_flags_out = stop_flags.copy_to(stop_flags.place(), false);
-  set_value_by_flags(stop_flags.data<bool>(),
-                     end_ids.data<int64_t>(),
-                     topk_ids_out.data<int64_t>(),
+
+  auto topk_ids_cpu = topk_ids.copy_to(paddle::CPUPlace(), true);
+  auto stop_flags_cpu = stop_flags.copy_to(paddle::CPUPlace(), true);
+  auto end_ids_cpu = end_ids.copy_to(paddle::CPUPlace(), true);
+  auto stop_flags_out = stop_flags.copy_to(stop_flags_cpu.place(), false);
+
+  set_value_by_flags(stop_flags_cpu.data<bool>(),
+                     end_ids_cpu.data<int64_t>(),
+                     topk_ids_cpu.data<int64_t>(),
                      stop_flags_out.data<bool>(),
                      bs_now,
                      end_length);
 
-  return {topk_ids_out, stop_flags_out};
+  return {topk_ids_cpu.copy_to(topk_ids.place(), true),
+          stop_flags_out.copy_to(stop_flags.place(), true)};
 }
 
 std::vector<std::vector<int64_t>> GetStopFlagsMultiInferShape(
@@ -101,6 +107,7 @@ void set_value_by_flag_and_id(const bool* stop_flags,
                               const int64_t* step_idx,
                               int bs,
                               int length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; bi++) {
     if (!stop_flags[bi]) {
       int64_t* pre_ids_all_now = pre_ids_all + bi * length;
@@ -117,18 +124,24 @@ std::vector<paddle::Tensor> SetValueByFlagsAndIdx(
     const paddle::Tensor& step_idx,
     const paddle::Tensor& stop_flags) {
   std::vector<int64_t> pre_ids_all_shape = pre_ids_all.shape();
-  auto stop_flags_out = stop_flags.copy_to(stop_flags.place(), false);
 
   int bs = stop_flags.shape()[0];
   int length = pre_ids_all_shape[1];
 
-  set_value_by_flag_and_id(stop_flags.data<bool>(),
-                           const_cast<int64_t*>(pre_ids_all.data<int64_t>()),
-                           pre_ids_now.data<int64_t>(),
-                           step_idx.data<int64_t>(),
-                           bs,
-                           length);
-  return {stop_flags_out};
+  auto pre_ids_all_cpu = pre_ids_all.copy_to(paddle::CPUPlace(), true);
+  auto pre_ids_now_cpu = pre_ids_now.copy_to(paddle::CPUPlace(), true);
+  auto step_idx_cpu = step_idx.copy_to(paddle::CPUPlace(), true);
+  auto stop_flags_cpu = stop_flags.copy_to(paddle::CPUPlace(), true);
+
+  set_value_by_flag_and_id(
+      stop_flags_cpu.data<bool>(),
+      const_cast<int64_t*>(pre_ids_all_cpu.data<int64_t>()),
+      pre_ids_now_cpu.data<int64_t>(),
+      step_idx_cpu.data<int64_t>(),
+      bs,
+      length);
+  pre_ids_all_cpu.copy_to(pre_ids_all.place(), true);
+  return {stop_flags};
 }
 
 std::vector<std::vector<int64_t>> SetValueByFlagsAndIdxInferShape(
@@ -162,6 +175,7 @@ void min_length_logits_process(T* logits,
                                const int64_t bs,
                                const int64_t length,
                                const int64_t end_length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; ++bi) {
     if (cur_len[bi] < 0) {
       continue;
@@ -180,6 +194,7 @@ void update_repeat_times(const int64_t* pre_ids,
                          const int64_t bs,
                          const int64_t length,
                          const int64_t length_id) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; ++bi) {
     if (cur_len[bi] < 0) {
       continue;
@@ -204,6 +219,7 @@ void update_value_by_repeat_times(const int* repeat_times,
                                   T* logits,
                                   const int64_t bs,
                                   const int64_t length) {
+#pragma omp parallel for num_threads(OMP_THREAD_NUM)
   for (int bi = 0; bi < bs; ++bi) {
     T* logits_now = logits + bi * length;
     const int* repeat_times_now = repeat_times + bi * length;

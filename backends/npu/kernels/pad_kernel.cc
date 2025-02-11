@@ -18,11 +18,11 @@
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void PadKernel(const Context& dev_ctx,
-               const phi::DenseTensor& x,
-               const std::vector<int>& paddings,
-               const phi::Scalar& pad_value_scalar,
-               phi::DenseTensor* out) {
+void AclopPadKernel(const Context& dev_ctx,
+                    const phi::DenseTensor& x,
+                    const std::vector<int>& paddings,
+                    const phi::Scalar& pad_value_scalar,
+                    phi::DenseTensor* out) {
   dev_ctx.template Alloc<T>(out);
   auto stream = dev_ctx.stream();
 
@@ -42,6 +42,38 @@ void PadKernel(const Context& dev_ctx,
       .AddOutput(*out);
 
   runner.Run(stream);
+}
+
+template <typename T, typename Context>
+void PadKernel(const Context& dev_ctx,
+               const phi::DenseTensor& x,
+               const std::vector<int>& paddings,
+               const phi::Scalar& pad_value_scalar,
+               phi::DenseTensor* out) {
+  DO_COMPATIBILITY(aclnnConstantPadNd,
+                   (custom_kernel::AclopPadKernel<T, Context>(
+                       dev_ctx, x, paddings, pad_value_scalar, out)));
+
+  dev_ctx.template Alloc<T>(out);
+  auto stream = dev_ctx.stream();
+  auto pad_value = pad_value_scalar.to<float>();
+
+  PADDLE_ENFORCE_LT(
+      abs(pad_value),
+      1e-5,
+      phi::errors::Unimplemented("npu npu only support pad_value=0 right now,"
+                                 "but received pad_value is %f .",
+                                 pad_value));
+
+  phi::Scalar value = 0;
+  std::vector<int64_t> paddings_;
+  int x_dims = x.dims().size();
+  for (int i = x_dims - 1; i >= 0; --i) {
+    paddings_.push_back(paddings[2 * i]);
+    paddings_.push_back(paddings[2 * i + 1]);
+  }
+
+  EXEC_NPU_CMD(aclnnConstantPadNd, dev_ctx, x, paddings_, value, *out);
 }
 
 template <typename T, typename Context>
@@ -71,7 +103,6 @@ void PadGradKernel(const Context& dev_ctx,
       .AddOutput(*dx)
       .Run(stream);
 }
-
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(pad,

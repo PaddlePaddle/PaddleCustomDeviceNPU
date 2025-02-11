@@ -25,23 +25,30 @@ class Where : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = nullptr;
+    if (inputs[1].device_addr == outputs[0].device_addr) {
+      section = createSection();
+    }
+
     std::vector<synTensor> syn_inputs;
     for (size_t i = 0; i < inputs.size(); i++) {
+      bool use_section = (i == 1 && section != nullptr);
       syn_inputs.push_back(createTensor(inputs[i].dims.size(),
                                         inputs[i].type,
                                         inputs[i].dims,
                                         true,
-                                        inputs[i].name));
+                                        inputs[i].name,
+                                        use_section ? section : nullptr));
     }
 
     std::vector<synTensor> syn_outputs;
-    for (size_t i = 0; i < outputs.size(); i++) {
-      syn_outputs.push_back(createTensor(outputs[i].dims.size(),
-                                         outputs[i].type,
-                                         outputs[i].dims,
-                                         true,
-                                         outputs[i].name));
-    }
+    syn_outputs.push_back(createTensor(outputs[0].dims.size(),
+                                       outputs[0].type,
+                                       outputs[0].dims,
+                                       true,
+                                       outputs[0].name,
+                                       section));
+
     guid_ = guid_ + SynDataTypeToStr(inputs[1].type);
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
@@ -78,7 +85,9 @@ void WhereKernel(const Context& dev_ctx,
 
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  op_info.prepareOpInfo<T, nullptr_t>("WhereKernel", inputs_dims, nullptr);
+  std::string op_name =
+      (x.data() == out->data()) ? "_WhereKernel" : "WhereKernel";
+  op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {

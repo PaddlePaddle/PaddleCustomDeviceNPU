@@ -86,6 +86,22 @@ void RmsNormKernel(const Context& dev_ctx,
   std::vector<int64_t> outputs_dim = phi::vectorize<int64_t>(out->dims());
   std::vector<int64_t> inv_var_dim = phi::vectorize<int64_t>(inv_var->dims());
 
+  std::vector<int64_t> x_reshape_dims;
+  for (int i = 0; i < begin_norm_axis; ++i) {
+    x_reshape_dims.push_back(x_dims[i]);
+  }
+
+  int32_t cols = 1;
+  for (int i = begin_norm_axis; i < x.dims().size(); ++i) {
+    cols *= x_dims[i];
+  }
+  x_reshape_dims.push_back(cols);
+
+  if (x_reshape_dims.size() < 3) {
+    for (int i = x_reshape_dims.size(); i < 3; i++)
+      x_reshape_dims.insert(x_reshape_dims.begin(), 1);
+  }
+
   ns_LayerNormKernel::Params params;
   memset(reinterpret_cast<void*>(&params),
          0x00,
@@ -95,12 +111,12 @@ void RmsNormKernel(const Context& dev_ctx,
 
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, ns_LayerNormKernel::Params>(
-      "rms_norm_ex_fwd", {x_dims, w_dims}, &params);
+      "rms_norm_ex_fwd", {x_reshape_dims, w_dims}, &params);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
     RMS op(op_info.guid_, op_info.datatype_);
-    op.AddNode({x_dims, w_dims}, {outputs_dim, inv_var_dim}, params);
+    op.AddNode({x_reshape_dims, w_dims}, {outputs_dim, inv_var_dim}, params);
     op.Compile();
     op_info.setOp(op);
 

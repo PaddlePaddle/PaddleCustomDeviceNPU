@@ -96,7 +96,8 @@ synTensor HpuOperator::createTensor(unsigned dims,
 
   for (unsigned i = 0; i < dims; ++i) {
     desc.m_sizes[i] = tensor_size[dims - 1 - i];
-    VLOG(6) << "name = " << name << ", " << tensor_size[dims - 1 - i];
+    VLOG(6) << "name = " << name << "[" << i << "], "
+            << tensor_size[dims - 1 - i];
   }
 
   synSectionHandle sectionHandle = section;

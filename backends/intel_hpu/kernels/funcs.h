@@ -34,6 +34,8 @@ inline synDataType PDDataTypeToSynDataType(phi::DataType type) {
     return syn_type_bf16;
   } else if (type == phi::DataType::INT32) {
     return syn_type_int32;
+  } else if (type == phi::DataType::INT16) {
+    return syn_type_int16;
   } else if (type == phi::DataType::INT8 || type == phi::DataType::BOOL) {
     return syn_type_int8;
   } else if (type == phi::DataType::UINT8) {

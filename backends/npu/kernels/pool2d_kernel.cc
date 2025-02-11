@@ -176,6 +176,7 @@ void Pool2dKernel(const Context& dev_ctx,
     // AdaptiveAvgPool2d only support NCHW
     phi::DenseTensor transformed_input, transformed_output;
     if (pooling_type == "avg" && channel_last) {
+      std::vector<int> in_trans_perm = {0, 3, 1, 2};
       transformed_input.Resize(common::make_dim(
           in_x_dims[0], in_x_dims[3], in_x_dims[1], in_x_dims[2]));
       dev_ctx.template Alloc<T>(&transformed_input);
@@ -183,33 +184,41 @@ void Pool2dKernel(const Context& dev_ctx,
           common::make_dim(out_dims[0], out_dims[3], out_dims[1], out_dims[2]));
       dev_ctx.template Alloc<T>(&transformed_output);
 
-      const auto& trans_runner =
-          NpuOpRunner("TransData",
-                      {in_x_tensor},
-                      {transformed_input},
-                      {{"src_format", std::string("NHWC")},
-                       {"dst_format", std::string("NCHW")}});
-      trans_runner.Run(dev_ctx.stream());
+      NpuOpRunner in_trans_runner;
+      in_trans_runner.SetType("Transpose")
+          .AddInput(in_x_tensor)
+          .AddInput(dev_ctx, std::move(in_trans_perm))
+          .AddOutput(transformed_input);
+      in_trans_runner.Run(dev_ctx.stream());
     } else {
       transformed_input = in_x_tensor;
       transformed_output = out_tensor;
     }
 
-    const auto& runner =
-        NpuOpRunner(pooling_mode,
-                    {transformed_input},
-                    {transformed_output},
-                    {{"output_size", phi::vectorize<int>(out_data_dims)}});
-    runner.Run(dev_ctx.stream());
+    if (pooling_type == "max") {
+      const auto& runner =
+          NpuOpRunner(pooling_mode,
+                      {transformed_input},
+                      {transformed_output},
+                      {{"output_size", phi::vectorize<int>(out_data_dims)}});
+      runner.Run(dev_ctx.stream());
+    } else if (pooling_type == "avg") {
+      std::vector<int64_t> vec = phi::vectorize<int64_t>(out_data_dims);
+      EXEC_NPU_CMD(aclnnAdaptiveAvgPool2d,
+                   dev_ctx,
+                   transformed_input,
+                   vec,
+                   transformed_output);
+    }
 
     if (pooling_type == "avg" && channel_last) {
-      const auto& trans_runner =
-          NpuOpRunner("TransData",
-                      {transformed_output},
-                      {out_tensor},
-                      {{"src_format", std::string("NCHW")},
-                       {"dst_format", std::string("NHWC")}});
-      trans_runner.Run(dev_ctx.stream());
+      std::vector<int> out_trans_perm = {0, 2, 3, 1};
+      NpuOpRunner out_trans_runner;
+      out_trans_runner.SetType("Transpose")
+          .AddInput(transformed_output)
+          .AddInput(dev_ctx, std::move(out_trans_perm))
+          .AddOutput(out_tensor);
+      out_trans_runner.Run(dev_ctx.stream());
     }
   } else {
     std::string pooling_mode = "AvgPoolV2";
@@ -480,7 +489,7 @@ void Pool2dGradKernel(const Context& dev_ctx,
                       const std::string& padding_algorithm,
                       phi::DenseTensor* in_x_grad) {
   DO_COMPATIBILITY(
-      aclnnAvgPool2dBackward,
+      aclnnAdaptiveAvgPool2dBackward,
       (custom_kernel::AclopPool2dGradKernel<T, Context>(dev_ctx,
                                                         in_x,
                                                         out,
@@ -519,20 +528,11 @@ void Pool2dGradKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(in_x_grad);
   const bool channel_last = data_format == "NHWC";
 
-  std::vector<int> ksize(kernel_size.GetData().begin(),
-                         kernel_size.GetData().end());
-  auto strides = strides_t;
-  auto paddings = paddings_t;
-
   // update paddings
   auto in_x_dims = in_x.dims();
   auto out_dims = out.dims();
   phi::DDim data_dims;
   phi::DDim out_data_dims;
-  std::vector<int64_t> ksize_vec = {static_cast<int64_t>(ksize[0]),
-                                    static_cast<int64_t>(ksize[1])};
-  std::vector<int64_t> strides_vec = {static_cast<int64_t>(strides[0]),
-                                      static_cast<int64_t>(strides[1])};
 
   if (channel_last) {
     data_dims = phi::slice_ddim(in_x_dims, 1, in_x_dims.size() - 1);
@@ -545,55 +545,6 @@ void Pool2dGradKernel(const Context& dev_ctx,
     TensorCopy(dev_ctx, out_grad, false, in_x_grad);
     return;
   }
-
-  UpdatePadding(&paddings,
-                global_pooling,
-                adaptive,
-                padding_algorithm,
-                data_dims,
-                strides,
-                ksize);
-
-  PADDLE_ENFORCE_LT(
-      std::max(paddings[0], paddings[1]),
-      ksize[0],
-      phi::errors::InvalidArgument(
-          "Paddings should be less than %d, but max(pads[0], pads[1]) is %d.",
-          ksize[0],
-          std::max(paddings[0], paddings[1])));
-  PADDLE_ENFORCE_LT(
-      std::max(paddings[2], paddings[3]),
-      ksize[1],
-      phi::errors::InvalidArgument(
-          "Paddings should be less than %d, but max(pads[2], pads[3]) is %d.",
-          ksize[1],
-          std::max(paddings[2], paddings[3])));
-
-  if (adaptive) {
-    strides_vec[0] = std::floor(data_dims[0] / out_data_dims[0]);
-    strides_vec[1] = std::floor(data_dims[1] / out_data_dims[1]);
-    ksize_vec[0] = data_dims[0] - ((out_data_dims[0] - 1) * strides_vec[0]);
-    ksize_vec[1] = data_dims[1] - ((out_data_dims[1] - 1) * strides_vec[1]);
-
-    for (auto& pad : paddings) {
-      pad = 0;
-    }
-  }
-  PADDLE_ENFORCE_LT(
-      std::max(strides[0], strides[1]),
-      64,
-      phi::errors::InvalidArgument("strides should be less than %d, but "
-                                   "max(strides[0], strides[1]) is %d.",
-                                   64,
-                                   std::max(strides[0], strides[1])));
-
-  bool count_include_pad = !exclusive;
-  int64_t divison_override = 0;
-  int8_t cube_math_type = 0;
-
-  std::vector<int64_t> paddings_new;
-  paddings_new = {static_cast<int64_t>(paddings[1]),
-                  static_cast<int64_t>(paddings[2])};
 
   phi::DenseTensor transformed_out_grad, transformed_in_x,
       transformed_in_x_grad;
@@ -635,17 +586,10 @@ void Pool2dGradKernel(const Context& dev_ctx,
     transformed_in_x_grad = *in_x_grad;
   }
   if (pooling_type == "avg") {
-    EXEC_NPU_CMD(aclnnAvgPool2dBackward,
+    EXEC_NPU_CMD(aclnnAdaptiveAvgPool2dBackward,
                  dev_ctx,
                  transformed_out_grad,
                  transformed_in_x,
-                 ksize_vec,
-                 strides_vec,
-                 paddings_new,
-                 ceil_mode,
-                 count_include_pad,
-                 divison_override,
-                 cube_math_type,
                  transformed_in_x_grad);
   }
 

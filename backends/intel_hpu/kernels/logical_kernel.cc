@@ -27,13 +27,20 @@ class Logical : public HpuOperator {
     auto inputs = ct.GetTensors();
     auto outputs = ct.GetTensors(false);
 
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+      section = createSection();
+    }
+
     std::vector<synTensor> syn_inputs;
     for (size_t i = 0; i < inputs.size(); i++) {
+      bool use_section = (i == 0 && section != nullptr);
       syn_inputs.push_back(createTensor(inputs[i].dims.size(),
                                         inputs[i].type,
                                         inputs[i].dims,
                                         true,
-                                        inputs[i].name));
+                                        inputs[i].name,
+                                        use_section ? section : nullptr));
     }
 
     std::vector<synTensor> syn_outputs;
@@ -42,7 +49,8 @@ class Logical : public HpuOperator {
                                          outputs[i].type,
                                          outputs[i].dims,
                                          true,
-                                         outputs[i].name));
+                                         outputs[i].name,
+                                         section));
     }
 
     std::string guid = params.op + "_" + SynDataTypeToStr(inputs[0].type);
@@ -111,7 +119,9 @@ void LogicalOrKernel(const Context& dev_ctx,
   LogicalParams params;
   params.op = "or";
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, nullptr_t>("LogicalOrKernel", inputs_dims, nullptr);
+  std::string op_name =
+      (x.data() == out->data()) ? "_LogicalOrKernel" : "LogicalOrKernel";
+  op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {
@@ -144,7 +154,9 @@ void LogicalAndKernel(const Context& dev_ctx,
   LogicalParams params;
   params.op = "and";
   std::vector<DIMS> inputs_dims = ct.GetDims();
-  op_info.prepareOpInfo<T, nullptr_t>("LogicalAndKernel", inputs_dims, nullptr);
+  std::string op_name =
+      (x.data() == out->data()) ? "_LogicalAndKernel" : "LogicalAndKernel";
+  op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
   auto recipe = op_info.GetRecipe();
 
   if (recipe == nullptr) {

@@ -61,6 +61,28 @@ class Fused_Rms_Qkv_Rope_v2(paddle.nn.Layer):
         return query_states, key_states, value_states
 
 
+class Fused_Rms_Qkv_Rope_v3(paddle.nn.Layer):
+    def __init__(self, ln_scales, qkv_weights, epsilon, head_dim, num_head):
+        super().__init__()
+        self.ln_scales = ln_scales
+        self.qkv_weights = qkv_weights
+        self.epsilon = epsilon
+        self.head_dim = head_dim
+        self.num_head = num_head
+
+    def forward(self, i, src, rotary_embs):
+        query_states, kv_states = fused_rms_qkv_rope_v3(
+            src,
+            self.ln_scales[i],
+            self.qkv_weights[i],
+            rotary_embs,
+            self.epsilon,
+            self.head_dim,
+            self.num_head,
+        )
+        return query_states, kv_states
+
+
 class Fused_Sdpa_Proj(paddle.nn.Layer):
     def __init__(self, scaling_factor, linear_weights):
         super().__init__()
@@ -72,6 +94,23 @@ class Fused_Sdpa_Proj(paddle.nn.Layer):
             query_states,
             key_states,
             value_states,
+            attention_mask,
+            self.linear_weights[i],
+            self.scaling_factor,
+        )
+        return out_linear_out
+
+
+class Fused_Sdpa_Proj_v2(paddle.nn.Layer):
+    def __init__(self, scaling_factor, linear_weights):
+        super().__init__()
+        self.scaling_factor = scaling_factor
+        self.linear_weights = linear_weights
+
+    def forward(self, i, query_states, kv_states, attention_mask):
+        out_linear_out = fused_sdpa_proj_v2(
+            query_states,
+            kv_states,
             attention_mask,
             self.linear_weights[i],
             self.scaling_factor,

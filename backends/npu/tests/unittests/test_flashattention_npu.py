@@ -70,10 +70,13 @@ class TestNPUFAFP16(unittest.TestCase):
         self.shape = (1, 5, 2048, 128)
         self.dropout = 0.0
         self.fixed_seed_offset = None
+        self.actual_seq_q_len = None
+        self.actual_seq_kv_len = None
         self.causal = False
         self.return_softmax = False
         self.is_test = False
         self.is_triangle_upper_mask = True
+        self.is_varlen = False
         self.pass_line = 0.9999
         self.init_dtype()
 
@@ -103,6 +106,7 @@ class TestNPUFAFP16(unittest.TestCase):
             np.sum(np.isclose(golden_dx, fused_dx, rtol=rtol, atol=atol))
             / golden_dx.size
         )
+
         self.assertTrue(
             y_pass_ratio > self.pass_line and dx_pass_ratio > self.pass_line
         )
@@ -120,6 +124,7 @@ class TestNPUFAFP16(unittest.TestCase):
         query = query_.transpose((0, 2, 1, 3))
         key = key_.transpose((0, 2, 1, 3))
         value = value_.transpose((0, 2, 1, 3))
+
         y = core.eager._run_custom_op(
             "flash_attention_npu",
             query,
@@ -127,11 +132,14 @@ class TestNPUFAFP16(unittest.TestCase):
             value,
             self.fixed_seed_offset,
             mask,
+            self.actual_seq_q_len,
+            self.actual_seq_kv_len,
             self.dropout,
             self.causal,
             self.return_softmax,
             self.is_test,
             self.is_triangle_upper_mask,
+            self.is_varlen,
         )[0]
         y.backward()
         dx = query_.grad
@@ -176,6 +184,7 @@ class TestNPUFAFP16(unittest.TestCase):
             golden_value = paddle.to_tensor(
                 np_value, place=self.npu_place, dtype=self.dtype, stop_gradient=True
             )
+
         fused_query = paddle.to_tensor(
             np_query, place=self.npu_place, dtype=self.dtype, stop_gradient=False
         )
@@ -230,6 +239,7 @@ class TestNPUFABF16(TestNPUFAFP16):
         mask = paddle.full(
             (self.shape[2], self.shape[2]), paddle.finfo(paddle.float16).min
         )
+
         mask = paddle.triu(mask, diagonal=1)
         mask = mask.astype(paddle.bool)
         np_uint16_query = convert_float_to_uint16(np_query)
@@ -266,6 +276,7 @@ class TestNPUFABF16_GQA(TestNPUFAFP16):
         mask = paddle.full(
             (self.shape[2], self.shape[2]), paddle.finfo(paddle.float16).min
         )
+
         mask = paddle.triu(mask, diagonal=1)
         mask = mask.astype(paddle.bool)
         np_uint16_query = convert_float_to_uint16(np_query)
@@ -291,6 +302,7 @@ class TestNPUFAFP16_GQA(TestNPUFABF16_GQA):
         mask = paddle.full(
             (self.shape[2], self.shape[2]), paddle.finfo(paddle.float16).min
         )
+
         mask = paddle.triu(mask, diagonal=1)
         mask = mask.astype(paddle.bool)
         return np_query, np_key, np_value, mask
@@ -318,6 +330,183 @@ class TestNPUFAFP16_GQA_NK4(TestNPUFAFP16_GQA):
     def setUp(self):
         super().setUp()
         self.num_keys = 4
+
+
+class TestNPUFAFP16_Varlen(TestNPUFAFP16):
+    def setUp(self):
+        super().setUp()
+        # (B, N, S ,D)
+        self.shape = (5, 64, 3, 128)
+        # (T, N, D)  T = B * S (If the lengths of S are different, accumulate S.)
+        self.trans_shape = (15, 64, 128)
+        self.actual_seq_q_len = self.actual_seq_kv_len = paddle.to_tensor(
+            [3, 6, 9, 12, 15], dtype=paddle.int32
+        )
+        self.is_varlen = True
+        self.pass_line = 0.999
+
+    def fused_fa(self, query_, key_, value_, mask=None):
+        query = query_.transpose((0, 2, 1, 3))
+        key = key_.transpose((0, 2, 1, 3))
+        value = value_.transpose((0, 2, 1, 3))
+        new_shape = query.shape
+
+        query = paddle.reshape(query, self.trans_shape)
+        key = paddle.reshape(key, self.trans_shape)
+        value = paddle.reshape(value, self.trans_shape)
+
+        y = core.eager._run_custom_op(
+            "flash_attention_npu",
+            query,
+            key,
+            value,
+            self.fixed_seed_offset,
+            mask,
+            self.actual_seq_q_len,
+            self.actual_seq_kv_len,
+            self.dropout,
+            self.causal,
+            self.return_softmax,
+            self.is_test,
+            self.is_triangle_upper_mask,
+            self.is_varlen,
+        )[0]
+        y.backward()
+        dx = query_.grad
+
+        y = paddle.reshape(y, new_shape)
+        if self.dtype == "bfloat16":
+            y = convert_uint16_to_float(y.numpy())
+            dx = convert_uint16_to_float(dx.numpy())
+            return y, dx
+        return y.numpy(), dx.numpy()
+
+
+class TestNPUFABF16_Varlen(TestNPUFAFP16_Varlen):
+    def init_dtype(self):
+        self.dtype = "bfloat16"
+
+
+class TestNPUFAFP16_Varlen_WithMask(TestNPUFAFP16_Varlen):
+    def gen_input(self):
+        np_query = np.random.randn(
+            self.shape[0], self.shape[1], self.shape[2], self.shape[3]
+        )
+        np_key = np.random.randn(
+            self.shape[0], self.shape[1], self.shape[2], self.shape[3]
+        )
+        np_value = np.random.randn(
+            self.shape[0], self.shape[1], self.shape[2], self.shape[3]
+        )
+        mask = paddle.full(
+            (self.shape[2], self.shape[2]), paddle.finfo(paddle.float16).min
+        )
+        mask = paddle.triu(mask, diagonal=1)
+        mask = mask.astype(paddle.bool)
+        return np_query, np_key, np_value, mask
+
+
+class TestNPUFABF16_Varlen_WithMask(TestNPUFAFP16_Varlen_WithMask):
+    def init_dtype(self):
+        self.dtype = "bfloat16"
+
+
+class TestNPUFAFP16_Varlen_GQA(TestNPUFAFP16_Varlen):
+    def setUp(self):
+        super().setUp()
+        # (B,N,S,D)
+        self.num_keys = 1
+        self.kv_trans_shape = (15, self.num_keys, 128)
+
+    def init_dtype(self):
+        self.dtype = "float16"
+
+    def gen_input(self):
+        np_query = np.random.randn(
+            self.shape[0], self.shape[1], self.shape[2], self.shape[3]
+        )
+        np_key = np.random.randn(
+            self.shape[0], self.num_keys, self.shape[2], self.shape[3]
+        )
+        np_value = np.random.randn(
+            self.shape[0], self.num_keys, self.shape[2], self.shape[3]
+        )
+        mask = paddle.full(
+            (self.shape[2], self.shape[2]), paddle.finfo(paddle.float16).min
+        )
+
+        mask = paddle.triu(mask, diagonal=1)
+        mask = mask.astype(paddle.bool)
+        return np_query, np_key, np_value, mask
+
+    def fused_fa(self, query_, key_, value_, mask=None):
+        query = query_.transpose((0, 2, 1, 3))
+        key = key_.transpose((0, 2, 1, 3))
+        value = value_.transpose((0, 2, 1, 3))
+        new_shape = query.shape
+
+        query = paddle.reshape(query, self.trans_shape)
+        key = paddle.reshape(key, self.kv_trans_shape)
+        value = paddle.reshape(value, self.kv_trans_shape)
+
+        y = core.eager._run_custom_op(
+            "flash_attention_npu",
+            query,
+            key,
+            value,
+            self.fixed_seed_offset,
+            mask,
+            self.actual_seq_q_len,
+            self.actual_seq_kv_len,
+            self.dropout,
+            self.causal,
+            self.return_softmax,
+            self.is_test,
+            self.is_triangle_upper_mask,
+            self.is_varlen,
+        )[0]
+        y.backward()
+        dx = query_.grad
+
+        y = paddle.reshape(y, new_shape)
+        if self.dtype == "bfloat16":
+            y = convert_uint16_to_float(y.numpy())
+            dx = convert_uint16_to_float(dx.numpy())
+            return y, dx
+        return y.numpy(), dx.numpy()
+
+
+class TestNPUFABF16_Varlen_GQA(TestNPUFAFP16_Varlen_GQA):
+    def init_dtype(self):
+        self.dtype = "bfloat16"
+
+
+class TestNPUFAFP16_Varlen_GQA_NK2(TestNPUFAFP16_Varlen_GQA):
+    def setUp(self):
+        super().setUp()
+        self.num_keys = 2
+        self.kv_trans_shape = (15, self.num_keys, 128)
+
+
+class TestNPUFABF16_Varlen_GQA_NK2(TestNPUFABF16_Varlen_GQA):
+    def setUp(self):
+        super().setUp()
+        self.num_keys = 2
+        self.kv_trans_shape = (15, self.num_keys, 128)
+
+
+class TestNPUFAFP16_Varlen_GQA_NK4(TestNPUFAFP16_Varlen_GQA):
+    def setUp(self):
+        super().setUp()
+        self.num_keys = 4
+        self.kv_trans_shape = (15, self.num_keys, 128)
+
+
+class TestNPUFABF16_Varlen_GQA_NK4(TestNPUFABF16_Varlen_GQA):
+    def setUp(self):
+        super().setUp()
+        self.num_keys = 4
+        self.kv_trans_shape = (15, self.num_keys, 128)
 
 
 if __name__ == "__main__":

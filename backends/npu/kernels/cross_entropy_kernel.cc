@@ -15,20 +15,42 @@ limitations under the License. */
 #include "kernels/funcs/npu_funcs.h"
 #include "kernels/funcs/npu_op_runner.h"
 #include "kernels/funcs/string_helper.h"
+
 namespace custom_kernel {
 
 template <typename T, typename Context>
-void GreaterEqualKernel(const Context& dev_ctx,
-                        const phi::DenseTensor& x,
-                        const phi::DenseTensor& y,
-                        phi::DenseTensor* out);
+void TransposeKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const std::vector<int>& axis,
+                     phi::DenseTensor* out);
 
 template <typename T, typename Context>
-void AllKernel(const Context& dev_ctx,
-               const phi::DenseTensor& x,
-               const std::vector<int64_t>& dims,
-               bool keep_dim,
-               phi::DenseTensor* out);
+void SoftmaxKernel(const Context& dev_ctx,
+                   const phi::DenseTensor& x,
+                   int axis,
+                   phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void CastKernel(const Context& dev_ctx,
+                const phi::DenseTensor& x,
+                phi::DataType dtype,
+                phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void LogSoftmaxKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      int axis,
+                      phi::DenseTensor* out);
+
+template <typename T, typename Context>
+void NllLossRawKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      const phi::DenseTensor& labels,
+                      const paddle::optional<phi::DenseTensor>& weight,
+                      int64_t ignore_index,
+                      const std::string& reduction,
+                      phi::DenseTensor* out,
+                      phi::DenseTensor* total_weight);
 
 template <typename T, typename Context>
 void EqualKernel(const Context& dev_ctx,
@@ -127,16 +149,16 @@ void CrossEntropyCpuImpl(const T* logits,
 }
 
 template <typename T, typename Context>
-void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
-                                   const phi::DenseTensor& logits,
-                                   const phi::DenseTensor& labels,
-                                   bool soft_label,
-                                   bool use_softmax,
-                                   bool numeric_stable_mode,
-                                   int ignore_index,
-                                   int axis,
-                                   phi::DenseTensor* softmax,
-                                   phi::DenseTensor* loss) {
+void CrossEntropyWithSoftmaxNPUKernel(const Context& dev_ctx,
+                                      const phi::DenseTensor& logits,
+                                      const phi::DenseTensor& labels,
+                                      bool soft_label,
+                                      bool use_softmax,
+                                      bool numeric_stable_mode,
+                                      int ignore_index,
+                                      int axis,
+                                      phi::DenseTensor* softmax,
+                                      phi::DenseTensor* loss) {
   auto logits_dims = logits.dims();
   const int rank = logits_dims.size();
   const int use_axis = axis < 0 ? axis + rank : axis;
@@ -180,31 +202,8 @@ void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
     phi::Copy<Context>(dev_ctx, logits, dev_ctx.GetPlace(), false, softmax);
   }
 
-  phi::DenseTensorMeta labels_zero_meta = {phi::DataType::INT32, labels.dims()};
-  phi::DenseTensor labels_zero_tensor;
-  labels_zero_tensor.set_meta(labels_zero_meta);
-  dev_ctx.template Alloc<T>(&labels_zero_tensor);
-  EXEC_NPU_CMD(aclnnInplaceZero, dev_ctx, labels_zero_tensor);
-  labels_zero_tensor.Resize(labels.dims());
-
-  phi::DenseTensorMeta labels_bool_meta = {phi::DataType::BOOL, labels.dims()};
-  phi::DenseTensor labels_bool;
-  labels_bool.set_meta(labels_bool_meta);
-  custom_kernel::GreaterEqualKernel<T, Context>(
-      dev_ctx, labels, labels_zero_tensor, &labels_bool);
-
-  phi::DenseTensor labels_result;
-  labels_result.Resize(phi::make_ddim({}));
-  std::vector<int64_t> emptyVector;
-  custom_kernel::AllKernel<bool, Context>(
-      dev_ctx, labels_bool, emptyVector, false, &labels_result);
-
-  std::vector<bool> labels_condition_vec;
-  TensorToVector(dev_ctx, *&labels_result, dev_ctx, &labels_condition_vec);
-  bool condition = labels_condition_vec[0];
-
   // Use NPU IR
-  if (!soft_label && labels.dims()[use_axis] == 1 && condition && use_softmax) {
+  if (!soft_label && labels.dims()[use_axis] == 1 && use_softmax) {
     PADDLE_ENFORCE_EQ(soft_label,
                       false,
                       phi::errors::Unimplemented(
@@ -282,7 +281,7 @@ void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
     custom_kernel::WhereKernel<T, Context>(
         dev_ctx, mid_out, zero_tensor, loss_1d, &loss_1d);
     loss_1d.Resize(dims);
-  } else if (labels.dims()[use_axis] != 1 && use_softmax) {
+  } else if (use_softmax) {
     phi::DenseTensor loss_1d(*loss), transformed_logits, transformed_lables;
     auto dims = labels.dims();
     dims[use_axis] = 1;
@@ -420,6 +419,128 @@ void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
     TensorCopy(dev_ctx, cpu_loss_out_tensor, true, loss);
     loss->Resize(loss_dims);
   }
+}
+
+template <typename T, typename Context>
+void CrossEntropyWithSoftmaxKernel(const Context& dev_ctx,
+                                   const phi::DenseTensor& logits,
+                                   const phi::DenseTensor& labels,
+                                   bool soft_label,
+                                   bool use_softmax,
+                                   bool numeric_stable_mode,
+                                   int ignore_index,
+                                   int axis,
+                                   phi::DenseTensor* softmax,
+                                   phi::DenseTensor* loss) {
+  // unspport type to another function
+  if (soft_label || !use_softmax ||
+      (logits.dims().size() != 2 && logits.dims().size() != 4)) {
+    return custom_kernel::CrossEntropyWithSoftmaxNPUKernel<T, Context>(
+        dev_ctx,
+        logits,
+        labels,
+        soft_label,
+        use_softmax,
+        numeric_stable_mode,
+        ignore_index,
+        axis,
+        softmax,
+        loss);
+  }
+
+  // softmax
+  dev_ctx.template Alloc<T>(softmax);
+  custom_kernel::SoftmaxKernel<T, Context>(dev_ctx, logits, axis, softmax);
+
+  // log_softmax
+  phi::DenseTensor log_softmax;
+  log_softmax.set_meta(softmax->meta());
+  dev_ctx.template Alloc<T>(&log_softmax);
+  custom_kernel::LogSoftmaxKernel<T, Context>(
+      dev_ctx, logits, axis, &log_softmax);
+
+  // labels & loss need remove axis
+  auto x_dims = log_softmax.dims();
+  phi::DenseTensor trans_x, labels_new(labels);
+  // 2d
+  if (x_dims.size() == 2 && labels.dims().size() == 2) {
+    labels_new.Resize({labels.dims()[0]});
+    loss->Resize({loss->dims()[0]});
+    trans_x = log_softmax;
+  }
+
+  // 4d
+  if (x_dims.size() == 4 && labels.dims().size() == 4) {
+    if (axis < 0) {
+      axis = axis + 4;
+    }
+
+    // only support input x NCHW
+    if (axis == 1) {
+      labels_new.Resize({labels.dims()[0], labels.dims()[2], labels.dims()[3]});
+      loss->Resize({loss->dims()[0], loss->dims()[2], loss->dims()[3]});
+      trans_x = log_softmax;
+    } else if (axis == 0) {
+      labels_new.Resize({labels.dims()[1], labels.dims()[2], labels.dims()[3]});
+      loss->Resize({loss->dims()[1], loss->dims()[2], loss->dims()[3]});
+
+      trans_x.Resize({x_dims[1], x_dims[0], x_dims[2], x_dims[3]});
+      std::vector<int> perm = {1, 0, 2, 3};
+      custom_kernel::TransposeKernel<T, Context>(
+          dev_ctx, log_softmax, perm, &trans_x);
+    } else if (axis == 2) {
+      labels_new.Resize({labels.dims()[0], labels.dims()[1], labels.dims()[3]});
+      loss->Resize({loss->dims()[0], loss->dims()[1], loss->dims()[3]});
+
+      trans_x.Resize({x_dims[0], x_dims[2], x_dims[1], x_dims[3]});
+      std::vector<int> perm = {0, 2, 1, 3};
+      custom_kernel::TransposeKernel<T, Context>(
+          dev_ctx, log_softmax, perm, &trans_x);
+    } else if (axis == 3) {
+      labels_new.Resize({labels.dims()[0], labels.dims()[1], labels.dims()[2]});
+      loss->Resize({loss->dims()[0], loss->dims()[1], loss->dims()[2]});
+
+      trans_x.Resize({x_dims[0], x_dims[3], x_dims[1], x_dims[2]});
+      std::vector<int> perm = {0, 3, 1, 2};
+      custom_kernel::TransposeKernel<T, Context>(
+          dev_ctx, log_softmax, perm, &trans_x);
+    }
+  } else {
+    trans_x = log_softmax;
+  }
+
+  // label unspport int8 and int16
+  phi::DenseTensor labels_cast;
+  if (labels_new.dtype() == phi::DataType::INT8 ||
+      labels_new.dtype() == phi::DataType::INT16) {
+    phi::DenseTensorMeta labels_meta;
+    labels_meta = {phi::DataType::INT32, labels_new.dims()};
+    labels_cast.set_meta(labels_meta);
+
+    dev_ctx.template Alloc<int32_t>(&labels_cast);
+    custom_kernel::CastKernel<T, Context>(
+        dev_ctx, labels_new, phi::DataType::INT32, &labels_cast);
+  } else {
+    labels_cast = labels_new;
+  }
+
+  // nll_loss
+  paddle::optional<phi::DenseTensor> weight(paddle::none);
+  std::string reduction = "none";
+  phi::DenseTensor total_weight;
+  phi::DenseTensorMeta meta = {log_softmax.dtype(), phi::DDim({1})};
+  total_weight.set_meta(meta);
+  dev_ctx.template Alloc<T>(&total_weight);
+
+  custom_kernel::NllLossRawKernel<T, Context>(dev_ctx,
+                                              trans_x,
+                                              labels_cast,
+                                              weight,
+                                              ignore_index,
+                                              reduction,
+                                              loss,
+                                              &total_weight);
+  loss->Resize(labels.dims());
 }
 
 template <typename T, typename Context, typename LabelT>
@@ -576,7 +697,7 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
   const int n = SizeToAxis(use_axis, logits_grad_dims);
   // Use NPU IR
   if (!soft_label && labels.numel() == n && ignore_index == -100) {
-    int cls_num = softmax.dims()[softmax.dims().size() - 1];
+    int64_t cls_num = softmax.dims()[softmax.dims().size() - 1];
     auto stream = dev_ctx.stream();
     // cast label from int64/int32 to int32 for OneHotD
     phi::DenseTensor casted_labels;
@@ -585,13 +706,8 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
                                                  labels.dims()};
       casted_labels.set_meta(casted_labels_meta);
       dev_ctx.template Alloc<int32_t>(&casted_labels);
-      auto dst_dtype = ConvertToNpuDtype(phi::DataType::INT32);
-      const auto& runner_cast_label =
-          NpuOpRunner("Cast",
-                      {labels},
-                      {casted_labels},
-                      {{"dst_type", static_cast<int>(dst_dtype)}});
-      runner_cast_label.Run(stream);
+      custom_kernel::CastKernel<T, Context>(
+          dev_ctx, labels, phi::DataType::INT32, &casted_labels);
     } else {
       casted_labels = labels;
     }
@@ -609,6 +725,7 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
         &off_tensor, dev_ctx, static_cast<int>(0));
 
     // one_hot
+    int64_t axis_one = -1;
     phi::DenseTensor tmp_onehot;
     phi::DenseTensorMeta tmp_onehot_meta = {on_tensor.dtype(), softmax.dims()};
     tmp_onehot.set_meta(tmp_onehot_meta);
@@ -631,13 +748,8 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
       phi::DenseTensorMeta onehot_meta = {softmax.dtype(), tmp_onehot.dims()};
       casted_onehot.set_meta(onehot_meta);
       dev_ctx.template Alloc<T>(&casted_onehot);
-      auto dst_dtype = ConvertToNpuDtype(softmax.dtype());
-      const auto& runner_cast_onehot =
-          NpuOpRunner("Cast",
-                      {tmp_onehot},
-                      {casted_onehot},
-                      {{"dst_type", static_cast<int>(dst_dtype)}});
-      runner_cast_onehot.Run(stream);
+      custom_kernel::CastKernel<T, Context>(
+          dev_ctx, tmp_onehot, softmax.dtype(), &casted_onehot);
     } else {
       casted_onehot = tmp_onehot;
     }
@@ -647,16 +759,17 @@ void CrossEntropyWithSoftmaxGradKernel(const Context& dev_ctx,
     phi::DenseTensorMeta tmp_sub_meta = {softmax.dtype(), softmax.dims()};
     tmp_sub.set_meta(tmp_sub_meta);
     dev_ctx.template Alloc<T>(&tmp_sub);
-
-    const auto& runner_sub =
-        NpuOpRunner("Sub", {softmax, casted_onehot}, {tmp_sub}, {});
-    runner_sub.Run(stream);
-
-    // mul
     dev_ctx.template Alloc<T>(logits_grad);
-    const auto& runner_mul =
-        NpuOpRunner("Mul", {loss_grad, tmp_sub}, {*logits_grad}, {});
-    runner_mul.Run(stream);
+
+    aclDataType acl_data_type = ConvertToNpuDtype(softmax.dtype());
+    static const auto aclCreateScalar = GET_OP_API_FUNC(aclCreateScalar);
+    auto one = static_cast<T>(1.0);
+    aclScalar* acl_scalar_one = aclCreateScalar(&one, acl_data_type);
+
+    EXEC_NPU_CMD(
+        aclnnSub, dev_ctx, softmax, casted_onehot, acl_scalar_one, tmp_sub);
+    EXEC_NPU_CMD(aclnnMul, dev_ctx, loss_grad, tmp_sub, *logits_grad);
+
   } else {  // Use CPU impl
     if (labels.numel() != n) {
       VLOG(4) << "The size of labels should be equal to phi::funcs::SizeToAxis "
