@@ -22,21 +22,14 @@
 
 #include "paddle/common/flags.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_attribute.h"
+#include "paddle/fluid/pir/transforms/sub_graph_detector.h"
 #include "paddle/pir/include/core/builder.h"
 #include "paddle/pir/include/core/builtin_op.h"
 #include "paddle/pir/include/pass/pass.h"
 #include "paddle/pir/include/pass/pass_registry.h"
+#include "runtime/flags.h"
 
-// #include "passes/sub_graph_detector.h"
-#include "paddle/fluid/pir/utils/sub_graph_detector.h"
-
-// COMMON_DECLARE_int32(gcu_min_group_size);
-PHI_DEFINE_EXPORTED_int32(
-    gcu_min_group_size,
-    1,
-    "when the gcu subgraph size is not larger than `gcu_min_group_size`, the "
-    "group will fallback to original graph.");
-
+FLAGS_DECLARE_int32(custom_engine_min_group_size);
 COMMON_DECLARE_bool(print_ir);
 
 namespace {
@@ -71,16 +64,17 @@ class GcuSubGraphExtractPass : public pir::Pass {
         pir::DetectSubGraphs(&block, IsSupportedByGCU);
     AddStatistics(groups.size());
     for (auto& group_ops : groups) {
-      if (group_ops.size() < static_cast<size_t>(FLAGS_gcu_min_group_size)) {
-        VLOG(0) << "current group_ops.size(): " << group_ops.size()
+      if (group_ops.size() <
+          static_cast<size_t>(FLAGS_custom_engine_min_group_size)) {
+        VLOG(3) << "current group_ops.size(): " << group_ops.size()
                 << ", less than min_group_size:"
-                << static_cast<size_t>(FLAGS_gcu_min_group_size)
+                << static_cast<size_t>(FLAGS_custom_engine_min_group_size)
                 << ", will fallback to paddle original graph";
         continue;
       }
-      VLOG(0) << "current group_ops.size(): " << group_ops.size()
+      VLOG(3) << "current group_ops.size(): " << group_ops.size()
               << ", greater or equal than min_group_size:"
-              << static_cast<size_t>(FLAGS_gcu_min_group_size)
+              << static_cast<size_t>(FLAGS_custom_engine_min_group_size)
               << ", will lower to GCU graph";
       pir::ReplaceWithGroupOp(&block, group_ops);
     }

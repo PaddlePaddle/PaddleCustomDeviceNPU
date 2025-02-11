@@ -49,6 +49,8 @@
 #ifndef BACKENDS_GCU_RUNTIME_FLAGS_H_
 #define BACKENDS_GCU_RUNTIME_FLAGS_H_
 
+#include "gflags/gflags.h"
+
 #define FLAGS_DEFINE_bool(name, value, meaning) \
   DEFINE_bool(name, EnvToBool("FLAGS_" #name, value), meaning)
 
@@ -74,5 +76,11 @@
 
 #define EnvToUInt(envname, dflt) \
   (!getenv(envname) ? (dflt) : strtoul(getenv(envname), NULL, 10))
+
+#define FLAGS_DECLARE_bool(name) DECLARE_bool(name)
+#define FLAGS_DECLARE_int32(name) DECLARE_int32(name)
+#define FLAGS_DECLARE_uint32(name) DECLARE_uint32(name)
+#define FLAGS_DECLARE_uint64(name) DECLARE_uint64(name)
+#define FLAGS_DECLARE_string(name) DECLARE_string(name)
 
 #endif  // BACKENDS_GCU_RUNTIME_FLAGS_H_
