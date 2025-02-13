@@ -76,7 +76,7 @@ std::vector<paddle::Tensor> GetStopFlagsMulti(const paddle::Tensor& topk_ids,
                      bs_now,
                      end_length);
 
-  return {topk_ids_cpu.copy_to(topk_ids.place(), true),
+  return {topk_ids_cpu.copy_to(stop_flags.place(), true),
           stop_flags_out.copy_to(stop_flags.place(), true)};
 }
 

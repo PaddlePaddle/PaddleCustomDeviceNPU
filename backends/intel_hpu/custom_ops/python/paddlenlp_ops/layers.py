@@ -118,6 +118,23 @@ class Fused_Sdpa_Proj_v2(paddle.nn.Layer):
         return out_linear_out
 
 
+class Fused_Sdpa_Dec_Proj(paddle.nn.Layer):
+    def __init__(self, scaling_factor, linear_weights):
+        super().__init__()
+        self.scaling_factor = scaling_factor
+        self.linear_weights = linear_weights
+
+    def forward(self, i, query_states, kv_states, attention_mask):
+        out_linear_out = fused_sdpa_dec_proj(
+            query_states,
+            kv_states,
+            attention_mask,
+            self.linear_weights[i],
+            self.scaling_factor,
+        )
+        return out_linear_out
+
+
 class Fused_Mlp(paddle.nn.Layer):
     def __init__(self, proj_weight, up_weight, down_weight):
         super().__init__()
