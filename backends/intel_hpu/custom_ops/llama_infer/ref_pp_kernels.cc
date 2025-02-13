@@ -67,7 +67,7 @@ std::vector<paddle::Tensor> GetStopFlagsMulti(const paddle::Tensor& topk_ids,
   auto topk_ids_cpu = topk_ids.copy_to(paddle::CPUPlace(), true);
   auto stop_flags_cpu = stop_flags.copy_to(paddle::CPUPlace(), true);
   auto end_ids_cpu = end_ids.copy_to(paddle::CPUPlace(), true);
-  auto stop_flags_out = stop_flags.copy_to(stop_flags_cpu.place(), false);
+  auto stop_flags_out = stop_flags.copy_to(stop_flags_cpu.place(), true);
 
   set_value_by_flags(stop_flags_cpu.data<bool>(),
                      end_ids_cpu.data<int64_t>(),
@@ -287,17 +287,27 @@ std::vector<paddle::Tensor> TokenPenaltyMultiScores(
     const paddle::Tensor& cur_len,
     const paddle::Tensor& min_len,
     const paddle::Tensor& eos_token_id) {
-  switch (logits.type()) {
+  auto pre_ids_cpu = pre_ids.copy_to(paddle::CPUPlace(), true);
+  auto logits_cpu = logits.copy_to(paddle::CPUPlace(), true);
+  auto penalty_scores_cpu = penalty_scores.copy_to(paddle::CPUPlace(), true);
+  auto frequency_scores_cpu =
+      frequency_scores.copy_to(paddle::CPUPlace(), true);
+  auto presence_scores_cpu = presence_scores.copy_to(paddle::CPUPlace(), true);
+  auto cur_len_cpu = cur_len.copy_to(paddle::CPUPlace(), true);
+  auto min_len_cpu = min_len.copy_to(paddle::CPUPlace(), true);
+  auto eos_token_id_cpu = eos_token_id.copy_to(paddle::CPUPlace(), true);
+  switch (logits_cpu.type()) {
     case paddle::DataType::FLOAT32: {
-      return token_penalty_multi_scores_kernel<paddle::DataType::FLOAT32>(
-          pre_ids,
-          logits,
-          penalty_scores,
-          frequency_scores,
-          presence_scores,
-          cur_len,
-          min_len,
-          eos_token_id);
+      return {token_penalty_multi_scores_kernel<paddle::DataType::FLOAT32>(
+                  pre_ids_cpu,
+                  logits_cpu,
+                  penalty_scores_cpu,
+                  frequency_scores_cpu,
+                  presence_scores_cpu,
+                  cur_len_cpu,
+                  min_len_cpu,
+                  eos_token_id_cpu)[0]
+                  .copy_to(logits.place(), true)};
     }
     default: {
       PD_THROW(

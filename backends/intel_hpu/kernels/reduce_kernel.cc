@@ -364,7 +364,8 @@ PD_REGISTER_PLUGIN_KERNEL(sum,
                           custom_kernel::SumKernel,
                           float,
                           phi::dtype::float16,
-                          phi::dtype::bfloat16) {}
+                          phi::dtype::bfloat16,
+                          int32_t) {}
 
 PD_REGISTER_PLUGIN_KERNEL(max,
                           intel_hpu,
@@ -372,7 +373,8 @@ PD_REGISTER_PLUGIN_KERNEL(max,
                           custom_kernel::MaxKernel,
                           float,
                           phi::dtype::float16,
-                          phi::dtype::bfloat16) {}
+                          phi::dtype::bfloat16,
+                          int32_t) {}
 
 PD_REGISTER_PLUGIN_KERNEL(prod,
                           intel_hpu,
