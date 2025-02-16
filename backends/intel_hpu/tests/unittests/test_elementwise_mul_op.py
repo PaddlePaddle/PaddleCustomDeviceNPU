@@ -25,6 +25,9 @@ paddle.enable_static()
 import os
 
 intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+intel_hpus_static_mold = os.environ.get(
+    "FLAGS_static_mold_intel_hpus", 0
+)  # default is dynamic mold test FLAGS_static_mold_intel_hpus=0
 
 
 class TestElementwiseMulOp(OpTest):
@@ -46,6 +49,10 @@ class TestElementwiseMulOp(OpTest):
         self.__class__.use_custom_device = True
         self.__class__.no_need_check_grad = True
         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
+        if int(intel_hpus_static_mold) == 0:
+            paddle.disable_static()
+        else:
+            paddle.enable_static()
 
     def init_input(self):
         np.random.seed(1024)
