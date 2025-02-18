@@ -18,7 +18,7 @@
 namespace custom_kernel {
 
 struct BitwiseParams {
-  std::string op;
+  char op[MAX_OPNAME_LEN];
 };
 
 class Bitwise : public HpuOperator {
@@ -46,7 +46,8 @@ class Bitwise : public HpuOperator {
                                          outputs[i].name));
     }
 
-    std::string guid = params.op + "_fwd_" + SynDataTypeToStr(inputs[0].type);
+    std::string guid =
+        std::string(params.op) + "_fwd_" + SynDataTypeToStr(inputs[0].type);
 
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
@@ -56,7 +57,7 @@ class Bitwise : public HpuOperator {
                                      nullptr,
                                      0,
                                      guid.c_str(),
-                                     params.op.c_str(),
+                                     params.op,
                                      nullptr,
                                      nullptr);
     PD_CHECK(
@@ -75,8 +76,8 @@ void BitwiseAndKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  BitwiseParams params;
-  params.op = "bitwise_and";
+  BitwiseParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "bitwise_and");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, nullptr_t>("BitwiseAndKernel", inputs_dims, nullptr);
@@ -106,8 +107,8 @@ void BitwiseNotKernel(const Context& dev_ctx,
   ct.Add(x);
   ct.Add(out, false);
 
-  BitwiseParams params;
-  params.op = "bitwise_not";
+  BitwiseParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "bitwise_not");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, nullptr_t>("BitwiseNotKernel", inputs_dims, nullptr);
@@ -139,8 +140,8 @@ void BitwiseOrKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  BitwiseParams params;
-  params.op = "bitwise_or";
+  BitwiseParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "bitwise_or");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, nullptr_t>("BitwiseOrKernel", inputs_dims, nullptr);
@@ -172,8 +173,8 @@ void BitwiseXorKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  BitwiseParams params;
-  params.op = "bitwise_xor";
+  BitwiseParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "bitwise_xor");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, nullptr_t>("BitwiseXorKernel", inputs_dims, nullptr);

@@ -26,6 +26,8 @@
 #include "habanalabs/synapse_api.h"
 #include "habanalabs/synapse_common_types.h"
 
+#define MAX_OPNAME_LEN 32
+
 template <class KEY_T, class VAL_T>
 class LRUCache {
  private:

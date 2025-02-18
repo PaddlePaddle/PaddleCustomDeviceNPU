@@ -17,7 +17,7 @@
 
 namespace custom_kernel {
 struct LogicalParams {
-  std::string op;
+  char op[MAX_OPNAME_LEN];
 };
 
 class Logical : public HpuOperator {
@@ -53,7 +53,8 @@ class Logical : public HpuOperator {
                                          section));
     }
 
-    std::string guid = params.op + "_" + SynDataTypeToStr(inputs[0].type);
+    std::string guid =
+        std::string(params.op) + "_" + SynDataTypeToStr(inputs[0].type);
 
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
@@ -63,7 +64,7 @@ class Logical : public HpuOperator {
                                      nullptr,
                                      0,
                                      guid.c_str(),
-                                     params.op.c_str(),
+                                     params.op,
                                      nullptr,
                                      nullptr);
     PD_CHECK(
@@ -81,8 +82,8 @@ void LogicalNotKernel(const Context& dev_ctx,
   ct.Add(x);
   ct.Add(out, false);
 
-  LogicalParams params;
-  params.op = "not";
+  LogicalParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "not");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, nullptr_t>("LogicalNotKernel", inputs_dims, nullptr);
@@ -116,8 +117,8 @@ void LogicalOrKernel(const Context& dev_ctx,
 
   ct.Add(out, false);
 
-  LogicalParams params;
-  params.op = "or";
+  LogicalParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "or");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   std::string op_name =
       (x.data() == out->data()) ? "_LogicalOrKernel" : "LogicalOrKernel";
@@ -151,8 +152,8 @@ void LogicalAndKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  LogicalParams params;
-  params.op = "and";
+  LogicalParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "and");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   std::string op_name =
       (x.data() == out->data()) ? "_LogicalAndKernel" : "LogicalAndKernel";

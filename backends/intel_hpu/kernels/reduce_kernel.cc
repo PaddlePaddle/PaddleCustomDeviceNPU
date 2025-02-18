@@ -25,7 +25,7 @@ struct ReduceParams {
   ns_Reduction::Params params;
   bool keep_dim;
   int dim;
-  std::string op;
+  char op[MAX_OPNAME_LEN];
   bool reduce_all;
 };
 
@@ -114,9 +114,9 @@ void MeanKernel(const Context& dev_ctx,
   auto rank = static_cast<int32_t>(x.dims().size());
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  ReduceParams params;
+  ReduceParams params = {};
   params.keep_dim = keep_dim;
-  params.op = "mean";
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "mean");
   if (dims.size() == 0) {
     params.dim = 0;
     params.reduce_all = true;
@@ -164,9 +164,9 @@ void MaxKernel(const Context& dev_ctx,
   auto rank = static_cast<int32_t>(x.dims().size());
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  ReduceParams params;
+  ReduceParams params = {};
   params.keep_dim = keep_dim;
-  params.op = "max";
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "max");
   if (dims.size() == 0) {
     params.dim = 0;
     params.reduce_all = true;
@@ -213,9 +213,9 @@ void MinKernel(const Context& dev_ctx,
   auto rank = static_cast<int32_t>(x.dims().size());
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  ReduceParams params;
+  ReduceParams params = {};
   params.keep_dim = keep_dim;
-  params.op = "min";
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "min");
   if (dims.size() == 0) {
     params.dim = 0;
     params.reduce_all = true;
@@ -263,9 +263,9 @@ void SumKernel(const Context& dev_ctx,
   auto rank = static_cast<int32_t>(x.dims().size());
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  ReduceParams params;
+  ReduceParams params = {};
   params.keep_dim = keep_dim;
-  params.op = "sum";
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "sum");
   if (dims.size() == 0) {
     params.dim = 0;
     params.reduce_all = true;
@@ -313,9 +313,9 @@ void ProdKernel(const Context& dev_ctx,
   auto rank = static_cast<int32_t>(x.dims().size());
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
-  ReduceParams params;
+  ReduceParams params = {};
   params.keep_dim = keep_dim;
-  params.op = "prod";
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "prod");
   if (dims.size() == 0) {
     params.dim = 0;
     params.reduce_all = true;
@@ -365,7 +365,8 @@ PD_REGISTER_PLUGIN_KERNEL(sum,
                           float,
                           phi::dtype::float16,
                           phi::dtype::bfloat16,
-                          int32_t) {}
+                          int32_t,
+                          int64_t) {}
 
 PD_REGISTER_PLUGIN_KERNEL(max,
                           intel_hpu,

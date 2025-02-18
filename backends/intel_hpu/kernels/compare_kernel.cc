@@ -19,7 +19,7 @@
 namespace custom_kernel {
 
 struct CompareParams {
-  std::string op;
+  char op[MAX_OPNAME_LEN];
 };
 
 class Compare : public HpuOperator {
@@ -47,7 +47,8 @@ class Compare : public HpuOperator {
                                          outputs[i].name));
     }
 
-    std::string guid = params.op + "_fwd_" + SynDataTypeToStr(inputs[0].type);
+    std::string guid =
+        std::string(params.op) + "_fwd_" + SynDataTypeToStr(inputs[0].type);
 
     synStatus status = synNodeCreate(graphHandle_,
                                      syn_inputs.data(),
@@ -57,7 +58,7 @@ class Compare : public HpuOperator {
                                      nullptr,
                                      0,
                                      guid.c_str(),
-                                     params.op.c_str(),
+                                     params.op,
                                      nullptr,
                                      nullptr);
     PD_CHECK(
@@ -139,7 +140,7 @@ class CompareCast : public HpuOperator {
                                          outputs[i].name));
     }
 
-    std::string guid = params.op + "_fwd_i32";
+    std::string guid = std::string(params.op) + "_fwd_i32";
 
     status = synNodeCreate(graphHandle_,
                            syn_inputs.data(),
@@ -149,7 +150,7 @@ class CompareCast : public HpuOperator {
                            nullptr,
                            0,
                            guid.c_str(),
-                           params.op.c_str(),
+                           params.op,
                            nullptr,
                            nullptr);
     PD_CHECK(status == synSuccess,
@@ -238,8 +239,8 @@ void NotEqualRawKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  CompareParams params;
-  params.op = "not_equal";
+  CompareParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "not_equal");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, CompareParams>(
@@ -289,8 +290,8 @@ void EqualRawKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  CompareParams params;
-  params.op = "equal";
+  CompareParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "equal");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, CompareParams>(
@@ -334,8 +335,8 @@ void LessThanRawKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  CompareParams params;
-  params.op = "less";
+  CompareParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "less");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, CompareParams>(
@@ -385,8 +386,8 @@ void LessEqualRawKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  CompareParams params;
-  params.op = "less_equal";
+  CompareParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "less_equal");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, CompareParams>(
@@ -436,8 +437,8 @@ void GreaterThanRawKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  CompareParams params;
-  params.op = "greater";
+  CompareParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "greater");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, CompareParams>(
@@ -487,8 +488,8 @@ void GreaterEqualRawKernel(const Context& dev_ctx,
   ct.Add(y);
   ct.Add(out, false);
 
-  CompareParams params;
-  params.op = "greater_equal";
+  CompareParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "greater_equal");
   std::vector<DIMS> inputs_dims = ct.GetDims();
   OpCacheOperator op_info;
   op_info.prepareOpInfo<T, CompareParams>(
