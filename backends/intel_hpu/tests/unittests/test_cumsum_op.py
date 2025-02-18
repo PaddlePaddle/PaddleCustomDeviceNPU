@@ -21,8 +21,12 @@ from tests.op_test import OpTest
 import paddle
 
 import os
+from util import enable_paddle_static_mode
 
 intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+intel_hpus_static_mode = os.environ.get(
+    "FLAGS_static_mode_intel_hpus", 0
+)  # default is dynamic mode test FLAGS_static_mode_intel_hpus=0
 
 
 class TestHPUCumSumOp(OpTest):
@@ -38,6 +42,7 @@ class TestHPUCumSumOp(OpTest):
     def set_hpu(self):
         self.__class__.use_custom_device = True
         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
+        enable_paddle_static_mode(int(intel_hpus_static_mode))
 
     def init_dtype(self):
         self.dtype = np.int32
