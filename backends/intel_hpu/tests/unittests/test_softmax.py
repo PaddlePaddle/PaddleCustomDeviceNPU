@@ -23,14 +23,20 @@ from tests.op_test import OpTest
 SEED = 2021
 
 import os
+from util import enable_paddle_static_mode
 
 intel_hpus_module_id = os.environ.get("FLAGS_selected_intel_hpus", 0)
+intel_hpus_static_mode = os.environ.get(
+    "FLAGS_static_mode_intel_hpus", 0
+)  # default is dynamic mode test FLAGS_static_mode_intel_hpus=0
 
 
 class TestSoftmax(OpTest):
     def setUp(self):
         self.set_npu()
         self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
+        enable_paddle_static_mode(int(intel_hpus_static_mode))
+
         self.op_type = "softmax"
         self.init_dtype()
 
