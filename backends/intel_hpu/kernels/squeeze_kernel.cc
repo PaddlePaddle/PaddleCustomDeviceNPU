@@ -23,6 +23,12 @@ struct SqueezeParams {
   synSqueezeParams params;
 };
 
+struct UnsqueezParams {
+  synExpandDimsParams params;
+};
+
+#define USE_HPU_EXPAND_DIMS_OP 0
+
 class Squeeze : public HpuOperator {
  public:
   Squeeze() : HpuOperator("squeeze") {}
@@ -121,6 +127,50 @@ class SqueezeNull : public HpuOperator {
   }
 };
 
+class Unsqueeze : public HpuOperator {
+ public:
+  Unsqueeze() : HpuOperator("expand_dims") {}
+
+  void AddNode(ConvertTensors& ct, UnsqueezParams& params) {
+    auto inputs = ct.GetTensors();
+    auto outputs = ct.GetTensors(false);
+
+    synSectionHandle section = nullptr;
+    if (inputs[0].device_addr == outputs[0].device_addr) {
+      section = createSection();
+    }
+
+    synTensor syn_inputs[1] = {createTensor(inputs[0].dims.size(),
+                                            inputs[0].type,
+                                            inputs[0].dims,
+                                            true,
+                                            inputs[0].name,
+                                            section)};
+
+    synTensor syn_outputs[1] = {createTensor(outputs[0].dims.size(),
+                                             outputs[0].type,
+                                             outputs[0].dims,
+                                             true,
+                                             outputs[0].name,
+                                             section)};
+
+    synStatus status = synNodeCreate(graphHandle_,
+                                     syn_inputs,
+                                     syn_outputs,
+                                     1,
+                                     1,
+                                     &params.params,
+                                     sizeof(params.params),
+                                     guid_.c_str(),
+                                     "unsqueeze",
+                                     nullptr,
+                                     nullptr);
+
+    PD_CHECK(
+        status == synSuccess, "[RUNTIME] synNodeCreate () failed = ", status);
+  }
+};
+
 template <typename T, typename Context>
 void SqueezeKernel(const Context& dev_ctx,
                    const phi::DenseTensor& x,
@@ -198,6 +248,61 @@ void SqueezeWithXShapeKernel(const Context& dev_ctx,
   custom_kernel::SqueezeKernel<T, Context>(dev_ctx, x, axes_int_array, out);
 }
 
+template <typename T, typename Context>
+void UnsqueezeKernel(const Context& dev_ctx,
+                     const phi::DenseTensor& x,
+                     const phi::IntArray& axes_int_array,
+                     phi::DenseTensor* out) {
+  VLOG(4) << "Call intel_hpu UnsqueezeKernel";
+  dev_ctx.template Alloc<T>(out);
+#if USE_HPU_EXPAND_DIMS_OP
+  std::vector<int32_t> axes(axes_int_array.GetData().begin(),
+                            axes_int_array.GetData().end());
+
+  PADDLE_ENFORCE_LT(axes.size(),
+                    2,
+                    phi::errors::InvalidArgument(
+                        "Intel HPU only support axis.size() = 1 at present."));
+
+  ConvertTensors ct;
+  ct.Add(x);
+  ct.Add(out, false);
+
+  synRecipeHandle recipe = nullptr;
+
+  std::string op_name =
+      (x.data() == out->data()) ? "_UnsqueezeKernel" : "UnsqueezeKernel";
+
+  std::vector<int32_t> dims = axes;
+  for (auto& dim : dims) {
+    if (dim < 0) {
+      dim += (x.dims().size() + 1);
+    }
+  }
+
+  OpCacheOperator op_info;
+  UnsqueezParams params;
+  params.params.axis = dims[0];
+
+  std::vector<DIMS> inputs_dims = ct.GetDims();
+  op_info.prepareOpInfo<T, UnsqueezParams>(op_name, inputs_dims, &params);
+  recipe = op_info.GetRecipe();
+  if (recipe == nullptr) {
+    Unsqueeze op;
+
+    op.AddNode(ct, params);
+    op.Compile();
+    op_info.setOp(op);
+
+    recipe = op_info.GetRecipe();
+  }
+
+  std::map<std::string, uint64_t> tensors = ct.GetDeviceAddr();
+  RecipeRunner runner(recipe);
+  runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
+#endif
+}
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(squeeze,
@@ -219,3 +324,15 @@ PD_REGISTER_PLUGIN_KERNEL(squeeze_with_xshape,
                           float,
                           int32_t,
                           int64_t) {}
+
+PD_REGISTER_PLUGIN_KERNEL(unsqueeze,
+                          intel_hpu,
+                          ALL_LAYOUT,
+                          custom_kernel::UnsqueezeKernel,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16,
+                          float,
+                          int8_t,
+                          int32_t,
+                          int64_t,
+                          bool) {}
