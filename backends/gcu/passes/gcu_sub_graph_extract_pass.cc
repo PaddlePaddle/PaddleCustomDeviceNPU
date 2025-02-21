@@ -62,7 +62,8 @@ class GcuSubGraphExtractPass : public pir::Pass {
 
     std::vector<GroupOpsVec> groups =
         pir::DetectSubGraphs(&block, IsSupportedByGCU);
-    AddStatistics(groups.size());
+    VLOG(3) << "GcuSubGraphExtractPass, detected " << groups.size()
+            << " groups.";
     for (auto& group_ops : groups) {
       if (group_ops.size() <
           static_cast<size_t>(FLAGS_custom_engine_min_group_size)) {
