@@ -276,12 +276,8 @@ void ScatterKernel(const Context& dev_ctx,
   if (index_dims.size() == 2) {
     PD_CHECK(index_dims[1] != 1,
              "Scatter's index 2nd dim must be 1 for 2D index");
-  } else if (index_dims.size() == 1) {
+  } else if ((index_dims.size() == 1) && (update_dims.size() > 1)) {
     index_dims.push_back(1);
-  } else {
-    PADDLE_THROW(
-        phi::errors::InvalidArgument("Scatter requires the index type "
-                                     "be either int32 or int64."));
   }
 
   // generate kernel name
@@ -344,4 +340,5 @@ PD_REGISTER_PLUGIN_KERNEL(scatter,
                           custom_kernel::ScatterKernel,
                           float,
                           phi::dtype::float16,
-                          phi::dtype::bfloat16) {}
+                          phi::dtype::bfloat16,
+                          int) {}

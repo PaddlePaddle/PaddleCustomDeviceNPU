@@ -198,5 +198,56 @@ class test_scatter_fp32_ow_2(test_scatter_fp32_ow):
         self.attrs = {"overwrite": True}
 
 
+class test_scatter_f32_1D_no_ow(OpTest):
+    def setUp(self):
+        self.set_hpu()
+        self.op_type = "scatter"
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
+        self.python_api = paddle.scatter
+
+        x = np.array([1, 2, 3, 4, 5, 6]).astype("float32")
+        index = np.array([2, 1, 0, 1]).astype("int32")
+        updates = np.array([30, -10, 10, 30]).astype("float32")
+
+        outputs = np.copy(x)
+        outputs[index] = 0
+        for i in range(0, len(index)):
+            outputs[index[i]] += updates[i]
+        self.inputs = {"X": x, "Ids": index, "Updates": updates}
+        self.outputs = {"Out": outputs}
+        self.attrs = {"overwrite": False}
+
+    def set_hpu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+
+class test_scatter_f32_1D_ow(test_scatter_f32_1D_no_ow):
+    def setUp(self):
+        self.set_hpu()
+        self.op_type = "scatter"
+        self.place = paddle.CustomPlace("intel_hpu", int(intel_hpus_module_id))
+        self.python_api = paddle.scatter
+
+        x = np.array([1, 2, 3, 4, 5, 6]).astype("float32")
+        index = np.array([2, 1, 0, 1]).astype("int32")
+        updates = np.array([30, -10, 10, 30]).astype("float32")
+
+        outputs = np.copy(x)
+        for i in range(0, len(index)):
+            outputs[index[i]] = updates[i]
+        self.inputs = {"X": x, "Ids": index, "Updates": updates}
+        self.outputs = {"Out": outputs}
+        self.attrs = {"overwrite": True}
+
+    def set_hpu(self):
+        self.__class__.use_custom_device = True
+
+    def test_check_output(self):
+        self.check_output_with_place(self.place)
+
+
 if __name__ == "__main__":
     unittest.main()
