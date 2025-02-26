@@ -175,6 +175,41 @@ void LogicalAndKernel(const Context& dev_ctx,
   runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
 }
 
+template <typename T, typename Context>
+void LogicalXorKernel(const Context& dev_ctx,
+                      const phi::DenseTensor& x,
+                      const phi::DenseTensor& y,
+                      phi::DenseTensor* out) {
+  dev_ctx.template Alloc<bool>(out);
+  OpCacheOperator op_info;
+  ConvertTensors ct;
+  ct.Add(x);
+  ct.Add(y);
+  ct.Add(out, false);
+
+  LogicalParams params = {};
+  snprintf(params.op, MAX_OPNAME_LEN, "%s", "xor");
+  std::vector<DIMS> inputs_dims = ct.GetDims();
+  std::string op_name =
+      (x.data() == out->data()) ? "_LogicalXorKernel" : "LogicalXorKernel";
+  op_info.prepareOpInfo<T, nullptr_t>(op_name, inputs_dims, nullptr);
+  auto recipe = op_info.GetRecipe();
+
+  if (recipe == nullptr) {
+    Logical op;
+
+    op.AddNode(ct, params);
+    op.Compile();
+    op_info.setOp(op);
+
+    recipe = op_info.GetRecipe();
+  }
+
+  std::map<std::string, uint64_t> tensors = ct.GetDeviceAddr();
+  RecipeRunner runner(recipe);
+  runner.Run(reinterpret_cast<C_Stream>(dev_ctx.stream()), tensors);
+}
+
 }  // namespace custom_kernel
 
 PD_REGISTER_PLUGIN_KERNEL(logical_not,
@@ -182,10 +217,8 @@ PD_REGISTER_PLUGIN_KERNEL(logical_not,
                           ALL_LAYOUT,
                           custom_kernel::LogicalNotKernel,
                           bool,
-                          int,
-                          int64_t,
-                          float,
-                          double,
+                          int8_t,
+                          uint8_t,
                           phi::dtype::float16) {
   kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
 }
@@ -195,11 +228,11 @@ PD_REGISTER_PLUGIN_KERNEL(logical_or,
                           ALL_LAYOUT,
                           custom_kernel::LogicalOrKernel,
                           bool,
-                          int,
-                          int64_t,
+                          int8_t,
+                          uint8_t,
                           float,
-                          double,
-                          phi::dtype::float16) {
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {
   kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
 }
 
@@ -208,10 +241,23 @@ PD_REGISTER_PLUGIN_KERNEL(logical_and,
                           ALL_LAYOUT,
                           custom_kernel::LogicalAndKernel,
                           bool,
-                          int,
-                          int64_t,
+                          int8_t,
+                          uint8_t,
                           float,
-                          double,
-                          phi::dtype::float16) {
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {
+  kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
+}
+
+PD_REGISTER_PLUGIN_KERNEL(logical_xor,
+                          intel_hpu,
+                          ALL_LAYOUT,
+                          custom_kernel::LogicalXorKernel,
+                          bool,
+                          int8_t,
+                          uint8_t,
+                          float,
+                          phi::dtype::float16,
+                          phi::dtype::bfloat16) {
   kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
 }
