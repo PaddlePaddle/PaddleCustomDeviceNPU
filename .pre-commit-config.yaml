@@ -90,8 +90,8 @@ repos:
     rev: v0.6.13
     hooks:
     -   id: cmake-format
--   repo: https://github.com/cmake-lint/cmake-lint
-    rev: 1.4.2
+-   repo: https://github.com/PFCCLab/cmake-lint-paddle
+    rev: v1.5.1
     hooks:
     -   id: cmakelint
         args: [--config=./tools/codestyle/.cmakelintrc]
