@@ -51,6 +51,7 @@ typedef struct aclIntArray aclIntArray;
 typedef struct aclFloatArray aclFloatArray;
 typedef struct aclBoolArray aclBoolArray;
 typedef struct aclTensorList aclTensorList;
+
 typedef aclTensor* (*_aclCreateTensor)(const int64_t* view_dims,
                                        uint64_t view_dims_num,
                                        aclDataType data_type,
@@ -60,14 +61,14 @@ typedef aclTensor* (*_aclCreateTensor)(const int64_t* view_dims,
                                        const int64_t* storage_dims,
                                        uint64_t storage_dims_num,
                                        void* tensor_data);
-typedef aclScalar* (*_aclCreateScalar)(void* value,
-                                       aclDataType data_type);
-typedef aclIntArray* (*_aclCreateIntArray)(const int64_t* value,
-                                           uint64_t size);
+typedef aclScalar* (*_aclCreateScalar)
+        (void* value, aclDataType data_type);
+typedef aclIntArray* (*_aclCreateIntArray)
+        (const int64_t* value, uint64_t size);
 typedef aclFloatArray* (*_aclCreateFloatArray)
-    (const float* value, uint64_t size);
-typedef aclBoolArray* (*_aclCreateBoolArray)(const bool* value,
-                                             uint64_t size);
+        (const float* value, uint64_t size);
+typedef aclBoolArray* (*_aclCreateBoolArray)
+        (const bool* value, uint64_t size);
 typedef aclTensorList* (*_aclCreateTensorList)
         (const aclTensor* const* value, uint64_t size);
 
@@ -82,6 +83,31 @@ typedef int (*InitHugeMemThreadLocal)(void*, bool);
 typedef void (*UnInitHugeMemThreadLocal)(void*, bool);
 typedef void (*ReleaseHugeMem)(void*, bool);
 typedef aclOpExecutor*(*PTAGetExecCache) (uint64_t, uint64_t*);
+typedef void (*InitPTACacheThreadLocal)();
+typedef void (*SetPTAHashKey)(uint64_t);
+typedef bool (*CanUsePTACache)(const char *);
+typedef void (*UnInitPTACacheThreadLocal)();
+
+constexpr int g_hash_buf_size = 8192;
+constexpr int g_hash_buf_max_size = g_hash_buf_size + 1024;
+extern thread_local char g_hash_buf[g_hash_buf_size];
+extern thread_local int g_hash_offset;
+
+uint64_t calc_hash_id();
+
+uint64_t gen_hash(const void *,
+                  const int,
+                  const uint32_t);
+
+using OpApiFunc = int (*)(void *, uint64_t, aclOpExecutor *, const aclrtStream);
+
+#define MEMCPY_TO_BUF(data_expression, size_expression)                   \
+    if (g_hash_offset + (size_expression) > g_hash_buf_size) {            \
+        g_hash_offset = g_hash_buf_max_size;                              \
+        return;                                                           \
+    }                                                                     \
+    memcpy(g_hash_buf + g_hash_offset, data_expression, size_expression); \
+    g_hash_offset += size_expression;
 
 #define GET_OP_API_FUNC(apiName)                           \
   reinterpret_cast<_##apiName>(GetOpApiFuncAddr(#apiName)) \
@@ -187,14 +213,52 @@ void ReleaseConvertTypes(const Tuple& t) {
   CallRelease(t, std::make_index_sequence<size>{});
 }
 
-template <std::size_t N>
-inline aclBoolArray* ConvertType(const std::array<bool, N> &value) {
-    static const auto aclCreateBoolArray = GET_OP_API_FUNC(aclCreateBoolArray);
-    if (aclCreateBoolArray == nullptr) {
-      return nullptr;
-    }
-    auto array = aclCreateBoolArray(value.data(), value.size());
-    return array;
+inline aclTensor* ConvertType(const phi::DenseTensor& at_tensor) {
+  // create aclDataBuffer
+  static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
+  if (aclCreateTensor == nullptr) {
+    return nullptr;
+  }
+  if (!at_tensor.initialized()) {
+    return nullptr;
+  }
+  auto at_tensor_dtype = at_tensor.dtype();
+
+  if (at_tensor_dtype == phi::DataType::FLOAT64) {
+    VLOG(2) << "Kernel is running on the AICPU."
+            << "For better performance. use other dtypes.";
+  }
+  auto acl_data_type = ConvertToNpuDtype(at_tensor_dtype);
+  const auto dimNum =
+      at_tensor.dims().size() == 0 ? 1 : at_tensor.dims().size();
+  std::vector<int64_t> storageDims(dimNum - 1);
+  // std::vector<int64_t> storageDims(5);
+  if (acl_data_type != ACL_STRING) {
+    storageDims.push_back(at_tensor.numel() * sizeof(at_tensor_dtype));
+  }
+  aclFormat format = ACL_FORMAT_ND;
+  switch (dimNum) {
+    case 4:
+      format = ACL_FORMAT_NCHW;
+      break;
+    case 5:
+      format = ACL_FORMAT_NCDHW;
+      break;
+    default:
+      format = ACL_FORMAT_ND;
+  }
+  auto origin_dims = phi::vectorize(at_tensor.dims());
+  auto origin_strides = phi::vectorize(at_tensor.strides());
+  auto acl_tensor = aclCreateTensor(origin_dims.data(),
+                                    origin_dims.size(),
+                                    acl_data_type,
+                                    origin_strides.data(),
+                                    0,
+                                    format,
+                                    origin_dims.data(),
+                                    storageDims.size(),
+                                    const_cast<void*>(at_tensor.data()));
+  return acl_tensor;
 }
 
 inline aclScalar* ConvertType(const phi::Scalar& at_scalar) {
@@ -211,6 +275,16 @@ inline aclScalar* ConvertType(const phi::Scalar& at_scalar) {
       acl_scalar = aclCreateScalar(&value, acl_data_type);
       break;
     }
+    // case phi::DataType::FLOAT16: {
+    //   auto value = static_cast<phi::dtype::float16>(at_scalar.to<float>());
+    //   acl_scalar = aclCreateScalar(&value, acl_data_type);
+    //   break;
+    // }
+    // case phi::DataType::BFLOAT16: {
+    //   auto value = static_cast<phi::dtype::bfloat16>(at_scalar.to<float>());
+    //   acl_scalar = aclCreateScalar(&value, acl_data_type);
+    //   break;
+    // }
     case phi::DataType::FLOAT64: {
       double value = at_scalar.to<double>();
       acl_scalar = aclCreateScalar(&value, acl_data_type);
@@ -238,53 +312,34 @@ inline aclScalar* ConvertType(const phi::Scalar& at_scalar) {
   return acl_scalar;
 }
 
-inline aclTensor* ConvertType(const phi::DenseTensor& at_tensor) {
-  // create aclDataBuffer
-  static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
-  if (aclCreateTensor == nullptr) {
+inline aclIntArray *ConvertType(const phi::IntArray &phi_array) {
+  static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
+  if (aclCreateIntArray == nullptr) {
     return nullptr;
   }
+  std::vector<int64_t> temp_array(
+    phi_array.GetData().begin(), phi_array.GetData().end());
+  auto array = aclCreateIntArray(temp_array.data(), temp_array.size());
+  return array;
+}
 
-  if (at_tensor.numel() == 0 && (at_tensor.dims().size() < 0)) {
+inline aclIntArray* ConvertType(const std::vector<int64_t>& at_array) {
+  static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
+  if (aclCreateIntArray == nullptr) {
     return nullptr;
   }
-  auto at_tensor_dtype = at_tensor.dtype();
+  auto array = aclCreateIntArray(at_array.data(), at_array.size());
+  return array;
+}
 
-  if (at_tensor_dtype == phi::DataType::FLOAT64) {
-    VLOG(2) << "Kernel is running on the AICPU."
-            << "For better performance. use other dtypes.";
+template <std::size_t N>
+inline aclBoolArray* ConvertType(const std::array<bool, N> &value) {
+  static const auto aclCreateBoolArray = GET_OP_API_FUNC(aclCreateBoolArray);
+  if (aclCreateBoolArray == nullptr) {
+    return nullptr;
   }
-  auto acl_data_type = ConvertToNpuDtype(at_tensor_dtype);
-  const auto dimNum =
-      at_tensor.dims().size() == 0 ? 1 : at_tensor.dims().size();
-  std::vector<int64_t> storageDims(dimNum - 1);
-  if (acl_data_type != ACL_STRING) {
-    storageDims.push_back(at_tensor.numel() * sizeof(at_tensor_dtype));
-  }
-  aclFormat format = ACL_FORMAT_ND;
-  switch (dimNum) {
-    case 4:
-      format = ACL_FORMAT_NCHW;
-      break;
-    case 5:
-      format = ACL_FORMAT_NCDHW;
-      break;
-    default:
-      format = ACL_FORMAT_ND;
-  }
-  auto origin_dims = phi::vectorize(at_tensor.dims());
-  auto origin_strides = phi::vectorize(at_tensor.strides());
-
-  auto acl_tensor = aclCreateTensor(origin_dims.data(),
-                                    origin_dims.size(),
-                                    acl_data_type,
-                                    origin_strides.data(),
-                                    0,
-                                    format,
-                                    origin_dims.data(),
-                                    storageDims.size(),
-                                    const_cast<void*>(at_tensor.data()));
-  return acl_tensor;
+  auto array = aclCreateBoolArray(value.data(), value.size());
+  return array;
 }
 
 template <typename T>
@@ -397,26 +452,6 @@ inline aclTensorList *ConvertType(
   return acl_tensor_list;
 }
 
-inline aclIntArray* ConvertType(const std::vector<int64_t>& at_array) {
-  static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
-  if (aclCreateIntArray == nullptr) {
-    return nullptr;
-  }
-  auto array = aclCreateIntArray(at_array.data(), at_array.size());
-  return array;
-}
-
-inline aclIntArray *ConvertType(const phi::IntArray &phi_array) {
-  static const auto aclCreateIntArray = GET_OP_API_FUNC(aclCreateIntArray);
-  if (aclCreateIntArray == nullptr) {
-    return nullptr;
-  }
-  std::vector<int64_t> temp_array(
-    phi_array.GetData().begin(), phi_array.GetData().end());
-  auto array = aclCreateIntArray(temp_array.data(), temp_array.size());
-  return array;
-}
-
 template <typename T>
 T ConvertType(T value) {
   return value;
@@ -470,6 +505,103 @@ inline void SetDeterministic() {
 #endif
 }
 
+template <std::size_t N>
+void add_param_to_buf(const std::array<bool, N> &value) {
+  MEMCPY_TO_BUF(value.data(),                                 \
+    static_cast<int64_t>(value.size() * sizeof(bool)));
+}
+
+#include <typeinfo>
+template <typename T> void add_param_to_buf(const T &value) {
+  MEMCPY_TO_BUF(&value, sizeof(T));
+}
+
+void add_param_to_buf(const phi::DenseTensor &);
+void add_param_to_buf(const phi::Scalar &);
+void add_param_to_buf(const phi::IntArray &);
+void add_param_to_buf(const std::vector<phi::DenseTensor*> &);
+void add_param_to_buf(const std::string &);
+void add_param_to_buf();
+
+template <typename T, typename... Args>
+void add_param_to_buf(const T &arg, Args &...args) {
+    add_param_to_buf(arg);
+    add_param_to_buf(args...);
+}
+
+inline void UnInitCacheThreadLocal() {
+  static const auto unInitPTACacheThreadLocalAddr =
+    GetOpApiFuncAddr("UnInitPTACacheThreadLocal");
+  UnInitPTACacheThreadLocal unInitPTACacheThreadLocalFunc =
+    reinterpret_cast<UnInitPTACacheThreadLocal>(unInitPTACacheThreadLocalAddr);
+  if (unInitPTACacheThreadLocalFunc) {
+    unInitPTACacheThreadLocalFunc();
+  }
+}
+
+static std::unordered_set<std::string> blacklist = {
+  "aclnnMatmul",
+  "aclnnMuls",
+};
+
+inline bool isInBlacklist(const std::string& aclnn_api) {
+  return blacklist.find(aclnn_api) != blacklist.end();
+}
+
+template <typename... Args> bool hit_cache(const phi::CustomContext& dev_ctx, \
+  aclrtStream acl_stream, const char *aclnn_api, void *phrase2,               \
+  Args &&...args) {
+  if (isInBlacklist(aclnn_api)) {
+      return false;
+  }
+  static const auto ptaGetExecCacheAddr = GetOpApiFuncAddr("PTAGetExecCache");
+  static const auto initPTACacheThreadLocalAddr =
+    GetOpApiFuncAddr("InitPTACacheThreadLocal");
+  static const auto setPTAHashKeyAddr = GetOpApiFuncAddr("SetPTAHashKey");
+  static const auto canUsePTACacheAddr = GetOpApiFuncAddr("CanUsePTACache");
+
+  PTAGetExecCache ptaGetExecCacheFunc =
+    reinterpret_cast<PTAGetExecCache>(ptaGetExecCacheAddr);
+  InitPTACacheThreadLocal initPTACacheThreadLocalFunc =
+    reinterpret_cast<InitPTACacheThreadLocal>(initPTACacheThreadLocalAddr);
+  SetPTAHashKey setPTAHashKeyFunc =
+    reinterpret_cast<SetPTAHashKey>(setPTAHashKeyAddr);
+  CanUsePTACache canUsePTACacheFunc =
+    reinterpret_cast<CanUsePTACache>(canUsePTACacheAddr);
+  bool has_func =
+    ptaGetExecCacheFunc && initPTACacheThreadLocalFunc && setPTAHashKeyFunc;
+  bool can_use = canUsePTACacheFunc && canUsePTACacheFunc(aclnn_api);
+  if (!has_func || !can_use) {
+      return false;
+  }
+  uint64_t workspace_size = 0;
+  uint64_t *workspace_size_addr = &workspace_size;
+  initPTACacheThreadLocalFunc();
+  g_hash_offset = 0;
+  add_param_to_buf(std::string(aclnn_api), args...);
+  uint64_t hashId = calc_hash_id();
+
+  setPTAHashKeyFunc(hashId);
+  aclOpExecutor *executor = ptaGetExecCacheFunc(hashId, workspace_size_addr);
+  if (executor == nullptr) {
+      return false;
+  }
+  void *workspace_addr = nullptr;
+  if (workspace_size != 0) {
+    phi::Allocator::AllocationPtr workspace_tensor =                    \
+      const_cast<phi::Allocator &>((dev_ctx).GetAllocator()).           \
+        Allocate(workspace_size);                                       \
+    workspace_addr = const_cast<void*>(workspace_tensor->ptr());
+  }
+
+  OpApiFunc opApiFunc = reinterpret_cast<OpApiFunc>(phrase2);
+  auto api_ret =
+    opApiFunc(workspace_addr, workspace_size, executor, acl_stream);
+  UnInitCacheThreadLocal();
+  return true;
+}
+
+
 #define EXEC_NPU_CMD(aclnn_api, dev_ctx, ...)                             \
   do {                                                                    \
     VLOG(1) << "NpuAclnnOpRunner: " << #aclnn_api;                        \
@@ -492,6 +624,10 @@ inline void SetDeterministic() {
       reinterpret_cast<InitHugeMemThreadLocal>(initMemAddr);              \
     UnInitHugeMemThreadLocal unInitMemFunc =                              \
       reinterpret_cast<UnInitHugeMemThreadLocal>(unInitMemAddr);          \
+    if (hit_cache(dev_ctx, acl_stream, #aclnn_api,                        \
+                  opApiFuncAddr, __VA_ARGS__)) {                          \
+      break;                                                              \
+    }                                                                     \
     if (initMemFunc) {                                                    \
       initMemFunc(nullptr, false);                                        \
     }                                                                     \
@@ -521,6 +657,7 @@ inline void SetDeterministic() {
     if (releaseMemFunc) {                                                 \
       releaseMemFunc(nullptr, false);                                     \
     }                                                                     \
+    UnInitCacheThreadLocal();                                             \
   } while (false)
 
 #define DO_COMPATIBILITY(aclnn_api, originCallExpression)                 \
