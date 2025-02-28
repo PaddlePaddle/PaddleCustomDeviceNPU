@@ -43,9 +43,9 @@ def chatglm_fuse_attention_layer():
             x=hidden_state,
         )
         qkv_proj = ir.PassDesc.OP.matmul_v2(X=input_norm.Output("out"), Y=qkv_weight)
+        qkv = ir.PassDesc.OP.elementwise_add(X=qkv_proj.Output("Out"), Y=qkv_bias)
         blha = ir.PassDesc.OP.block_multihead_attention(
-            qkv=qkv_proj.Output("Out"),
-            qkv_bias=qkv_bias,
+            qkv=qkv.Output("Out"),
             key_cache=key_cache,
             value_cache=value_cache,
             seq_lens_encoder=seq_lens_encoder,
@@ -183,9 +183,9 @@ def chatglm_fuse_attention_layer_begin():
             x=embedding.Output("Out"),
         )
         qkv_proj = ir.PassDesc.OP.matmul_v2(X=input_norm.Output("out"), Y=qkv_weight)
+        qkv = ir.PassDesc.OP.elementwise_add(X=qkv_proj.Output("Out"), Y=qkv_bias)
         blha = ir.PassDesc.OP.block_multihead_attention(
-            qkv=qkv_proj.Output("Out"),
-            qkv_bias=qkv_bias,
+            qkv=qkv.Output("Out"),
             key_cache=key_cache,
             value_cache=value_cache,
             seq_lens_encoder=seq_lens_encoder,
@@ -324,9 +324,9 @@ def chatglm_fuse_attention_layer_end():
             x=hidden_state,
         )
         qkv_proj = ir.PassDesc.OP.matmul_v2(X=input_norm.Output("out"), Y=qkv_weight)
+        qkv = ir.PassDesc.OP.elementwise_add(X=qkv_proj.Output("Out"), Y=qkv_bias)
         blha = ir.PassDesc.OP.block_multihead_attention(
-            qkv=qkv_proj.Output("Out"),
-            qkv_bias=qkv_bias,
+            qkv=qkv.Output("Out"),
             key_cache=key_cache,
             value_cache=value_cache,
             seq_lens_encoder=seq_lens_encoder,
